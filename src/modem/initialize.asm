@@ -12,8 +12,8 @@
   pha
   plb
 
+  stz $4201 ; 必要ないかもしれない
   lda #$80
-  stz $4201
   sta $4201
 
   nop
