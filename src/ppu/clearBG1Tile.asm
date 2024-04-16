@@ -1,9 +1,12 @@
-; BG1 の Tile(#$0000 - #$4000)を 0 で埋めてクリアする。起動直後に呼ばれることを期待している。
+; Clear BG1 Tile(#$0000 - #$4000) with 0. Expected to be called just after booting.
 .macro clearBG1Tile
+  .a16
+  .i16
+
   lda #$0000
   sta rVRamAddress
 
-  ldy #$4000
+  ldy #$8000
 
   lda #$0000
 

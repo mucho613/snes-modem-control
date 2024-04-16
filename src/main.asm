@@ -2,70 +2,70 @@
 
 .import initializeRegisters
 .import transferText
-.import textWritePosition
-.import copyPalettes
+.import copyPalette
+.import copyPattern
+.import copyText
 .import VBlank
+.import initializeModem
 
 .include "./registers.inc"
 .include "ppu/clearBG1Tile.asm"
-.include "ppu/fontDisplayTileMap.asm"
 
 .segment "RODATA"
-.export FontHeader, FontBody, Text
-FontHeader:
-  .incbin "../assets/fontHeader.bin"
-FontBody:
-  .incbin "../assets/fontBody.bin"
-Text:
-  .incbin "../assets/test-utf-16le.txt"
 
 .segment "STARTUP"
 .proc Reset
+  sei
   clc
   xce
 
   phk
   plb
 
-  jsr initializeRegisters
-
   rep #$30
   .a16
   .i16
 
-  clearBG1Tile ; BG1 のタイルマップをクリアする
-  fontDisplayTileMap ; BG1 にフォントを並べて表示する
+  jsr initializeRegisters
 
   ldx #$1fff ; Stack pointer value set
   txs
 
-  jsr copyPalettes ; Palette のコピー
+  clearBG1Tile
+  jsr copyPalette ; Copy palette
+  jsr copyPattern ; Copy pattern
 
-  jsr transferText ; テキストの転送
+  jsr copyText    ; Copy text
 
-  sep #$20
+  sep #$30
   .a8
-
-  lda #$00
-  pha
-  plb
+  .i8
 
   lda #$40
   sta $2107 ; BG 1 Address and Size
 
   lda #$01
   sta $212c ; Background and Object Enable (Main Screen)
-  stz $212d ; Background and Object Enable (Sub Screen)
+  stz $212d ; Background and Object Disable (Sub Screen)
 
   lda #$0f
   sta $2100 ; Screen Display Register
+
+  rep #$30
+  .a16
+  .i16
+
+  jsr initializeModem
+
+  sep #$30
+  .a8
+  .i8
 
   ; Enable NMI
   lda #$80
   sta $4200 ; NMI, V/H Count, and Joypad Enable
 
-  rep #$20
-  .a16
+  cli
 
   rti
 .endproc

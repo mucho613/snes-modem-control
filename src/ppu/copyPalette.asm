@@ -7,18 +7,20 @@ Palette:
 
 .segment "STARTUP"
 
-.export copyPalettes
-.proc copyPalettes
+.export copyPalette
+.proc copyPalette
   .a16
   .i16
 
-  lda #$2121
+  phb
+
+  lda #$2100
   tcd
 
   sep #$20
   .a8
 
-  stz $00 ; $2121: Address for CG-RAM Write
+  stz $21 ; $2121: Address for CG-RAM Write
 
   lda #^Palette
   pha
@@ -29,7 +31,7 @@ Palette:
   @loop:
     lda Palette, x
 
-    sta $01 ; $2122: Data for CG-RAM Write
+    sta $22 ; $2122: Data for CG-RAM Write
 
     inx
     cpx #$0200
@@ -37,6 +39,8 @@ Palette:
 
   rep #$20
   .a16
+
+  plb
 
   rts
 .endproc
