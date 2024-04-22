@@ -12,7 +12,7 @@
   pha
   plb
 
-  stz $4201 ; 必要ないかもしれない
+  stz $4201 ; It may not be necessary
   lda #$80
   sta $4201
 
