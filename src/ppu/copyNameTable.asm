@@ -35,7 +35,7 @@ Text:
     sta $18
     stz $19
     inx
-    cpx #$0400
+    cpx #$0080
     bne @loop
 
   rep #$20
