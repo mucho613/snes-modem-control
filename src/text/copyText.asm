@@ -14,10 +14,10 @@ Text:
 
   phb
 
-  lda #$2116
+  lda #$2100
   tcd
 
-  stz $00
+  stz $16
 
   sep #$20
   .a8
@@ -26,7 +26,7 @@ Text:
   pha
   plb
 
-  ldx #$0000
+  ldx #$0040
 
   @loop:
     lda Text, x
@@ -46,9 +46,17 @@ Text:
 
     plb ; restore the bank
 
+    cmp #$00 ; check for null terminator
+    beq @transferEnd
+
+    cmp #$0d ; check for carriage return
+
+
     inx
     cpx #$0080
     bne @loop
+
+  @transferEnd:
 
   plb
 

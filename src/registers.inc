@@ -6,7 +6,7 @@
 ; OBJ sprite size (S), name secondary select (N), name base address (B).
 ; Type: W8
 ; Bits: SSSN NbBB
-.define OBSEL $2101
+.define OBJSEL $2101
 
 ; OAM word address (A).
 ; Type: W16

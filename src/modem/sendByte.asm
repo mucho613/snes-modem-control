@@ -2,48 +2,11 @@
 
 .segment "STARTUP"
 
-.export initializeModem
-.proc initializeModem
+.export sendByte
+.proc sendByte
   sep #$30
   .a8
   .i8
-
-  lda #$00
-  pha
-  plb
-
-  stz $4201 ; It may not be necessary
-  lda #$80
-  sta $4201
-
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
 
   lda #$01 ; latch
   stz $4016
@@ -51,19 +14,6 @@
   stz $4016
 
   ldx #$10
-
-  nop ; wait
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
-  nop
 
   @loop1:
     lda $4017

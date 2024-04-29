@@ -3,15 +3,30 @@
   .a16
   .i16
 
+  pha
+  phb
+  phx
+  phy
+
   lda #$0000
-  sta rVRamAddress
+  pha
+  plb
+  plb
+
+  lda #$0000
+  sta VMADDL
 
   ldy #$8000
 
   lda #$0000
 
 @loop:
-  sta rVRamDataWrite
+  sta VMDATAL
   dey
   bne @loop
+
+  ply
+  plx
+  plb
+  pla
 .endmacro
