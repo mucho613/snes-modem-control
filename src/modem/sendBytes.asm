@@ -1,67 +1,65 @@
 .setcpu "65816"
 
+.include "../registers.inc"
+
+.import sendByteToModem
+
 .segment "STARTUP"
 
-.export sendBytes
-.proc sendBytes
-  sep #$30
-  .a8
-  .i8
-
-  lda #$01 ; latch
-  stz $4016
-  sta $4016
-  stz $4016
-
-  ldx #$10
-
-  @loop1:
-    lda $4017
-
-    dex
-    bne @loop1
-
-  ; Pulse latch
-  lda #$01
-  stz $4016
-  sta $4016
-  stz $4016
-
-  ; R -> 0101 0010
-  lda #$52
-  pha
-  ldx #$08
-
-  @loop2:
-    pla
-    rol
-    pha
-    lda #$00
-    ror
-
-    pha
-    lda $4017
-    pla
-    sta $4201 ; 0 or 1
-
-    dex
-    bne @loop2
-
-  pla
-
-  lda $4017
-  lda #$80
-  sta $4201 ; 1
-
-  ; Pulse latch
-  lda #$01
-  stz $4016
-  sta $4016
-  stz $4016
-
-  rep #$30
+.export sendBytesToModem
+.proc sendBytesToModem
   .a16
   .i16
+
+  pha
+  phb
+  phx
+  phy
+
+  pea $8000 ; change bank to $80
+  plb
+  plb
+
+  sep #$20
+  .a8
+
+  tsx
+  txy
+
+  @bytesLoop:
+    lda $000a, y
+
+    beq @done ; if byte is $00, end transmission
+
+    pha
+
+    rep #$20
+    .a16
+    jsr sendByteToModem
+    sep #$20
+    .a8
+
+    pla
+
+    iny
+
+    bne @bytesLoop
+
+  @done:
+
+  ; latch
+  lda #$01
+  stz JOYOUT
+  sta JOYOUT
+  stz JOYOUT
+
+  rep #$20
+  .a16
+
+  ply
+  plx
+  plb
+  pla
 
   rts
 .endproc

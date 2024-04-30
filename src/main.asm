@@ -110,7 +110,7 @@
   .a16
   .i16
 
-  ; jsr initializeModem
+  jsr initializeModem
 
   sep #$30
   .a8
