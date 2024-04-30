@@ -96,7 +96,7 @@
   .a8
   .i8
 
-  lda #$40
+  lda #$42
   sta $2107 ; BG 1 Address and Size
 
   lda #$01

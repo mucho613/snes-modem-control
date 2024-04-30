@@ -6,6 +6,7 @@
 
 .import copyNameTable
 .import readControllersInput
+.import drawFrameCount
 .import drawText
 
 .export VBlank
@@ -31,19 +32,7 @@
   ; Fetch controller input
   jsr readControllersInput
 
-  pea $000a
-  pea $3938
-  pea $3736
-  pea $3534
-  pea $3332
-  pea $3130
-  jsr drawText
-  pla
-  pla
-  pla
-  pla
-  pla
-  pla
+  jsr drawFrameCount
 
   rti
 .endproc

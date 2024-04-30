@@ -4,6 +4,8 @@
 
 .segment "STARTUP"
 
+; args:
+; 0: string terminated with 0x00
 .export drawText
 .proc drawText
   .a16
@@ -101,7 +103,14 @@
     @endLineFeed:
     @endBackSpace:
 
-    iny
+    ; if text pointer reached BG1 tilemap end, reset it
+    cpx #$0800 ; X - $0400
+    bne :+
+    ldx #$4000 ; reset to base address
+    stx $16
+    ldx #$0000
+
+  : iny
     cpy #$0080
     bne @loop
 
@@ -109,6 +118,21 @@
 
   stx terminalTextPointer ; save text pointer position
 
+  rep #$20
+  .a16
+
+  ; scrolling to follow new line
+  txa
+  lsr
+  lsr
+  clc
+  sbc #$e1
+
+  sep #$20
+  .a8
+  sta $0e
+  swa
+  sta $0e
   rep #$20
   .a16
 
