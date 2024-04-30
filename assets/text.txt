@@ -1,0 +1,3 @@
+modem-control-test
+
+Hello! This is controller application for NTT DATA NDM24 modem.
