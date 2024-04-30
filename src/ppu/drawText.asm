@@ -22,6 +22,7 @@
   plb
   plb
   lda terminalTextPointer
+  clc
   adc #$4000 ; BG1 tilemap base address
   sta $16 ; set text position
   plb ; restore bank
@@ -34,6 +35,9 @@
   sep #$20
   .a8
 
+  ; X is cursor position
+  ; Y is pointer of text
+
   @loop:
     lda $000a, y ; a + b + x + y + return address
 
@@ -43,26 +47,46 @@
     .a16
     txa
     and #$ffe0 ; clear lower 5 bits
-    sta $16
     tax
+
+    clc
+    adc #$4000
+    sta $16
     sep #$20
     .a8
     bra @endCarriageReturn
 
     @checkLineFeed:
     cmp #$0a ; check for line feed
-    bne @checkNullTerminator
+    bne @checkBackSpace
     rep #$20
     .a16
     txa
     and #$ffe0 ; clear lower 5 bits
     clc
     adc #$20
-    sta $16
     tax
+
+    clc
+    adc #$4000
+    sta $16
     sep #$20
     .a8
     bra @endLineFeed
+
+    @checkBackSpace:
+    cmp #$08 ; check for backspace
+    bne @checkNullTerminator
+    rep #$20
+    .a16
+    dex ; move back one character
+    txa
+    clc
+    adc #$4000
+    sta $16
+    sep #$20
+    .a8
+    bra @endBackSpace
 
     @checkNullTerminator:
     cmp #$00 ; check for null terminator
@@ -75,6 +99,7 @@
 
     @endCarriageReturn:
     @endLineFeed:
+    @endBackSpace:
 
     iny
     cpy #$0080
