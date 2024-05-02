@@ -45,7 +45,6 @@
     dex
     bne @loop
 
-  @done:
   pla
 
   rep #$20
