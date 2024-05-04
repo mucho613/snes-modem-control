@@ -1,7 +1,7 @@
 CL65 = cl65
 LD65 = ld65
 
-ROM_NAME := modem-control.smc
+ROM_NAME := modem-control.sfc
 CONFIG := modem-control.cfg
 SOURCE_DIR := src
 OUT_DIR := build
