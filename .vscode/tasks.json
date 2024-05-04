@@ -6,11 +6,10 @@
     {
       "label": "make",
       "type": "shell",
-      "command": "make",
+      "command": "make clean && make",
       "presentation": {
         "panel": "dedicated",
-        "clear": true,
-        "focus": true
+        "clear": true
       },
       "problemMatcher": [],
       "group": {
