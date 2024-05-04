@@ -1,11 +1,17 @@
+.p816
+
+.include "../registers.inc"
+
+.segment "STARTUP"
+
 ; Clear BG1 Tile(#$0000 - #$4000) with 0. Expected to be called just after booting.
-.macro clearBG1Tile
+.export clearBG1Tile
+.proc clearBG1Tile
   .a16
   .i16
 
   pha
   phb
-  phx
   phy
 
   lda #$0000
@@ -26,7 +32,6 @@
   bne @loop
 
   ply
-  plx
   plb
   pla
-.endmacro
+.endproc

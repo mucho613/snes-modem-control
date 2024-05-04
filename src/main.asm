@@ -2,6 +2,7 @@
 
 .import initializeRegisters
 .import transferText
+.import clearBG1Tile
 .import copyPalette
 .import copyPattern
 .import VBlank
@@ -9,7 +10,6 @@
 
 .include "./registers.inc"
 .include "./common/utility.asm"
-.include "ppu/clearBG1Tile.asm"
 
 .segment "RODATA"
 
@@ -87,7 +87,7 @@
   rep #$20
   .a16
 
-  clearBG1Tile
+  jsr clearBG1Tile
   jsr copyPalette ; Copy palette
   jsr copyPattern ; Copy pattern
 
