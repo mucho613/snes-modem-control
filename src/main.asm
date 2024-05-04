@@ -8,6 +8,7 @@
 .import initializeModem
 
 .include "./registers.inc"
+.include "./common/utility.asm"
 .include "ppu/clearBG1Tile.asm"
 
 .segment "RODATA"
@@ -38,8 +39,7 @@
   ldx #$1fff
   txs ; Stack pointer value set
 
-  pea $00
-  pld ; Reset Direct Page register to 0
+  setDP $0000
 
   ; phk
   ; plb ; Set Data Bank to Program Bank

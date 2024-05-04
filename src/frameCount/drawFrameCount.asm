@@ -4,7 +4,7 @@
 
 .segment "STARTUP"
 
-.import drawText
+.import print
 
 .export drawFrameCount
 .proc drawFrameCount
@@ -126,7 +126,7 @@
 
   rep #$20
   .a16
-  jsr drawText
+  jsr print
   pla ; 00 0d
   pla ; Bytes 0, 1
   pla ; Bytes 2, 3

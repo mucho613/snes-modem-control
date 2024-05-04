@@ -5,7 +5,7 @@
 
 .segment "STARTUP"
 
-.import drawText
+.import print
 
 .export drawControllerInput
 .proc drawControllerInput
@@ -18,7 +18,7 @@
   .a8
 
   ; 1st byte
-  lda controller2Input
+  lda controller1Input
   and #$0f
   cmp #$0a ; 0~9: Negative、A~F: Positive
   bmi :+
@@ -30,7 +30,7 @@
   adc #$30 ; 0~9
 : pha
 
-  lda controller2Input
+  lda controller1Input
   lsr
   lsr
   lsr
@@ -45,7 +45,7 @@
 : pha
 
   ; 2nd byte
-  lda controller2Input + 1
+  lda controller1Input + 1
   and #$0f
   cmp #$0a ; 0~9: Negative、A~F: Positive
   bmi :+
@@ -57,7 +57,7 @@
   adc #$30 ; 0~9
 : pha
 
-  lda controller2Input + 1
+  lda controller1Input + 1
   lsr
   lsr
   lsr
@@ -73,7 +73,7 @@
 
 
   ; 3nd byte
-  lda controller2Input + 2
+  lda controller1Input + 2
   and #$0f
   cmp #$0a ; 0~9: Negative、A~F: Positive
   bmi :+
@@ -85,7 +85,7 @@
   adc #$30 ; 0~9
 : pha
 
-  lda controller2Input + 2
+  lda controller1Input + 2
   lsr
   lsr
   lsr
@@ -100,7 +100,7 @@
 : pha
 
   ; 4th byte
-  lda controller2Input + 3
+  lda controller1Input + 3
   and #$0f
   cmp #$0a ; 0~9: Negative、A~F: Positive
   bmi :+
@@ -112,7 +112,7 @@
   adc #$30 ; 0~9
 : pha
 
-  lda controller2Input + 3
+  lda controller1Input + 3
   lsr
   lsr
   lsr
@@ -128,7 +128,7 @@
 
   rep #$20
   .a16
-  jsr drawText
+  jsr print
   pla ; 00 0d
   pla ; Bytes 0, 1
   pla ; Bytes 2, 3

@@ -1,6 +1,8 @@
 .setcpu "65816"
 
+.include "../registers.inc"
 .include "../ram/global.asm"
+.include "../common/utility.asm"
 
 .segment "STARTUP"
 
@@ -10,19 +12,13 @@
 .proc readControllersInput
   .a16
   .i16
+
   pha
   phb
   phx
   phy
 
-  ; set bank to $7E
-  sep #$20
-  .a8
-  lda #$7e
-  pha
-  plb
-  rep #$20
-  .a16
+  setDBR $7e
 
   ; copy inputs of previous frame
   lda controller1Input
@@ -36,28 +32,26 @@
   sta controller2InputPrev + 2
 
   ; read controller 1
-  clc
-  pea $4000
-  pld
-
-  lda #$01
-  sta $16 ; latch controller 1 & 2
-  stz $16
-
-  ldx #$20
+  setDP $4000
 
   sep #$20
   .a8
 
+  lda #$01
+  sta .lobyte(JOYSER0) ; latch controller 1 & 2
+  stz .lobyte(JOYSER0)
+
+  ldx #$20
+
   @loop:
-    lda $16
+    lda .lobyte(JOYSER0)
     lsr
     rol controller1Input
     rol controller1Input + 1
     rol controller1Input + 2
     rol controller1Input + 3
 
-    lda $17
+    lda .lobyte(JOYSER1)
     lsr
     rol controller2Input
     rol controller2Input + 1

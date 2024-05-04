@@ -8,7 +8,7 @@
 .import readControllersInput
 .import drawFrameCount
 .import drawControllerInput
-.import drawText
+.import print
 .import sendBytesToModem
 
 .export execModemSettings
