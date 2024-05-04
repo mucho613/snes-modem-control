@@ -15,6 +15,10 @@
 
 .export VBlank
 .proc VBlank
+  jml VBlankFast
+.endproc
+
+.proc VBlankFast
   .a16
   .i16
 

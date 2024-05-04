@@ -21,16 +21,15 @@
   jmp @infiniteLoop
 .endproc
 
-.export ResetHandler
-.proc ResetHandler
-  jsl _FastRomReset
-.endproc
-
-.proc _FastRomReset
+.export Reset
+.proc Reset
   sei
   clc
   xce
+  jml ResetFast
+.endproc
 
+.proc ResetFast
   rep #$ff
   sep #$24
   .a8

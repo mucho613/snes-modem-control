@@ -1,5 +1,5 @@
 .import EmptyInt
-.import ResetHandler
+.import Reset
 .import VBlank
 
 .segment "TITLE"
@@ -31,5 +31,5 @@
   .word .loword(EmptyInt)       ; None
   .word .loword(EmptyInt)       ; $FFF8: Emulation:ABORT
   .word .loword(VBlank)         ; $FFFA: Emulation:NMI
-  .word .loword(ResetHandler)          ; $FFFC: Emulation:RESET
+  .word .loword(Reset)          ; $FFFC: Emulation:RESET
   .word .loword(EmptyInt)       ; $FFFE: Emulation:IRQ/BRK
