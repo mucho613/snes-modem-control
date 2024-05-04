@@ -1,4 +1,4 @@
-.setcpu "65816"
+.p816
 
 .segment "RODATA"
 

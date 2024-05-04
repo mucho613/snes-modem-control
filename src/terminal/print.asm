@@ -1,4 +1,6 @@
-.setcpu "65816"
+.p816
+
+.macpack generic
 
 .include "../registers.inc"
 .include "../ram/global.asm"
