@@ -14,18 +14,14 @@
   phx
   phy
 
-  pea $8000 ; change bank to $80
-  plb
-  plb
+  tsx
+  txy
 
   sep #$20
   .a8
 
-  tsx
-  txy
-
   @bytesLoop:
-    lda $000a, y
+    lda ($0a, s), y
 
     beq @done ; if byte is $00, end transmission
 

@@ -1,4 +1,5 @@
 .include "../registers.inc"
+.include "../common/utility.asm"
 
 .import sendByteToModem
 
@@ -13,10 +14,6 @@
   phb
   phx
   phy
-
-  pea $8000 ; change bank to $80
-  plb
-  plb
 
   sep #$20
   .a8

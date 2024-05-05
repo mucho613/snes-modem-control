@@ -26,8 +26,6 @@
   add #$4000 ; BG1 tilemap base address
   sta .lobyte(VMADDL) ; set text position
 
-  tsx
-
   ldx terminalTextPointer
 
   ; X is cursor position

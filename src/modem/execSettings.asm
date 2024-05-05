@@ -1,5 +1,3 @@
-.include "../modem/atCommand.asm"
-
 .segment "STARTUP"
 
 .import copyNameTable
@@ -9,6 +7,8 @@
 .import print
 .import sendBytesToModem
 .import frameCounter
+.import executeModemSettings
+.import at
 
 .export execModemSettings
 .proc execModemSettings
@@ -17,8 +17,15 @@
 
   ; send AT command to modem
   lda frameCounter
-  cmp #$0200
+  cmp #$0100
   bne @skip
+  lda frameCounter + 2
+  bne @skip
+
+  pea executeModemSettings
+  jsr print
+  pla
+
   pea at
   jsr sendBytesToModem
   pla

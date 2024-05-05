@@ -1,5 +1,4 @@
 .include "./common/utility.asm"
-.include "./modem/atCommand.asm"
 
 .segment "STARTUP"
 
@@ -7,7 +6,9 @@
 .import readControllersInput
 .import drawFrameCount
 .import drawControllerInput
+.import execModemSettings
 .import print
+.import startup
 .import sendBytesToModem
 .import sendBytesNToModem
 .import frameCounter
@@ -21,19 +22,20 @@
   .a16
   .i16
 
-  ; increment the frame counter
-  inc32 frameCounter
-
-  ; Fetch controller input
-  jsr readControllersInput
-
-  jsr drawControllerInput
-
-; jsr execModemSettings
-
-  pea at
+  lda frameCounter
+  bne @skip
+  pea startup
   jsr print
   pla
+  @skip:
+
+  inc32 frameCounter
+
+  ; jsr readControllersInput
+
+  ; jsr drawControllerInput
+
+  jsr execModemSettings
 
   rti
 .endproc
