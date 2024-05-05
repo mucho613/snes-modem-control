@@ -33,7 +33,7 @@
   sep #$20
   .a8
 
-  ldy $0000
+  ldy #$0000
 
   @loop:
     lda ($0a, s), y ; a + b + x + y + return address

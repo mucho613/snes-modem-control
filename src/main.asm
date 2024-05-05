@@ -11,8 +11,6 @@
 .include "./common/utility.asm"
 .include "./ram/clearAll.inc"
 
-.segment "RODATA"
-
 .segment "STARTUP"
 
 .export EmptyInt
@@ -95,5 +93,5 @@
 
   cli
 
-  rti
+  jml EmptyInt
 .endproc

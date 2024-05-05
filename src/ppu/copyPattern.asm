@@ -1,9 +1,7 @@
-.segment "RODATA"
+.segment "STARTUP"
 
 Font:
   .incbin "../../assets/font.bin"
-
-.segment "STARTUP"
 
 .export copyPattern
 .proc copyPattern

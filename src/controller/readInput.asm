@@ -8,8 +8,11 @@
 .import controller1InputPrev
 .import controller2InputData1
 .import controller2InputData2
+.import terminalTextBuffer
 .import modemReceiveBuffer
 .import modemReceiveBufferCount
+.import print
+.import pleaseConnectModemMessage
 
 .export readControllersInput
 .proc readControllersInput
@@ -21,35 +24,20 @@
   phx
   phy
 
-  ; copy inputs of previous frame
-  ; lda controller1Input
-  ; sta controller1InputPrev
-  ; lda controller1Input + 2
-  ; sta controller1InputPrev + 2
-
   setDP $4000
 
   sep #$30
   .a8
   .i8
 
-  ldy #$00 ; counter
-
-  @poll: ; Data1 の bit 2 が Low になるまでやる
+  .scope fetch16Bit
     lda #$01
-    sta .lobyte(JOYSER0) ; latch controller 1 & 2
-    stz .lobyte(JOYSER0)
+    sta .lobyte(JOYOUT) ; latch controller 1 & 2
+    stz .lobyte(JOYOUT)
 
-    ldx #$09
+    ldx #$10
 
     @bitLoop:
-      ; lda .lobyte(JOYSER0)
-      ; lsr
-      ; rol controller1Input
-      ; rol controller1Input + 1
-      ; rol controller1Input + 2
-      ; rol controller1Input + 3
-
       lda .lobyte(JOYSER1)
       lsr
       rol controller2InputData1
@@ -60,33 +48,11 @@
 
       dex
       bne @bitLoop
+  .endscope
 
-    lda controller2InputData1 + 1
-    bit #$01 ; Check Data1 - bit 9
-    bne @notAvailableData
-    sta modemReceiveBuffer, y
-    @notAvailableData:
-
-    iny
-
-    tya ; up to 32 bytes
-    cmp #$20
-    beq @end
-
-    lda controller2InputData2
-    bit #$02 ; Check Data2 - bit 2
-    beq @poll
-
-  @end:
-
-  sty modemReceiveBufferCount ; Save byte count
-
-  lda #$01
-  sta .lobyte(JOYSER0) ; latch controller 1 & 2
-  stz .lobyte(JOYSER0)
-
-  rep #$20
+  rep #$30
   .a16
+  .i16
 
   ply
   plx

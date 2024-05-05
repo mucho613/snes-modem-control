@@ -14,11 +14,10 @@
   phx
   phy
 
-  tsx
-  txy
-
   sep #$20
   .a8
+
+  ldy #$0000
 
   @bytesLoop:
     lda ($0a, s), y
@@ -40,12 +39,6 @@
     bne @bytesLoop
 
   @done:
-
-  ; latch
-  lda #$01
-  stz JOYOUT
-  sta JOYOUT
-  stz JOYOUT
 
   rep #$20
   .a16

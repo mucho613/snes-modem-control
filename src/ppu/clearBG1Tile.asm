@@ -31,4 +31,6 @@
   ply
   plb
   pla
+
+  rts
 .endproc

@@ -9,6 +9,7 @@
 .import frameCounter
 .import executeModemSettings
 .import at
+.import ati4
 
 .export execModemSettings
 .proc execModemSettings
@@ -17,10 +18,10 @@
 
   ; send AT command to modem
   lda frameCounter
-  cmp #$0100
-  bne @skip
+  cmp #$0200
+  bne @skip1
   lda frameCounter + 2
-  bne @skip
+  bne @skip1
 
   pea executeModemSettings
   jsr print
@@ -29,6 +30,22 @@
   pea at
   jsr sendBytesToModem
   pla
-  @skip:
+  @skip1:
+
+  ; send AT command to modem
+  lda frameCounter
+  cmp #$0300
+  bne @skip2
+  lda frameCounter + 2
+  bne @skip2
+
+  pea executeModemSettings
+  jsr print
+  pla
+
+  pea ati4
+  jsr sendBytesToModem
+  pla
+  @skip2:
 
 .endproc

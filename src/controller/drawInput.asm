@@ -2,6 +2,8 @@
 
 .import print
 .import controller1Input
+.import controller2InputData1
+.import controller2InputData2
 .import terminalTextBuffer
 
 .macpack generic
@@ -20,7 +22,7 @@
     @numericCharacter:
       add #$30 ; 0~9
     @setToBuffer:
-      sta terminalTextBuffer + (offset * 2)
+      sta terminalTextBuffer + (offset * 2) + 1
   .endscope
 
   .scope
@@ -36,7 +38,7 @@
     @numericCharacter:
       add #$30 ; 0~9
     @setToBuffer:
-      sta terminalTextBuffer + (offset * 2) + 1
+      sta terminalTextBuffer + (offset * 2)
   .endscope
 .endmacro
 
@@ -48,10 +50,10 @@
   sep #$20
   .a8
 
-  setCharacterToBuffer controller1Input, $00
-  setCharacterToBuffer controller1Input, $01
-  setCharacterToBuffer controller1Input, $02
-  setCharacterToBuffer controller1Input, $03
+  setCharacterToBuffer controller2InputData1, $00
+  setCharacterToBuffer controller2InputData1, $01
+  setCharacterToBuffer controller2InputData1, $02
+  setCharacterToBuffer controller2InputData1, $03
 
   lda #$0a
   sta terminalTextBuffer + 8

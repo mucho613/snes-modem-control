@@ -1,9 +1,8 @@
-.segment "RODATA"
+
+.segment "STARTUP"
 
 Palette:
   .incbin "../../assets/palette.bin"
-
-.segment "STARTUP"
 
 .export copyPalette
 .proc copyPalette
