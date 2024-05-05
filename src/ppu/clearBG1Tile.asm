@@ -1,5 +1,3 @@
-.p816
-
 .include "../registers.inc"
 
 .segment "STARTUP"
@@ -14,8 +12,7 @@
   phb
   phy
 
-  lda #$0000
-  pha
+  pea $0000
   plb
   plb
 

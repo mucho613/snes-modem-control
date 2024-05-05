@@ -1,5 +1,3 @@
-.p816
-
 .include "../registers.inc"
 
 .segment "STARTUP"

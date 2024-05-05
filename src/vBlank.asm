@@ -1,7 +1,5 @@
-.p816
-
-.include "./ram/global.asm"
 .include "./common/utility.asm"
+.include "./modem/atCommand.asm"
 
 .segment "STARTUP"
 
@@ -12,6 +10,7 @@
 .import print
 .import sendBytesToModem
 .import sendBytesNToModem
+.import frameCounter
 
 .export VBlank
 .proc VBlank
@@ -21,10 +20,6 @@
 .proc VBlankFast
   .a16
   .i16
-
-  phb
-
-  setDBR $7e
 
   ; increment the frame counter
   inc32 frameCounter
@@ -36,7 +31,9 @@
 
 ; jsr execModemSettings
 
-  plb
+  pea at
+  jsr print
+  pla
 
   rti
 .endproc

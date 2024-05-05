@@ -1,12 +1,13 @@
-.p816
-
 .include "../registers.inc"
-.include "../ram/global.asm"
 .include "../common/utility.asm"
 
 .segment "STARTUP"
 
 .import copyNameTable
+.import controller1Input
+.import controller1InputPrev
+.import controller2Input
+.import controller2InputPrev
 
 .export readControllersInput
 .proc readControllersInput
@@ -17,8 +18,6 @@
   phb
   phx
   phy
-
-  setDBR $7e
 
   ; copy inputs of previous frame
   lda controller1Input

@@ -1,10 +1,9 @@
-.p816
-
 .macpack generic
 
 .include "../registers.inc"
-.include "../ram/global.asm"
 .include "../common/utility.asm"
+
+.import terminalTextPointer
 
 .segment "STARTUP"
 
@@ -23,29 +22,23 @@
   lda #$2100
   tcd
 
-  phb ; save bank
-  pea $7e00
-  plb
-  plb
   lda terminalTextPointer
-  clc
-  adc #$4000 ; BG1 tilemap base address
+  add #$4000 ; BG1 tilemap base address
   sta .lobyte(VMADDL) ; set text position
-  plb ; restore bank
 
   tsx
-  txy
 
   ldx terminalTextPointer
 
+  ; X is cursor position
+  ; Y is pointer of text
   sep #$20
   .a8
 
-  ; X is cursor position
-  ; Y is pointer of text
+  ldy $0000
 
   @loop:
-    lda $000a, y ; a + b + x + y + return address
+    lda ($0a, s), y ; a + b + x + y + return address
 
     cmp #$0d ; check for carriage return
     bne @checkLineFeed
@@ -114,7 +107,7 @@
 
     @noReset:
     iny
-    cpy #$0080
+    cpy #$0080 ; up to 128 characters
     bne @loop
 
   @transferEnd:

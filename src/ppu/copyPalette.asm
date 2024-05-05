@@ -1,5 +1,3 @@
-.p816
-
 .segment "RODATA"
 
 Palette:

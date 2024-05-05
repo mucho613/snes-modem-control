@@ -1,10 +1,7 @@
-.p816
-
-.include "../ram/global.asm"
-
 .segment "STARTUP"
 
 .import print
+.import frameCounter
 
 .export drawFrameCount
 .proc drawFrameCount

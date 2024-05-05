@@ -18,7 +18,7 @@ $(TARGET): $(OBJECTS)
 
 $(OUT_DIR)/%.o: %.asm
 	@if [ ! -e `dirname $@` ]; then mkdir -p `dirname $@`; fi
-	$(CL65) -g -t none -o $@ -c $<
+	$(CL65) --cpu 65816 -g -t none -o $@ -c $<
 
 clean:
 	rm -rf $(OUT_DIR)

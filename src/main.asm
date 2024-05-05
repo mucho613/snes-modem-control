@@ -1,5 +1,3 @@
-.p816
-
 .import initializeRegisters
 .import transferText
 .import clearBG1Tile

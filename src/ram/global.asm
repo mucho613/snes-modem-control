@@ -1,10 +1,16 @@
-.segment "GLOBAL"
+.bss
 
-.define frameCounter $2000 ; 4 bytes
+.export frameCounter
+frameCounter: .res $4
 
-.define controller1Input $2004 ; 4 bytes
-.define controller1InputPrev $2008 ; 4 bytes
-.define controller2Input $200c ; 4 bytes
-.define controller2InputPrev $2010 ; 4 bytes
+.export controller1Input, controller1InputPrev, controller2Input, controller2InputPrev
+controller1Input: .res $4
+controller1InputPrev: .res $4
+controller2Input: .res $4
+controller2InputPrev: .res $4
 
-.define terminalTextPointer $2014 ; 2 bytes
+.export terminalTextPointer
+terminalTextPointer: .res $2
+
+.export terminalTextBuffer
+terminalTextBuffer: .res $100
