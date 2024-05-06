@@ -34,6 +34,12 @@
 
     pla
 
+    ; latch
+    lda #$01
+    stz JOYOUT
+    sta JOYOUT
+    stz JOYOUT
+
     iny
 
     bne @bytesLoop

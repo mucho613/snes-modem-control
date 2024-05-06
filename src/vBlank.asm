@@ -22,8 +22,6 @@
   jml VBlankFast
 .endproc
 
-testMessage: .byte "Hello!", $00
-
 .proc VBlankFast
   .a16
   .i16
@@ -37,32 +35,11 @@ testMessage: .byte "Hello!", $00
     pla
   @skip:
 
-  inc32 frameCounter
-
   jsr execModemSettings
 
   jsr readControllersInput
 
-  sep #$20
-  .a8
-  lda controller2InputData1
-  bit #$80 ; RX data transmitted?
-  beq @skipDraw
-  lda controller2InputData1 + 1
-  sta terminalTextBuffer
-  pea terminalTextBuffer
-  rep #$20
-  .a16
-  jsr print
-  sep #$20
-  .a8
-  pla
-  pla
-
-  @skipDraw:
-
-  rep #$20
-  .a16
+  inc32 frameCounter
 
   rti
 .endproc

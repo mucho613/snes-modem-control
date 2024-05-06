@@ -30,7 +30,7 @@
   .a8
   .i8
 
-  .scope fetch16Bit
+  .scope fetch16Bit1
     lda #$01
     sta .lobyte(JOYOUT) ; latch controller 1 & 2
     stz .lobyte(JOYOUT)
@@ -48,11 +48,30 @@
 
       dex
       bne @bitLoop
+
+    lda #$01
+    sta .lobyte(JOYOUT) ; latch controller 1 & 2
+    stz .lobyte(JOYOUT)
+
+    lda controller2InputData1
+    bit #$80 ; RX data transmitted?
+    beq @notPresented
+    lda controller2InputData1 + 1
+    sta terminalTextBuffer
+    stz terminalTextBuffer + 1
+    bra @end
+    @notPresented:
+    stz terminalTextBuffer
+    @end:
   .endscope
 
   rep #$30
   .a16
   .i16
+
+  pea terminalTextBuffer
+  jsr print
+  pla
 
   ply
   plx

@@ -48,4 +48,5 @@
   pla
   @skip2:
 
+  rts
 .endproc
