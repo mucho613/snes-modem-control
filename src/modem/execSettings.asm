@@ -8,45 +8,51 @@
 .import sendBytesToModem
 .import frameCounter
 .import executeModemSettings
-.import at
-.import ati4
+.import atl0
+.import atd0123456789
+
+someData: .byte "Send some data to modem!", $0d, $0a, $00
 
 .export execModemSettings
 .proc execModemSettings
   .a16
   .i16
 
-  ; send AT command to modem
-  lda frameCounter
-  cmp #$0200
-  bne @skip1
-  lda frameCounter + 2
-  bne @skip1
+  .scope
+    ; send ATL0 command to modem
+    lda frameCounter
+    cmp #$0200
+    bne @skip
+    lda frameCounter + 2
+    bne @skip
 
-  pea executeModemSettings
-  jsr print
-  pla
+    pea executeModemSettings
+    jsr print
+    pla
 
-  pea at
-  jsr sendBytesToModem
-  pla
-  @skip1:
+    pea atl0
+    jsr sendBytesToModem
+    pla
+    @skip:
+  .endscope
 
-  ; send AT command to modem
-  lda frameCounter
-  cmp #$0300
-  bne @skip2
-  lda frameCounter + 2
-  bne @skip2
+  .scope
+    ; send ATH1 command to modem
+    lda frameCounter
+    cmp #$0280
+    bne @skip
+    lda frameCounter + 2
+    bne @skip
 
-  pea executeModemSettings
-  jsr print
-  pla
+    pea executeModemSettings
+    jsr print
+    pla
 
-  pea ati4
-  jsr sendBytesToModem
-  pla
-  @skip2:
+    pea atd0123456789
+    jsr sendBytesToModem
+    pla
+    @skip:
+  .endscope
 
   rts
 .endproc
