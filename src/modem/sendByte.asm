@@ -1,4 +1,5 @@
 .include "../registers.inc"
+.include "../common/utility.asm"
 
 .segment "STARTUP"
 
@@ -18,15 +19,16 @@
   tsx
   txy
 
+  setDP $4000
+
   ; latch
   lda #$01
-  stz JOYOUT
-  sta JOYOUT
-  stz JOYOUT
+  sta .lobyte(JOYOUT) ; latch controller 1 & 2
+  stz .lobyte(JOYOUT)
 
   ; 1st bit set
   stz WRIO
-  lda JOYSER1
+  lda .lobyte(JOYSER1)
 
   ldx #$0008
   lda $000a, y
@@ -38,7 +40,7 @@
     lda #$00
     ror
     sta WRIO ; Write to joypad serial data port 2
-    lda JOYSER1
+    lda .lobyte(JOYSER1)
 
     dex
     bne @loop

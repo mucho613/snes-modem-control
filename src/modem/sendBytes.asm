@@ -1,4 +1,5 @@
 .include "../registers.inc"
+.include "../common/utility.asm"
 
 .import sendByteToModem
 
@@ -19,6 +20,13 @@
 
   ldy #$0000
 
+  setDP $4000
+
+  ; latch
+  lda #$01
+  sta .lobyte(JOYOUT) ; latch controller 1 & 2
+  stz .lobyte(JOYOUT)
+
   @bytesLoop:
     lda ($0a, s), y
 
@@ -36,9 +44,8 @@
 
     ; latch
     lda #$01
-    stz JOYOUT
-    sta JOYOUT
-    stz JOYOUT
+    sta .lobyte(JOYOUT) ; latch controller 1 & 2
+    stz .lobyte(JOYOUT)
 
     iny
 
