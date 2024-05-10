@@ -66,13 +66,11 @@
 
     lda controller2InputData1
     bit #$80 ; RX data transmitted?
-    beq @notPresented
+    beq @end
     lda controller2InputData1 + 1
-    sta terminalTextBuffer
-    stz terminalTextBuffer + 1
-    bra @end
-    @notPresented:
-    stz terminalTextBuffer
+    ldy modemReceiveBufferCount
+    sta modemReceiveBuffer, y
+    inc modemReceiveBufferCount
     @end:
 
     rep #$30

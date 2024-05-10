@@ -17,14 +17,14 @@ terminalTextPointer: .res $2
 .export terminalTextBuffer
 terminalTextBuffer: .res $100
 
-.export modemReceiveBuffer
-modemReceiveBuffer: .res $20
-
 .export modemReceiveBufferCount
 modemReceiveBufferCount: .res $1
 
-.export modemTransmitBuffer
-modemTransmitBuffer: .res $20
+.export modemReceiveBuffer
+modemReceiveBuffer: .res $20
 
 .export modemTransmitBufferCount
 modemTransmitBufferCount: .res $1
+
+.export modemTransmitBuffer
+modemTransmitBuffer: .res $20

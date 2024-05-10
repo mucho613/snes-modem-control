@@ -39,6 +39,27 @@
 
   jsr readControllersInput
 
+  .scope drawTextFromModemReadBuffer
+    sep #$20
+    .a8
+    lda modemReceiveBufferCount
+    beq @skipDraw
+
+    rep #$20
+    .a16
+    pea modemReceiveBuffer
+    jsr print
+    pla
+    sep #$20
+    .a8
+
+    stz modemReceiveBufferCount
+
+    @skipDraw:
+    rep #$20
+    .a16
+  .endscope
+
   inc32 frameCounter
 
   rti
