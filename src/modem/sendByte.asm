@@ -40,6 +40,22 @@
     lda #$00
     ror
     sta WRIO ; Write to joypad serial data port 2
+
+    ; この NOP がないと WRIO で送ったバイトが取りこぼされる。
+    ; 8個は確実に必要
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+
     lda .lobyte(JOYSER1)
 
     dex

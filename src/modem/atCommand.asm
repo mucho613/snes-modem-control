@@ -20,6 +20,9 @@
 .export ati2
 .export ati3
 .export ati4
+.export ati5
+.export ati6
+.export ati7
 .export ath1
 
 at:
@@ -81,6 +84,15 @@ ati3:
 
 ati4:
 .byte "ATI4", $0d, $0a, $00
+
+ati5:
+.byte "ATI5", $0d, $0a, $00
+
+ati6:
+.byte "ATI6", $0d, $0a, $00
+
+ati7:
+.byte "ATI7", $0d, $0a, $00
 
 ath1:
 .byte "ATH1", $0d, $0a, $00

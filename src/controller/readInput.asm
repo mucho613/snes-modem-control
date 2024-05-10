@@ -26,14 +26,29 @@
 
   setDP $4000
 
-  sep #$30
-  .a8
-  .i8
+  @byteLoop:
+    sep #$30
+    .a8
+    .i8
 
-  .scope fetch16Bit1
     lda #$01
     sta .lobyte(JOYOUT) ; latch controller 1 & 2
     stz .lobyte(JOYOUT)
+
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
 
     ldx #$10
 
@@ -49,10 +64,6 @@
       dex
       bne @bitLoop
 
-    lda #$01
-    sta .lobyte(JOYOUT) ; latch controller 1 & 2
-    stz .lobyte(JOYOUT)
-
     lda controller2InputData1
     bit #$80 ; RX data transmitted?
     beq @notPresented
@@ -63,15 +74,30 @@
     @notPresented:
     stz terminalTextBuffer
     @end:
-  .endscope
+
+    rep #$30
+    .a16
+    .i16
+
+    pea terminalTextBuffer
+    jsr print
+    pla
+
+    sep #$30
+    .a8
+    .i8
+
+    ; lda controller2InputData2 + 1
+    ; bit #$40
+    ; bne @byteLoop
+
+  lda #$01
+  sta .lobyte(JOYOUT) ; latch controller 1 & 2
+  stz .lobyte(JOYOUT)
 
   rep #$30
   .a16
   .i16
-
-  pea terminalTextBuffer
-  jsr print
-  pla
 
   ply
   plx
