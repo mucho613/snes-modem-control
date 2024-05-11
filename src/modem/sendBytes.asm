@@ -2,6 +2,8 @@
 .include "../common/utility.asm"
 
 .import sendByteToModem
+.import modemTransmitBuffer
+.import modemTransmitBufferCount
 
 .segment "STARTUP"
 
@@ -18,6 +20,9 @@
   sep #$20
   .a8
 
+  lda modemTransmitBufferCount ; if no bytes to send, return
+  beq @done
+
   ldy #$0000
 
   setDP $4000
@@ -28,7 +33,7 @@
   stz .lobyte(JOYOUT)
 
   @bytesLoop:
-    lda ($0a, s), y
+    lda modemTransmitBuffer, y
 
     beq @done ; if byte is $00, end transmission
 
@@ -52,6 +57,8 @@
     bne @bytesLoop
 
   @done:
+
+  stz modemTransmitBufferCount
 
   rep #$20
   .a16
