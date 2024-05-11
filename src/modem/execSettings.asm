@@ -8,16 +8,9 @@
 .import sendBytesToModem
 .import frameCounter
 .import executeModemSettings
-.import atx4
-.import atl0
-.import ati0
-.import ati1
-.import ati2
-.import ati3
-.import ati4
-.import ati5
-.import ati6
-.import ati7
+.import modemTransmitBuffer
+.import modemTransmitBufferCount
+.import at
 
 .import atd0123456789
 
@@ -26,8 +19,11 @@
   .a16
   .i16
 
+  pha
+  phx
+
   .scope
-    ; send ATL0 command to modem
+    ; send AT command to modem
     lda frameCounter
     cmp #$0200
     bne @skip
@@ -38,39 +34,32 @@
     jsr print
     pla
 
-    pea atl0
-    jsr sendBytesToModem
-    pla
+    sep #$30
+    .a8
+    .i8
+
+    ldx #$00
+
+    @copyLoop:
+    lda at, x
+    sta modemTransmitBuffer, x
+    beq @copyEnd
+    inx
+    bne @copyLoop
+
+    @copyEnd:
+    inx
+    stx modemTransmitBufferCount
+
     @skip:
+
+    rep #$30
+    .a16
+    .i16
   .endscope
 
-  .scope
-    ; send ATI0 command to modem
-    lda frameCounter
-    cmp #$0280
-    bne @skip
-    lda frameCounter + 2
-    bne @skip
-
-    pea atx4
-    jsr sendBytesToModem
-    pla
-    @skip:
-  .endscope
-
-  .scope
-    ; send ATD0123456789 command to modem
-    lda frameCounter
-    cmp #$0300
-    bne @skip
-    lda frameCounter + 2
-    bne @skip
-
-    pea atd0123456789
-    jsr sendBytesToModem
-    pla
-    @skip:
-  .endscope
+  plx
+  pla
 
   rts
 .endproc
