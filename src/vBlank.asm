@@ -3,7 +3,7 @@
 .segment "STARTUP"
 
 .import copyNameTable
-.import readControllersInput
+.import communicateWithModem
 .import modemReceiveBuffer
 .import modemReceiveBufferCount
 .import controller2InputData1
@@ -37,7 +37,8 @@
 
   jsr execModemSettings
 
-  jsr readControllersInput
+  ; jsr readControllersInput
+  jsr communicateWithModem
 
   jsr sendBytesToModem
 

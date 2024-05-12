@@ -21,10 +21,10 @@ terminalTextBuffer: .res $100
 modemReceiveBufferCount: .res $1
 
 .export modemReceiveBuffer
-modemReceiveBuffer: .res $20
+modemReceiveBuffer: .res $40
 
 .export modemTransmitBufferCount
 modemTransmitBufferCount: .res $1
 
 .export modemTransmitBuffer
-modemTransmitBuffer: .res $20
+modemTransmitBuffer: .res $40
