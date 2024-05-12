@@ -58,13 +58,29 @@
     bne @checkBackSpace
     rep #$20
     .a16
+
     txa
-    and #$ffe0 ; clear lower 5 bits
-    add #$20
+    @fillRemainingSpace:
+    stz .lobyte(VMDATAL)
+    inc
+    bit #$001f
+    bne @fillRemainingSpace
     tax
 
     add #$4000
     sta .lobyte(VMADDL)
+
+    ; clear characters written in the current line
+    lda #$0020
+    @clearNewLineLoop:
+    stz .lobyte(VMDATAL)
+    dec
+    bne @clearNewLineLoop
+
+    txa
+    add #$4000
+    sta .lobyte(VMADDL)
+
     sep #$20
     .a8
     bra @endLineFeed
