@@ -1,5 +1,7 @@
 .segment "STARTUP"
 
+ramResetByte: .byte $00
+
 .macro clearRamAll
   .a16
   .i16
@@ -19,9 +21,9 @@
   lda #.lobyte(WMDATA)
   sta BBAD0
 
-  ldx #.loword(WorkRamResetByte) ; Set DMA source to WorkRamResetByte
+  ldx #.loword(ramResetByte) ; Set DMA source to WorkramResetByte
   stx A1T0L
-  lda #.bankbyte(WorkRamResetByte)
+  lda #.bankbyte(ramResetByte)
   sta A1B0
 
   ldx #$0000
@@ -38,5 +40,3 @@
   .i16
 .endmacro
 
-WorkRamResetByte:
-  .byte $00
