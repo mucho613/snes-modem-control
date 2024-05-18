@@ -13,8 +13,11 @@
 .import terminalTextBuffer
 .import modemReceiveBuffer
 .import modemReceiveBufferCount
+.import modemTransmitBuffer
+.import modemTransmitBufferCount
 .import print
 .import pleaseConnectModemMessage
+.import read9Bits
 
 .export communicateWithModem
 .proc communicateWithModem
@@ -28,43 +31,54 @@
 
   setDP $4000
 
-  @byteLoop:
-    sep #$30
-    .a8
-    .i8
+  sep #$30
+  .a8
+  .i8
 
-    lda #$01
-    sta .lobyte(JOYOUT) ; latch controller 1 & 2
-    stz .lobyte(JOYOUT)
+  ; 16 bits read
+  lda #$01
+  sta .lobyte(JOYOUT) ; latch controller 1 & 2
+  stz .lobyte(JOYOUT)
 
-    nop8Times
+  ldx #$10
 
-    ldx #$10
+  @16bitLoop:
+    lda .lobyte(JOYSER1)
+    lsr
+    rol controller2InputData1
+    rol controller2InputData1 + 1
+    lsr
+    rol controller2InputData2
+    rol controller2InputData2 + 1
 
-    @bitLoop:
-      lda .lobyte(JOYSER1)
-      lsr
-      rol controller2InputData1
-      rol controller2InputData1 + 1
-      lsr
-      rol controller2InputData2
-      rol controller2InputData2 + 1
+    dex
+    bne @16bitLoop
 
-      dex
-      bne @bitLoop
+  ; ID がモデム(3)ではなかったらメッセージを出す
+  lda controller2InputData1
+  and #$0f
+  cmp #$03
+  beq @idCheckOk
+  bra @communicateEnd
+  @idCheckOk:
 
-    lda controller2InputData1
-    bit #$80 ; RX data transmitted?
-    beq @end
-    lda controller2InputData1 + 1
-    ldy modemReceiveBufferCount
-    sta modemReceiveBuffer, y
-    inc modemReceiveBufferCount
-    @end:
+  ; 読み取るバイトがあれば即ループに入る。無ければ書き込むバイトのチェックに移る
+  lda controller2InputData2 + 1
+  bit #$40
+  bne @execute9BitsRead
 
-    ; lda controller2InputData2 + 1
-    ; bit #$40
-    ; bne @byteLoop
+  ; 書き込むバイトが無ければ終了
+  lda modemTransmitBufferCount
+  beq @communicateEnd
+
+  @execute9BitsRead:
+  jsr read9Bits
+
+  lda controller2InputData2 + 1
+  bit #$40
+  bne @execute9BitsRead
+
+  @communicateEnd:
 
   lda #$01
   sta .lobyte(JOYOUT) ; latch controller 1 & 2

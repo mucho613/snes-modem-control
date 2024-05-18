@@ -40,8 +40,6 @@
   ; jsr readControllersInput
   jsr communicateWithModem
 
-  jsr sendBytesToModem
-
   .scope drawTextFromModemReadBuffer
     sep #$20
     .a8

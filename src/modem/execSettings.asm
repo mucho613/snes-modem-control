@@ -57,42 +57,6 @@
     .i16
   .endscope
 
-  .scope
-    ; send AT command to modem
-    lda frameCounter
-    cmp #$0280
-    bne @skip
-    lda frameCounter + 2
-    bne @skip
-
-    pea executeModemSettings
-    jsr print
-    pla
-
-    sep #$30
-    .a8
-    .i8
-
-    ldx #$00
-
-    @copyLoop:
-      lda ati3, x
-      sta modemTransmitBuffer, x
-      beq @copyEnd
-      inx
-      bne @copyLoop
-
-    @copyEnd:
-    inx
-    stx modemTransmitBufferCount
-
-    @skip:
-
-    rep #$30
-    .a16
-    .i16
-  .endscope
-
   plx
   pla
 

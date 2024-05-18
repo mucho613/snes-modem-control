@@ -6,18 +6,19 @@
 
 .export idCheck
 .proc idCheck
-  .a16
-  .i16
+  .a8
+  .i8
 
   pha
 
   lda controller2InputData1
-  and #$000f
-  cmp #$0003
+  and #$0f
+  cmp #$03
   beq @ok
 
   pea pleaseConnectModemMessage
   jsr print
+  pla
   pla
   @ok:
 
