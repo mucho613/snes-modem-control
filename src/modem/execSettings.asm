@@ -8,10 +8,11 @@
 .import sendBytesToModem
 .import frameCounter
 .import executeModemSettings
+.import dialing
 .import modemTransmitBuffer
 .import modemTransmitBufferCount
 .import atl0
-.import ati3
+.import atd0123456789
 
 .export execModemSettings
 .proc execModemSettings
@@ -22,14 +23,14 @@
   phx
 
   .scope
-    ; send AT command to modem
+    ; send ATL0 command to modem
     lda frameCounter
     cmp #$0200
     bne @skip
     lda frameCounter + 2
     bne @skip
 
-    pea executeModemSettings
+    pea dialing
     jsr print
     pla
 
@@ -40,21 +41,20 @@
     ldx #$00
 
     @copyLoop:
-      lda ati3, x
+      lda atd0123456789, x
       sta modemTransmitBuffer, x
       beq @copyEnd
       inx
       bne @copyLoop
 
     @copyEnd:
-    inx
     stx modemTransmitBufferCount
-
-    @skip:
 
     rep #$30
     .a16
     .i16
+
+    @skip:
   .endscope
 
   plx

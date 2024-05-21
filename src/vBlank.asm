@@ -35,11 +35,6 @@
     pla
   @skip:
 
-  jsr execModemSettings
-
-  ; jsr readControllersInput
-  jsr communicateWithModem
-
   .scope drawTextFromModemReadBuffer
     sep #$20
     .a8
@@ -60,6 +55,10 @@
     rep #$20
     .a16
   .endscope
+
+  jsr execModemSettings
+
+  jsr communicateWithModem
 
   inc32 frameCounter
 

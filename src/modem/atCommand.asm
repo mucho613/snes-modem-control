@@ -68,7 +68,7 @@ atx4:
 .byte "ATX4", $0d, $0a, $00
 
 atd0123456789:
-.byte "ATD0123456789", $0d, $0a, $00
+.byte "ATDT0123456789", $0d, $0a, $00
 
 ati0:
 .byte "ATI0", $0d, $0a, $00

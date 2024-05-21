@@ -36,7 +36,8 @@
   stz JOYOUT
 
   lda #$80
-  sta WRIO
+  sta WRIO  ; WRIO bit on
+
   lda JOYSER1
 
   ; R -> 0101 0010
@@ -56,6 +57,9 @@
     bne @loop2
 
   pla
+
+  lda #$80
+  sta WRIO ; WRIO bit on
 
   ; Pulse latch
   lda #$01

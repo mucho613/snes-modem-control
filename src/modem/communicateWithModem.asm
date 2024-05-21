@@ -40,6 +40,10 @@
   sta .lobyte(JOYOUT) ; latch controller 1 & 2
   stz .lobyte(JOYOUT)
 
+  nop8Times
+  nop8Times
+  nop8Times
+
   ldx #$10
 
   @16bitLoop:
@@ -54,13 +58,17 @@
     dex
     bne @16bitLoop
 
-  ; ID がモデム(3)ではなかったらメッセージを出す
-  lda controller2InputData1
-  and #$0f
-  cmp #$03
-  beq @idCheckOk
-  bra @communicateEnd
-  @idCheckOk:
+  ; FIXME: どうやら DATA1 2nd bit が最初に立つときにも有効なデータが DATA0 に入ってくるようなので、
+  ; その byte も拾って Receive buffer に保存しなければならない
+
+  ; エミュレータでの実行時に邪魔なので一旦コメントアウト
+  ; ; ID がモデム(3)ではなかったらメッセージを出す
+  ; lda controller2InputData1
+  ; and #$0f
+  ; cmp #$03
+  ; beq @idCheckOk
+  ; bra @communicateEnd
+  ; @idCheckOk:
 
   ; 読み取るバイトがあれば即ループに入る。無ければ書き込むバイトのチェックに移る
   lda controller2InputData2 + 1
@@ -71,11 +79,20 @@
   lda modemTransmitBufferCount
   beq @communicateEnd
 
+  ldx #$00 ; Transfer byte pointer
+
   @execute9BitsRead:
   jsr read9Bits
+  inx ; Increment transfer byte pointer
 
   lda controller2InputData2 + 1
   bit #$40
+  bne @execute9BitsRead
+
+  lda modemTransmitBufferCount
+  beq @communicateEnd ; if 0, end communication
+  dec
+  sta modemTransmitBufferCount
   bne @execute9BitsRead
 
   @communicateEnd:

@@ -24,36 +24,39 @@
   stz .lobyte(JOYOUT)
 
   lda modemTransmitBufferCount
-  bne @skipTransmitStartBitOn
-  lda #$80
-  sta .lobyte(WRIO)
+  beq @skipTransmitStartBitOn
+  stz WRIO
   @skipTransmitStartBitOn:
 
   nop8Times
+  nop8Times
+
   lda .lobyte(JOYSER1)
   lsr
   rol controller2InputData1
   lsr
   rol controller2InputData2
 
+  ; Load transmit byte
+  ; If transmitter buffer is empty, send 0x80
+  lda modemTransmitBufferCount
+  beq @transmitBufferEmpty
+  lda modemTransmitBuffer, x
+  bra @loadTransmitByteEnd
+  @transmitBufferEmpty:
+  lda #$80
+  @loadTransmitByteEnd:
+
   ldy #$08
 
   @bitLoop:
-    ldx #$00
-    lda modemTransmitBuffer, x
-    and #$7f
-
-    sta .lobyte(WRIO)
+    sta WRIO
+    asl
+    xba ; Write data -> B, Read data -> A
 
     nop8Times
 
-    ; 1 bit 左にシフトして保存しておく
-    lda modemTransmitBuffer, x
-    asl
-    sta modemTransmitBuffer, x
-
-    ; 読み取り
-    lda .lobyte(JOYSER1)
+    lda .lobyte(JOYSER1) ; Read controller 2 input
     lsr
     rol controller2InputData1
     rol controller2InputData1 + 1
@@ -61,10 +64,13 @@
     rol controller2InputData2
     rol controller2InputData2 + 1
 
+    xba ; Write data -> A, Read data -> B
+
     dey
     bne @bitLoop
 
-  inx ; 次のバイトを指す
+  lda #$80
+  sta WRIO ; WRIO bit on
 
   ldy #$07
   @remainingBitsShiftLoop:

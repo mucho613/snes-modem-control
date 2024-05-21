@@ -7,8 +7,4 @@
   nop
   nop
   nop
-  nop
-  nop
-  nop
-  nop
 .endmacro
