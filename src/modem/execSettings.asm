@@ -25,6 +25,41 @@
   .scope
     ; send ATL0 command to modem
     lda frameCounter
+    cmp #$0180
+    bne @skip
+    lda frameCounter + 2
+    bne @skip
+
+    pea executeModemSettings
+    jsr print
+    pla
+
+    sep #$30
+    .a8
+    .i8
+
+    ldx #$00
+
+    @copyLoop:
+      lda atl0, x
+      sta modemTransmitBuffer, x
+      beq @copyEnd
+      inx
+      bne @copyLoop
+
+    @copyEnd:
+    stx modemTransmitBufferCount
+
+    rep #$30
+    .a16
+    .i16
+
+    @skip:
+  .endscope
+
+  .scope
+    ; send ATL0 command to modem
+    lda frameCounter
     cmp #$0200
     bne @skip
     lda frameCounter + 2
