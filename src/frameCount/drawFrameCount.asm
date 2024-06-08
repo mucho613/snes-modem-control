@@ -1,10 +1,7 @@
-.setcpu "65816"
-
-.include "../ram/global.asm"
-
 .segment "STARTUP"
 
-.import drawText
+.import print
+.import frameCounter
 
 .export drawFrameCount
 .proc drawFrameCount
@@ -126,7 +123,7 @@
 
   rep #$20
   .a16
-  jsr drawText
+  jsr print
   pla ; 00 0d
   pla ; Bytes 0, 1
   pla ; Bytes 2, 3

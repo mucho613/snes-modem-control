@@ -1,13 +1,16 @@
-.setcpu "65816"
+.macpack generic
 
-.include "../ram/global.asm"
+.include "../registers.inc"
+.include "../common/utility.asm"
+
+.import terminalTextPointer
 
 .segment "STARTUP"
 
 ; args:
 ; 0: string terminated with 0x00
-.export drawText
-.proc drawText
+.export print
+.proc print
   .a16
   .i16
 
@@ -19,29 +22,21 @@
   lda #$2100
   tcd
 
-  phb ; save bank
-  pea $7e00
-  plb
-  plb
   lda terminalTextPointer
-  clc
-  adc #$4000 ; BG1 tilemap base address
-  sta $16 ; set text position
-  plb ; restore bank
-
-  tsx
-  txy
+  add #$4000 ; BG1 tilemap base address
+  sta .lobyte(VMADDL) ; set text position
 
   ldx terminalTextPointer
 
+  ; X is cursor position
+  ; Y is pointer of text
   sep #$20
   .a8
 
-  ; X is cursor position
-  ; Y is pointer of text
+  ldy #$0000
 
   @loop:
-    lda $000a, y ; a + b + x + y + return address
+    lda ($0a, s), y ; a + b + x + y + return address
 
     cmp #$0d ; check for carriage return
     bne @checkLineFeed
@@ -53,7 +48,7 @@
 
     clc
     adc #$4000
-    sta $16
+    sta .lobyte(VMADDL)
     sep #$20
     .a8
     bra @endCarriageReturn
@@ -65,13 +60,11 @@
     .a16
     txa
     and #$ffe0 ; clear lower 5 bits
-    clc
-    adc #$20
+    add #$20
     tax
 
-    clc
-    adc #$4000
-    sta $16
+    add #$4000
+    sta .lobyte(VMADDL)
     sep #$20
     .a8
     bra @endLineFeed
@@ -85,7 +78,7 @@
     txa
     clc
     adc #$4000
-    sta $16
+    sta .lobyte(VMADDL)
     sep #$20
     .a8
     bra @endBackSpace
@@ -95,23 +88,24 @@
     beq @transferEnd
 
     @transferNormalCharacter:
-    sta $18 ; write character to VRAM
-    stz $19
+    sta .lobyte(VMDATAL) ; write character to VRAM
+    stz .lobyte(VMDATAH)
     inx
 
     @endCarriageReturn:
     @endLineFeed:
     @endBackSpace:
 
-    ; if text pointer reached BG1 tilemap end, reset it
-    cpx #$0800 ; X - $0400
-    bne :+
+    ; if text pointer reached end of BG1 tilemap, reset it
+    cpx #$0800 ; X - $0800
+    bne @noReset
     ldx #$4000 ; reset to base address
-    stx $16
+    stx .lobyte(VMADDL)
     ldx #$0000
 
-  : iny
-    cpy #$0080
+    @noReset:
+    iny
+    cpy #$0080 ; up to 128 characters
     bne @loop
 
   @transferEnd:
@@ -123,15 +117,15 @@
 
   ; scrolling to follow new line
   txa
+  and #$ffe0
   lsr
   lsr
-  clc
-  sbc #$e1
+  sub #$d9
 
   sep #$20
   .a8
-  sta $0e
-  swa
+  sta $0e ; write to scroll position register
+  xba
   sta $0e
   rep #$20
   .a16

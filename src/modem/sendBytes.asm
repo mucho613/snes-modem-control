@@ -1,67 +1,72 @@
-.setcpu "65816"
+.include "../registers.inc"
+.include "../common/utility.asm"
+
+.import sendByteToModem
+.import modemTransmitBuffer
+.import modemTransmitBufferCount
 
 .segment "STARTUP"
 
-.export sendBytes
-.proc sendBytes
-  sep #$30
-  .a8
-  .i8
-
-  lda #$01 ; latch
-  stz $4016
-  sta $4016
-  stz $4016
-
-  ldx #$10
-
-  @loop1:
-    lda $4017
-
-    dex
-    bne @loop1
-
-  ; Pulse latch
-  lda #$01
-  stz $4016
-  sta $4016
-  stz $4016
-
-  ; R -> 0101 0010
-  lda #$52
-  pha
-  ldx #$08
-
-  @loop2:
-    pla
-    rol
-    pha
-    lda #$00
-    ror
-
-    pha
-    lda $4017
-    pla
-    sta $4201 ; 0 or 1
-
-    dex
-    bne @loop2
-
-  pla
-
-  lda $4017
-  lda #$80
-  sta $4201 ; 1
-
-  ; Pulse latch
-  lda #$01
-  stz $4016
-  sta $4016
-  stz $4016
-
-  rep #$30
+.export sendBytesToModem
+.proc sendBytesToModem
   .a16
   .i16
+
+  pha
+  phb
+  phx
+  phy
+
+  sep #$20
+  .a8
+
+  lda modemTransmitBufferCount ; if no bytes to send, return
+  beq @done
+
+  ldy #$0000
+
+  setDP $4000
+
+  ; latch
+  lda #$01
+  sta .lobyte(JOYOUT) ; latch controller 1 & 2
+  stz .lobyte(JOYOUT)
+
+  @bytesLoop:
+    lda modemTransmitBuffer, y
+
+    beq @done ; if byte is $00, end transmission
+
+    pha
+
+    rep #$20
+    .a16
+    jsr sendByteToModem
+    sep #$20
+    .a8
+
+    pla
+
+    ; latch
+    lda #$01
+    sta .lobyte(JOYOUT) ; latch controller 1 & 2
+    stz .lobyte(JOYOUT)
+
+    iny
+
+    bne @bytesLoop
+
+  @done:
+
+  stz modemTransmitBufferCount
+
+  rep #$20
+  .a16
+
+  ply
+  plx
+  plb
+  pla
 
   rts
 .endproc

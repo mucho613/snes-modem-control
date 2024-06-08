@@ -1,16 +1,15 @@
-.setcpu "65816"
-
 .import initializeRegisters
 .import transferText
+.import clearBG1Tile
 .import copyPalette
 .import copyPattern
 .import VBlank
 .import initializeModem
+.import clearRamAll
 
 .include "./registers.inc"
-.include "ppu/clearBG1Tile.asm"
-
-.segment "RODATA"
+.include "./common/utility.asm"
+.include "./ram/clearAll.inc"
 
 .segment "STARTUP"
 
@@ -20,29 +19,24 @@
   jmp @infiniteLoop
 .endproc
 
-.export ResetHandler
-.proc ResetHandler
-  jsl _FastRomReset
-.endproc
-
-.proc _FastRomReset
+.export Reset
+.proc Reset
   sei
   clc
   xce
+  jml ResetFast
+.endproc
 
+.proc ResetFast
   rep #$ff
-  sep #$24
+  sep #$24 ; Disable IRQ
   .a8
   .i16
 
   ldx #$1fff
   txs ; Stack pointer value set
 
-  pea $00
-  pld ; Reset Direct Page register to 0
-
-  ; phk
-  ; plb ; Set Data Bank to Program Bank
+  setDP $0000
 
   stz NMITIMEN ; Disable interrupts
   stz HDMAEN ; Disable HDMA
@@ -50,37 +44,10 @@
   lda #$8f
   sta INIDISP ; Disable screen
 
-  rep #$30
+  rep #$20
   .a16
-  .i16
 
-  ; Fill WRAM with zeros using two 64KiB fixed address DMA transfers to WMDATA
-  stz WMADDL
-  stz WMADDM
-  stz WMADDH
-
-  lda #$08
-  sta DMAP0
-
-  lda #WMDATA & $ff
-  sta BBAD0
-
-  ldx #.loword(WorkRamResetByte) ; Set DMA source to WorkRamResetByte
-  stx A1T0L
-  lda #.bankbyte(WorkRamResetByte)
-  sta A1B0
-
-  ldx #$00
-  stx DAS0L ; Transfer size = 64KiB
-
-  lda #$01
-  sta MDMAEN ; First DMA transfer
-
-  ; x = 0
-  stx DAS0L ; Transfer size = 64KiB
-
-  ; a = 1
-  sta MDMAEN ; Second DMA transfer
+  clearRamAll
 
   ; Reset PPU
   jsr initializeRegisters
@@ -88,7 +55,7 @@
   rep #$20
   .a16
 
-  clearBG1Tile
+  jsr clearBG1Tile
   jsr copyPalette ; Copy palette
   jsr copyPattern ; Copy pattern
 
@@ -110,7 +77,7 @@
   .a16
   .i16
 
-  ; jsr initializeModem
+  jsr initializeModem
 
   sep #$30
   .a8
@@ -120,10 +87,11 @@
   lda #$80
   sta $4200 ; NMI, V/H Count, and Joypad Enable
 
+  rep #$30
+  .a16
+  .i16
+
   cli
 
-  rti
+  jml EmptyInt
 .endproc
-
-WorkRamResetByte:
-  .byte 00

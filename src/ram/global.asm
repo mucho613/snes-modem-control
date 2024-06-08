@@ -1,10 +1,30 @@
-.segment "GLOBAL"
+.bss
 
-.define frameCounter $2000 ; 4 bytes
+.export frameCounter
+frameCounter: .res $4
 
-.define controller1Input $2004 ; 4 bytes
-.define controller1InputPrev $2008 ; 4 bytes
-.define controller2Input $200c ; 4 bytes
-.define controller2InputPrev $2010 ; 4 bytes
+.export controller1Input, controller1InputPrev
+controller1Input: .res $4
+controller1InputPrev: .res $4
 
-.define terminalTextPointer $2014 ; 2 bytes
+.export controller2InputData1, controller2InputData2
+controller2InputData1: .res $2
+controller2InputData2: .res $2
+
+.export terminalTextPointer
+terminalTextPointer: .res $2
+
+.export terminalTextBuffer
+terminalTextBuffer: .res $100
+
+.export modemReceiveBufferCount
+modemReceiveBufferCount: .res $1
+
+.export modemReceiveBuffer
+modemReceiveBuffer: .res $40
+
+.export modemTransmitBufferCount
+modemTransmitBufferCount: .res $1
+
+.export modemTransmitBuffer
+modemTransmitBuffer: .res $40

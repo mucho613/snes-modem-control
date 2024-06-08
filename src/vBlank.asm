@@ -1,38 +1,73 @@
-.setcpu "65816"
-
-.include "./ram/global.asm"
+.include "./common/utility.asm"
 
 .segment "STARTUP"
 
 .import copyNameTable
-.import readControllersInput
+.import communicateWithModem
+.import modemReceiveBuffer
+.import modemReceiveBufferCount
+.import controller2InputData1
+.import terminalTextBuffer
 .import drawFrameCount
-.import drawText
+.import drawControllerInput
+.import execModemSettings
+.import print
+.import startup
+.import sendBytesToModem
+.import sendBytesNToModem
+.import frameCounter
 
 .export VBlank
 .proc VBlank
+  jml VBlankFast
+.endproc
+
+.proc VBlankFast
   .a16
   .i16
 
-  ; set bank to $7E
-  sep #$20
-  .a8
-  lda #$7e
-  pha
-  plb
-  rep #$20
-  .a16
-
-  ; increment the frame counter
-  inc frameCounter
+  lda frameCounter
   bne @skip
-  inc frameCounter + 2
+  lda frameCounter + 2
+  bne @skip
+    pea startup
+    jsr print
+    pla
   @skip:
 
-  ; Fetch controller input
-  jsr readControllersInput
+  .scope drawTextFromModemReadBuffer
+    sep #$20
+    .a8
+    lda modemReceiveBufferCount
+    beq @skipDraw
 
-  jsr drawFrameCount
+    rep #$20
+    .a16
+    pea modemReceiveBuffer
+    jsr print
+    pla
+    sep #$20
+    .a8
+
+    stz modemReceiveBufferCount
+
+    ldx #$0000
+    @clearBufferLoop:
+      stz modemReceiveBuffer, x
+      inx
+      cpx #$0040
+      bne @clearBufferLoop
+
+    @skipDraw:
+    rep #$20
+    .a16
+  .endscope
+
+  jsr execModemSettings
+
+  jsr communicateWithModem
+
+  inc32 frameCounter
 
   rti
 .endproc

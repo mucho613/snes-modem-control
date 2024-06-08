@@ -1,11 +1,10 @@
-.setcpu "65816"
+.include "../registers.inc"
+.include "../common/utility.asm"
 
-.segment "RODATA"
+.segment "STARTUP"
 
 Palette:
   .incbin "../../assets/palette.bin"
-
-.segment "STARTUP"
 
 .export copyPalette
 .proc copyPalette
@@ -14,24 +13,21 @@ Palette:
 
   phb
 
-  lda #$2100
-  tcd
+  setDP $2100
 
   sep #$20
   .a8
 
-  stz $21 ; $2121: Address for CG-RAM Write
+  stz .lobyte(CGADD)
 
-  lda #^Palette
-  pha
-  plb
+  setDBR .bankbyte(Palette)
 
   ldx #$0000
 
   @loop:
     lda Palette, x
 
-    sta $22 ; $2122: Data for CG-RAM Write
+    sta .lobyte(CGDATA)
 
     inx
     cpx #$0200

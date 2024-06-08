@@ -1,5 +1,3 @@
-.setcpu "65816"
-
 .export initializeRegisters
 
 .include "./registers.inc"

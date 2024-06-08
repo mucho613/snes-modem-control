@@ -1,40 +1,30 @@
-.setcpu "65816"
+.include "../registers.inc"
+.include "../common/utility.asm"
 
-.segment "RODATA"
+.segment "STARTUP"
 
 Font:
   .incbin "../../assets/font.bin"
-
-.segment "STARTUP"
 
 .export copyPattern
 .proc copyPattern
   .a16
   .i16
 
+  pha
   phb
 
-  lda #$2100
-  tcd
+  setDP $2100
 
-  stz $16
-
-  sep #$20
-  .a8
-
-  lda #^Font
-  pha
-  plb
-
-  rep #$20
-  .a16
+  stz .lobyte(VMADDL)
+  setDBR .bankbyte(Font)
 
   ldx #$0000
 
   @loop:
     lda Font, x
 
-    sta $18 ; $2118
+    sta .lobyte(VMDATAL)
 
     inx
     inx
@@ -42,6 +32,7 @@ Font:
     bne @loop
 
   plb
+  pla
 
   rts
 .endproc

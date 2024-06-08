@@ -1,67 +1,75 @@
-.setcpu "65816"
+.include "../registers.inc"
+.include "../common/utility.asm"
 
 .segment "STARTUP"
 
-.export sendByte
-.proc sendByte
-  sep #$30
-  .a8
-  .i8
+.export sendByteToModem
+.proc sendByteToModem
+  .a16
+  .i16
 
-  lda #$01 ; latch
-  stz $4016
-  sta $4016
-  stz $4016
-
-  ldx #$10
-
-  @loop1:
-    lda $4017
-
-    dex
-    bne @loop1
-
-  ; Pulse latch
-  lda #$01
-  stz $4016
-  sta $4016
-  stz $4016
-
-  ; R -> 0101 0010
-  lda #$52
   pha
-  ldx #$08
+  phb
+  phx
+  phy
 
-  @loop2:
+  sep #$20
+  .a8
+
+  tsx
+  txy
+
+  setDP $4000
+
+  ; latch
+  lda #$01
+  sta .lobyte(JOYOUT) ; latch controller 1 & 2
+  stz .lobyte(JOYOUT)
+
+  ; 1st bit set
+  stz WRIO
+  lda .lobyte(JOYSER1)
+
+  ldx #$0008
+  lda $000a, y
+  pha
+  @loop:
     pla
-    rol
-    pha
+    rol ; shift bit into carry
+    pha ; save for later
     lda #$00
     ror
+    sta WRIO ; Write to joypad serial data port 2
 
-    pha
-    lda $4017
-    pla
-    sta $4201 ; 0 or 1
+    ; この NOP がないと WRIO で送ったバイトが取りこぼされる。
+    ; 8個は確実に必要
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+
+    lda .lobyte(JOYSER1)
 
     dex
-    bne @loop2
+    bne @loop
 
   pla
 
-  lda $4017
-  lda #$80
-  sta $4201 ; 1
-
-  ; Pulse latch
-  lda #$01
-  stz $4016
-  sta $4016
-  stz $4016
-
-  rep #$30
+  rep #$20
   .a16
-  .i16
+
+  ply
+  plx
+  plb
+  pla
 
   rts
 .endproc
