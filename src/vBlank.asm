@@ -51,6 +51,13 @@
 
     stz modemReceiveBufferCount
 
+    ldx #$0000
+    @clearBufferLoop:
+      stz modemReceiveBuffer, x
+      inx
+      cpx #$0040
+      bne @clearBufferLoop
+
     @skipDraw:
     rep #$20
     .a16

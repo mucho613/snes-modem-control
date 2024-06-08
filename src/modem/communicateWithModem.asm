@@ -58,17 +58,14 @@
     dex
     bne @16bitLoop
 
-  ; FIXME: どうやら DATA1 2nd bit が最初に立つときにも有効なデータが DATA0 に入ってくるようなので、
-  ; その byte も拾って Receive buffer に保存しなければならない
-
-  ; エミュレータでの実行時に邪魔なので一旦コメントアウト
-  ; ; ID がモデム(3)ではなかったらメッセージを出す
-  ; lda controller2InputData1
-  ; and #$0f
-  ; cmp #$03
-  ; beq @idCheckOk
-  ; bra @communicateEnd
-  ; @idCheckOk:
+  lda controller2InputData1
+  bit #$80 ; RX data exists?
+  beq @skipStoreToBuffer
+  lda controller2InputData1 + 1
+  ldy modemReceiveBufferCount
+  sta modemReceiveBuffer, y
+  inc modemReceiveBufferCount
+  @skipStoreToBuffer:
 
   ; 読み取るバイトがあれば即ループに入る。無ければ書き込むバイトのチェックに移る
   lda controller2InputData2 + 1
