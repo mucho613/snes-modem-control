@@ -58,7 +58,7 @@
   .endscope
 
   .scope
-    ; send ATL0 command to modem
+    ; send dial command to modem
     lda frameCounter
     cmp #$0200
     bne @skip
