@@ -23,7 +23,6 @@
 .export ati5
 .export ati6
 .export ati7
-.export ath1
 
 at:
 .byte "AT", $0d, $0a, $00
@@ -93,6 +92,3 @@ ati6:
 
 ati7:
 .byte "ATI7", $0d, $0a, $00
-
-ath1:
-.byte "ATH1", $0d, $0a, $00
