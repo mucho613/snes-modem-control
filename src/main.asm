@@ -67,8 +67,8 @@
   sta $2107 ; BG 1 Address and Size
 
   lda #$01
-  sta $212c ; Background and Object Enable (Main Screen)
-  stz $212d ; Background and Object Disable (Sub Screen)
+  sta TM ; Background and Object Enable (Main Screen)
+  sta TS ; Background and Object Enable (Sub Screen)
 
   lda #$0f
   sta $2100 ; Screen Display Register

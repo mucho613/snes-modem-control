@@ -107,6 +107,7 @@
   sta COLDATA ; set Fixed color data to black
 
   lda #$0b
+  ; lda #$00
   sta SETINI
 
   rep #$20
