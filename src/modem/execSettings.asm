@@ -7,12 +7,12 @@
 .import print
 .import sendBytesToModem
 .import frameCounter
-.import executeModemSettings
+.import startModemConfiguration
 .import dialing
 .import modemTransmitBuffer
 .import modemTransmitBufferCount
-.import atl0
-.import atd0123456789
+.import att
+.import atdNumber
 
 .export execModemSettings
 .proc execModemSettings
@@ -30,7 +30,7 @@
     lda frameCounter + 2
     bne @skip
 
-    pea executeModemSettings
+    pea startModemConfiguration
     jsr print
     pla
 
@@ -41,7 +41,7 @@
     ldx #$00
 
     @copyLoop:
-      lda atl0, x
+      lda att, x
       sta modemTransmitBuffer, x
       beq @copyEnd
       inx
@@ -76,7 +76,7 @@
     ldx #$00
 
     @copyLoop:
-      lda atd0123456789, x
+      lda atdNumber, x
       sta modemTransmitBuffer, x
       beq @copyEnd
       inx

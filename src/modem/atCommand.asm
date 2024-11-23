@@ -14,7 +14,7 @@
 .export ats11_95
 .export ats91_15
 .export atx4
-.export atd0123456789
+.export atdNumber
 .export ati0
 .export ati1
 .export ati2
@@ -66,8 +66,8 @@ ats91_15:
 atx4:
 .byte "ATX4", $0d, $0a, $00
 
-atd0123456789:
-.byte "ATDT0123456789", $0d, $0a, $00
+atdNumber:
+.byte "ATD117", $0d, $0a, $00
 
 ati0:
 .byte "ATI0", $0d, $0a, $00
