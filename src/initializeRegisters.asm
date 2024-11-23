@@ -25,7 +25,8 @@
   stz OAMADDL ; disable OAM priority rotation
   stz OAMADDH
 
-  stz BGMODE
+  lda #$05
+  sta BGMODE
   stz MOSAIC
 
   stz BG1SC
@@ -105,7 +106,8 @@
   lda #$e0
   sta COLDATA ; set Fixed color data to black
 
-  stz SETINI
+  lda #$0b
+  sta SETINI
 
   rep #$20
   .a16
