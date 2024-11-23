@@ -2,11 +2,11 @@
 
 .export startup
 startup:
-.byte "modem-control-test", $0a, "--------------------------------", $0a, $00
+.byte "Modem control test - @mucho613", $0a, "--------------------------------", $0a, $00
 
-.export executeModemSettings
-executeModemSettings:
-.byte "Execute modem settings.", $0a, $00
+.export startModemConfiguration
+startModemConfiguration:
+.byte "Start modem configuration.", $0a, $00
 
 .export dialing
 dialing:
