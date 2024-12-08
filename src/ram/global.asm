@@ -14,8 +14,11 @@ controller2InputData2: .res $2
 .export terminalTextPointer
 terminalTextPointer: .res $2
 
-.export terminalTextBuffer
-terminalTextBuffer: .res $100
+.export terminalTextWriteBuffer ; Store texts that will be written in terminal
+terminalTextWriteBuffer: .res $100
+
+.export terminalTextBuffer ; Store all of texts in terminal
+terminalTextBuffer: .res 80 * 28 ; 80 columns, 28 rows
 
 .export modemReceiveBufferCount
 modemReceiveBufferCount: .res $1

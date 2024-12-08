@@ -4,7 +4,7 @@
 .segment "STARTUP"
 
 Font:
-  .incbin "../../assets/font.bin"
+  .incbin "../../assets/pattern.bin"
 
 .export copyPattern
 .proc copyPattern
@@ -13,6 +13,8 @@ Font:
 
   pha
   phb
+  phx
+  phy
 
   setDP $2100
 
@@ -40,9 +42,11 @@ Font:
       dey
       bne @innerLoop2
 
-    cpx #$2000
+    cpx #$7800
     bne @outerLoop
 
+  ply
+  plx
   plb
   pla
 

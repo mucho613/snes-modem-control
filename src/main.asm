@@ -1,6 +1,7 @@
 .import initializeRegisters
 .import transferText
 .import clearBG1Tile
+.import setBG1Tile
 .import copyPalette
 .import copyPattern
 .import VBlank
@@ -56,6 +57,7 @@
   .a16
 
   jsr clearBG1Tile
+  jsr setBG1Tile
   jsr copyPalette ; Copy palette
   jsr copyPattern ; Copy pattern
 
@@ -63,8 +65,8 @@
   .a8
   .i8
 
-  lda #$42
-  sta $2107 ; BG 1 Address and Size
+  lda #$fa
+  sta BG1SC ; BG 1 Address and Size
 
   lda #$01
   sta TM ; Background and Object Enable (Main Screen)
@@ -77,7 +79,7 @@
   .a16
   .i16
 
-  jsr initializeModem
+  ; jsr initializeModem
 
   sep #$30
   .a8

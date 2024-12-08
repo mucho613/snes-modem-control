@@ -7,7 +7,7 @@
 .import modemReceiveBuffer
 .import modemReceiveBufferCount
 .import controller2InputData1
-.import terminalTextBuffer
+.import terminalTextWriteBuffer
 .import drawFrameCount
 .import drawControllerInput
 .import execModemSettings
@@ -26,46 +26,46 @@
   .a16
   .i16
 
-  lda frameCounter
-  bne @skip
-  lda frameCounter + 2
-  bne @skip
-    pea startup
-    jsr print
-    pla
-  @skip:
+  ; lda frameCounter
+  ; bne @skip
+  ; lda frameCounter + 2
+  ; bne @skip
+  ;   pea startup
+  ;   jsr print
+  ;   pla
+  ; @skip:
 
-  .scope drawTextFromModemReadBuffer
-    sep #$20
-    .a8
-    lda modemReceiveBufferCount
-    beq @skipDraw
+  ; .scope drawTextFromModemReadBuffer
+  ;   sep #$20
+  ;   .a8
+  ;   lda modemReceiveBufferCount
+  ;   beq @skipDraw
 
-    rep #$20
-    .a16
-    pea modemReceiveBuffer
-    jsr print
-    pla
-    sep #$20
-    .a8
+  ;   rep #$20
+  ;   .a16
+  ;   pea modemReceiveBuffer
+  ;   jsr print
+  ;   pla
+  ;   sep #$20
+  ;   .a8
 
-    stz modemReceiveBufferCount
+  ;   stz modemReceiveBufferCount
 
-    ldx #$0000
-    @clearBufferLoop:
-      stz modemReceiveBuffer, x
-      inx
-      cpx #$0040
-      bne @clearBufferLoop
+  ;   ldx #$0000
+  ;   @clearBufferLoop:
+  ;     stz modemReceiveBuffer, x
+  ;     inx
+  ;     cpx #$0040
+  ;     bne @clearBufferLoop
 
-    @skipDraw:
-    rep #$20
-    .a16
-  .endscope
+  ;   @skipDraw:
+  ;   rep #$20
+  ;   .a16
+  ; .endscope
 
-  jsr execModemSettings
+  ; jsr execModemSettings
 
-  jsr communicateWithModem
+  ; jsr communicateWithModem
 
   inc32 frameCounter
 

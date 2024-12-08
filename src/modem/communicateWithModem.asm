@@ -10,7 +10,7 @@
 .import controller1InputPrev
 .import controller2InputData1
 .import controller2InputData2
-.import terminalTextBuffer
+.import terminalTextWriteBuffer
 .import modemReceiveBuffer
 .import modemReceiveBufferCount
 .import modemTransmitBuffer
