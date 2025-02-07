@@ -95,5 +95,6 @@
 
   cli
 
-  jml EmptyInt
+  @waitNmi:
+  jmp @waitNmi
 .endproc

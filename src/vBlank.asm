@@ -19,7 +19,7 @@
 
 .export VBlank
 .proc VBlank
-  jml VBlankFast
+  jml VBlankFast ; Jump to fast VBlank
 .endproc
 
 .proc VBlankFast

@@ -8,7 +8,7 @@
 .segment "HEADER"
   .byte $31                     ; $FFD5: ROM Type
   .byte $00                     ; $FFD6: Cartidge Type: ROM only
-  .byte $06                     ; $FFD7: ROM Size: 17 ~ 32MBit
+  .byte $10                     ; $FFD7: ROM Size: 64 KiB
   .byte $00                     ; $FFD8: RAM Size: No RAM
   .byte $00                     ; $FFD9: Destination Code: Japan
   .byte $00                     ; $FFDA: Developer ID
