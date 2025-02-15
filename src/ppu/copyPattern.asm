@@ -1,10 +1,11 @@
 .include "../registers.inc"
 .include "../common/utility.asm"
 
-.segment "STARTUP"
-
+.segment "ASSETS"
 Font:
   .incbin "../../assets/pattern.bin"
+
+.segment "STARTUP"
 
 .export copyPattern
 .proc copyPattern

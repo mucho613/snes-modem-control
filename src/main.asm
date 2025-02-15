@@ -22,15 +22,15 @@
 
 .export Reset
 .proc Reset
-  sei
-  clc
-  xce
   jml ResetFast
 .endproc
 
 .proc ResetFast
+  clc
+  xce
+
   rep #$ff
-  sep #$24 ; Disable IRQ
+  sep #$24 ; Disable IRQ and NMI
   .a8
   .i16
 
