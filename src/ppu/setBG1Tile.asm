@@ -37,24 +37,6 @@ vramResetByte: .byte $00
     cmp #$0400
     bne @loop2
 
-  clc
-  lda #$0000
-  @loop3:
-    sta .lobyte(VMDATAL)
-
-    adc #$0002
-    cmp #$0400
-    bne @loop3
-
-  clc
-  lda #$0000
-  @loop4:
-    sta .lobyte(VMDATAL)
-
-    adc #$0002
-    cmp #$0400
-    bne @loop4
-
   plb
   pla
 

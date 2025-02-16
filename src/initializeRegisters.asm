@@ -107,8 +107,7 @@
   sta COLDATA ; set Fixed color data to black
 
   lda #$0b
-  ; lda #$00
-  sta SETINI
+  sta SETINI ; Enable Hi-res, OBJ interlace, and Screen interlace
 
   rep #$20
   .a16

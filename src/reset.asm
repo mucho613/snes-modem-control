@@ -58,8 +58,8 @@
 
   jsr clearBG1Tile
   jsr setBG1Tile
-  jsr copyPalette ; Copy palette
-  jsr copyPattern ; Copy pattern
+  jsr copyPalette
+  jsr copyPattern
 
   sep #$30
   .a8
