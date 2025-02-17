@@ -39,12 +39,6 @@
 
   setDP $0000
 
-  stz NMITIMEN ; Disable interrupts
-  stz HDMAEN ; Disable HDMA
-
-  lda #$8f
-  sta INIDISP ; Disable screen
-
   rep #$20
   .a16
 

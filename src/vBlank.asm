@@ -1,4 +1,5 @@
 .include "./common/utility.asm"
+.include "./registers.inc"
 
 .segment "STARTUP"
 
@@ -23,8 +24,30 @@
 .endproc
 
 .proc VBlankFast
+  pha
+  phb
+  phx
+  phy
+  php
+
+  rep #$20
   .a16
-  .i16
+
+  ; screll test ---
+  ; sep #$20
+  ; .a8
+
+  ; lda frameCounter
+  ; bit #$01
+  ; bne @skip
+  ; sta BG1VOFS
+  ; lda frameCounter + 1
+  ; sta BG1VOFS
+  ; @skip:
+
+  ; rep #$20
+  ; .a16
+  ; scroll test ---
 
   ; lda frameCounter
   ; bne @skip
@@ -68,6 +91,12 @@
   ; jsr communicateWithModem
 
   inc32 frameCounter
+
+  plp
+  ply
+  plx
+  plb
+  pla
 
   rti
 .endproc
