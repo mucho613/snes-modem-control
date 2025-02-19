@@ -30,9 +30,6 @@
   phy
   php
 
-  rep #$20
-  .a16
-
   ; screll test ---
   ; sep #$20
   ; .a8
@@ -89,6 +86,15 @@
   ; jsr execModemSettings
 
   ; jsr communicateWithModem
+
+  sep #$20
+  .a8
+
+  lda #$04
+  sta BG12NBA
+
+  rep #$20
+  .a16
 
   inc32 frameCounter
 
