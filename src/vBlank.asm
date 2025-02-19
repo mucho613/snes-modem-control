@@ -91,7 +91,7 @@
   sep #$20
   .a8
 
-  lda #$04
+  lda #$00
   sta BG12NBA
 
   rep #$20
