@@ -2,7 +2,7 @@
 
 .export hdmaTable
 hdmaTable:
-.byte 64
+.byte 63
   .byte $08
 
 .byte 1

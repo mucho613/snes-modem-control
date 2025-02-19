@@ -13,10 +13,13 @@ vramResetByte: .byte $00
 
   pha
   phb
+  phx
+  phy
+  php
 
   setDP $2100
 
-  lda #$7800 ; BG1 tilemap base address
+  lda #$7c00 ; BG1 tilemap base address
   sta .lobyte(VMADDL)
 
   clc
@@ -37,6 +40,9 @@ vramResetByte: .byte $00
     cmp #$0400
     bne @loop2
 
+  plp
+  ply
+  plx
   plb
   pla
 

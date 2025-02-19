@@ -26,6 +26,7 @@
 .proc VBlankFast
   pha
   phb
+  phd
   phx
   phy
   php
@@ -100,6 +101,7 @@
 
   plp
   ply
+  pld
   plx
   plb
   pla
