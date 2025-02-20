@@ -3,6 +3,7 @@
 
 .segment "STARTUP"
 
+.import hdmaTable
 .import copyNameTable
 .import communicateWithModem
 .import modemReceiveBuffer
@@ -30,6 +31,36 @@
   phx
   phy
   php
+
+  sep #$20
+  .a8
+
+  ; HDMA settings
+  stz DMAP0
+  lda #.lobyte(BG12NBA)
+  sta BBAD0
+  lda #.lobyte(hdmaTable)
+  sta A1T0L
+  lda #.hibyte(hdmaTable)
+  sta A1T0H
+  lda #.bankbyte(hdmaTable)
+  sta A1B0
+
+  lda STAT78
+  bit #%10000000
+  bne @hdmaOff ; If odd frame, skip HDMA
+
+  lda #$01
+  sta HDMAEN ; Enable HDMA channel 1
+  jmp @hdmaBranchEnd
+
+  @hdmaOff:
+
+  lda #$00
+  sta HDMAEN
+
+  @hdmaBranchEnd:
+
 
   ; screll test ---
   ; sep #$20
