@@ -3,7 +3,8 @@
 
 .segment "STARTUP"
 
-.import hdmaTable
+.import evenFrameHdmaTable
+.import oddFrameHdmaTable
 .import copyNameTable
 .import communicateWithModem
 .import modemReceiveBuffer
@@ -35,32 +36,40 @@
   sep #$20
   .a8
 
-  ; HDMA settings
+  lda STAT78
+  bit #%10000000
+  beq @oddFrameHdma ; If odd frame, skip HDMA
+
+  ; Even frame HDMA settings
   stz DMAP0
   lda #.lobyte(BG12NBA)
   sta BBAD0
-  lda #.lobyte(hdmaTable)
+  lda #.lobyte(evenFrameHdmaTable)
   sta A1T0L
-  lda #.hibyte(hdmaTable)
+  lda #.hibyte(evenFrameHdmaTable)
   sta A1T0H
-  lda #.bankbyte(hdmaTable)
+  lda #.bankbyte(evenFrameHdmaTable)
   sta A1B0
-
-  lda STAT78
-  bit #%10000000
-  bne @hdmaOff ; If odd frame, skip HDMA
-
-  lda #$01
-  sta HDMAEN ; Enable HDMA channel 1
   jmp @hdmaBranchEnd
 
-  @hdmaOff:
+  @oddFrameHdma:
 
-  lda #$00
-  sta HDMAEN
+  ; Even frame HDMA settings
+  stz DMAP0
+  lda #.lobyte(BG12NBA)
+  sta BBAD0
+  lda #.lobyte(oddFrameHdmaTable)
+  sta A1T0L
+  lda #.hibyte(oddFrameHdmaTable)
+  sta A1T0H
+  lda #.bankbyte(oddFrameHdmaTable)
+  sta A1B0
+  jmp @hdmaBranchEnd
 
   @hdmaBranchEnd:
 
+  lda #$01
+  sta HDMAEN ; Enable HDMA channel 1
 
   ; screll test ---
   ; sep #$20
