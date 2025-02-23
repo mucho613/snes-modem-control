@@ -1,48 +1,52 @@
 .include "../registers.inc"
 .include "../common/utility.asm"
 
+.segment "ASSETS"
+
+Tilemap:
+  .incbin "../../assets/tilemap.bin"
+
 .segment "STARTUP"
 
-vramResetByte: .byte $00
-
-; Set BG1 Tile(#$0000 - #$4000).
 .export setBG1Tile
 .proc setBG1Tile
-  .a16
-  .i16
-
   pha
   phb
+  phd
   phx
   phy
   php
+
+  rep #$30
+  .a16
+  .i16
 
   setDP $2100
 
   lda #$7c00 ; BG1 tilemap base address
   sta .lobyte(VMADDL)
 
-  clc
-  lda #$0000
-  @loop1:
-    sta .lobyte(VMDATAL)
+  sep #$20
+  .a8
 
-    adc #$0002
-    cmp #$0400
-    bne @loop1
+  lda #$01
+  sta DMAP0
+  lda #.lobyte(VMDATAL)
+  sta BBAD0
+  lda #.lobyte(Tilemap)
+  sta A1T0L
+  lda #.hibyte(Tilemap)
+  sta A1T0H
+  lda #.bankbyte(Tilemap)
+  sta A1B0
 
-  clc
-  lda #$0000
-  @loop2:
-    sta .lobyte(VMDATAL)
-
-    adc #$0002
-    cmp #$0400
-    bne @loop2
+  lda #$01
+  sta MDMAEN
 
   plp
   ply
   plx
+  pld
   plb
   pla
 
