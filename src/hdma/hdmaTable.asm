@@ -2,16 +2,16 @@
 
 .export evenFrameHdmaTable
 evenFrameHdmaTable:
-.byte 64
+.byte 76
   .byte $00
-.byte 64
-  .byte $04
+.byte 128
+  .byte $03
 .byte 0
 
 .export oddFrameHdmaTable
 oddFrameHdmaTable:
-.byte 63
+.byte 75
   .byte $00
-.byte 64
-  .byte $04
+.byte 128
+  .byte $03
 .byte 0

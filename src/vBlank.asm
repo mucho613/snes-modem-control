@@ -68,8 +68,8 @@
 
   @hdmaBranchEnd:
 
-  ; lda #$01
-  ; sta HDMAEN ; Enable HDMA channel 1
+  lda #$01
+  sta HDMAEN ; Enable HDMA channel 1
 
   ; lda frameCounter
   ; bne @skip
