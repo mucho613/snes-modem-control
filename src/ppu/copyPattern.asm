@@ -43,7 +43,7 @@ Font:
       dey
       bne @innerLoop2
 
-    cpx #$7c00
+    cpx #$6B40
     bne @outerLoop
 
   ply

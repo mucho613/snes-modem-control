@@ -59,7 +59,7 @@
   .a8
   .i8
 
-  lda #$fe
+  lda #$fa
   sta BG1SC ; BG 1 Address and Size
 
   lda #$01

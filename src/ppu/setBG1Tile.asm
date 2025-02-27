@@ -23,7 +23,7 @@ Tilemap:
 
   setDP $2100
 
-  lda #$7c00 ; BG1 tilemap base address
+  lda #$7800 ; BG1 tilemap base address
   sta .lobyte(VMADDL)
 
   sep #$20
@@ -39,6 +39,10 @@ Tilemap:
   sta A1T0H
   lda #.bankbyte(Tilemap)
   sta A1B0
+  lda #$3f
+  sta DAS0L
+  lda #$08
+  sta DAS0H
 
   lda #$01
   sta MDMAEN
