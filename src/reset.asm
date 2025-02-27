@@ -80,8 +80,8 @@
   .i8
 
   ; Enable NMI
-  lda #$80
-  sta $4200 ; NMI, V/H Count, and Joypad Enable
+  lda #$81
+  sta NMITIMEN ; NMI, V/H Count, and Joypad Enable
   cli
 
   @waitNmi:

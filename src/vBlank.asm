@@ -5,6 +5,7 @@
 
 .import evenFrameHdmaTable
 .import oddFrameHdmaTable
+.import bg1YScrollPos
 .import copyNameTable
 .import communicateWithModem
 .import modemReceiveBuffer
@@ -112,16 +113,75 @@
 
   ; jsr communicateWithModem
 
-  sep #$20
-  .a8
-
-  lda #$00
-  sta BG12NBA
-
   rep #$20
   .a16
 
   inc32 frameCounter
+
+  sep #$20
+  .a8
+
+  @joypadRead:
+  lda HVBJOY
+  and #$01
+  bne @joypadRead
+
+  lda JOY1H
+
+  bit #$08
+  bne @inputUp
+  bit #$04
+  bne @inputDown
+  jmp @inputBranchEnd
+
+  @inputUp:
+  rep #$20
+  .a16
+  lda bg1YScrollPos
+  dec
+  sta bg1YScrollPos
+  jmp @inputBranchEnd
+
+  @inputDown:
+  rep #$20
+  .a16
+  lda bg1YScrollPos
+  inc
+  sta bg1YScrollPos
+  jmp @inputBranchEnd
+
+  @inputBranchEnd:
+
+  ; Update BG1VOFS
+  sep #$20
+  .a8
+  lda bg1YScrollPos
+  sta BG1VOFS
+  lda bg1YScrollPos + 1
+  sta BG1VOFS
+
+  ; Update HDMA table
+  lda #76 ; 76 lines
+  sta evenFrameHdmaTable + 0
+  lda #$00
+  sta evenFrameHdmaTable + 1
+  lda #128 ; 128 lines
+  sta evenFrameHdmaTable + 2
+  lda #$03
+  sta evenFrameHdmaTable + 3
+  lda #$00
+  sta evenFrameHdmaTable + 4
+
+  lda #75
+  sta oddFrameHdmaTable + 0
+  lda #$00
+  sta oddFrameHdmaTable + 1
+  lda #128 ; 128 lines
+  sta oddFrameHdmaTable + 2
+  lda #$03
+  sta oddFrameHdmaTable + 3
+  lda #$00
+  sta oddFrameHdmaTable + 4
 
   plp
   ply
