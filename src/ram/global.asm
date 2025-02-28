@@ -3,6 +3,9 @@
 .export frameCounter
 frameCounter: .res $4
 
+.export bg1YScrollPos
+bg1YScrollPos: .res $2
+
 .export evenFrameHdmaTable
 evenFrameHdmaTable: .res $5
 
@@ -37,6 +40,3 @@ modemTransmitBufferCount: .res $1
 
 .export modemTransmitBuffer
 modemTransmitBuffer: .res $40
-
-.export bg1YScrollPos
-bg1YScrollPos: .res $2

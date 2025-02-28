@@ -161,7 +161,11 @@
   sta BG1VOFS
 
   ; Update HDMA table
-  lda #76 ; 76 lines
+  lda bg1YScrollPos
+  eor #$FF
+  clc
+  adc #152
+  lsr ; 76 lines
   sta evenFrameHdmaTable + 0
   lda #$00
   sta evenFrameHdmaTable + 1
@@ -172,7 +176,11 @@
   lda #$00
   sta evenFrameHdmaTable + 4
 
-  lda #75
+  lda bg1YScrollPos
+  eor #$FF
+  clc
+  adc #150
+  lsr ; 75 lines
   sta oddFrameHdmaTable + 0
   lda #$00
   sta oddFrameHdmaTable + 1

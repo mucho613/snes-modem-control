@@ -1,5 +1,6 @@
 .import initializeRegisters
 .import transferText
+.import bg1YScrollPos
 .import clearBG1Tile
 .import setBG1Tile
 .import copyPalette
@@ -72,6 +73,10 @@
   rep #$30
   .a16
   .i16
+
+  ; Reset BG1 scroll position
+  lda #$01FF
+  sta bg1YScrollPos
 
   ; jsr initializeModem
 
