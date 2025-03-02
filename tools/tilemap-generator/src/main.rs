@@ -7,9 +7,7 @@ fn main() -> Result<(), std::io::Error> {
     let mut data: Vec<u8> = Vec::new();
     let mut address: u16 = 0;
     for i in 0..0x0260 {
-        // 以下の場合は 00 00 を追加
-        // - i を 32 で割ったときに余りが 0～2 のとき
-        // - i を 32 で割ったときに余りが 29～31 のとき
+        // 左右の空白は 0x0000 のタイルを指定
         if i % 32 <= 2 || i % 32 >= 29 {
             data.push(0);
             data.push(0);
@@ -22,9 +20,7 @@ fn main() -> Result<(), std::io::Error> {
 
     address = 0x00dc;
     for i in 0..0x0260 {
-        // 以下の場合は 00 00 を追加
-        // - i を 32 で割ったときに余りが 0～2 のとき
-        // - i を 32 で割ったときに余りが 29～31 のとき
+        // 左右の空白は 0x0000 のタイルを指定
         if i % 32 <= 2 || i % 32 >= 29 {
             data.push(0);
             data.push(0);
