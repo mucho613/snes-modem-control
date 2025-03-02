@@ -1,8 +1,11 @@
+.macpack generic
+
 .include "./common/utility.asm"
 .include "./registers.inc"
 
 .segment "STARTUP"
 
+.import terminalDownwardScroll
 .import evenFrameHdmaTable
 .import oddFrameHdmaTable
 .import bg1YScrollPos
@@ -122,9 +125,9 @@
   .a8
 
   @joypadRead:
-  lda HVBJOY
-  and #$01
-  bne @joypadRead
+    lda HVBJOY
+    and #$01
+    bne @joypadRead
 
   lda JOY1H
 
@@ -134,21 +137,30 @@
   bne @inputDown
   jmp @inputBranchEnd
 
+  ; スクロール位置が 0 ～ 131 の範囲で遷移するようにする
+  ; 131 のときはスクロール位置を 0 に戻す
   @inputUp:
-  rep #$20
-  .a16
-  lda bg1YScrollPos
-  dec
-  sta bg1YScrollPos
-  jmp @inputBranchEnd
+    lda terminalDownwardScroll
+    dec
+    cmp #$FF
+    bne @upNegativeCheckEnd
+    lda #131
+    @upNegativeCheckEnd:
+    sta terminalDownwardScroll
 
+    jmp @inputBranchEnd
+
+  ; 132 のときはスクロール位置を 0 に戻す
   @inputDown:
-  rep #$20
-  .a16
-  lda bg1YScrollPos
-  inc
-  sta bg1YScrollPos
-  jmp @inputBranchEnd
+    lda terminalDownwardScroll
+    inc
+    cmp #132
+    bne @downNegativeCheckEnd
+    lda #$00
+    @downNegativeCheckEnd:
+    sta terminalDownwardScroll
+
+    jmp @inputBranchEnd
 
   @inputBranchEnd:
 
@@ -161,20 +173,20 @@
   sta BG1VOFS
 
   ; Update HDMA table
+  ; BG1 のY座標に合わせて、BG1 tile の開始位置の更新走査線の番号を変える
   lda bg1YScrollPos
   eor #$FF
-  clc
-  adc #152
+  add #152
   lsr ; 76 lines
   sta evenFrameHdmaTable + 0
-  lda #$00
-  sta evenFrameHdmaTable + 1
-  lda #128 ; 128 lines
+  stz evenFrameHdmaTable + 1
+  lda #56
+
   sta evenFrameHdmaTable + 2
   lda #$03
   sta evenFrameHdmaTable + 3
-  lda #$00
-  sta evenFrameHdmaTable + 4
+
+  stz evenFrameHdmaTable + 4
 
   lda bg1YScrollPos
   eor #$FF
@@ -182,14 +194,14 @@
   adc #150
   lsr ; 75 lines
   sta oddFrameHdmaTable + 0
-  lda #$00
-  sta oddFrameHdmaTable + 1
-  lda #128 ; 128 lines
+  stz oddFrameHdmaTable + 1
+  lda #56
+
   sta oddFrameHdmaTable + 2
   lda #$03
   sta oddFrameHdmaTable + 3
-  lda #$00
-  sta oddFrameHdmaTable + 4
+
+  stz oddFrameHdmaTable + 4
 
   plp
   ply

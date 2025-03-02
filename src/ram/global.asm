@@ -3,14 +3,17 @@
 .export frameCounter
 frameCounter: .res $4
 
+.export terminalDownwardScroll
+terminalDownwardScroll: .res $1
+
 .export bg1YScrollPos
 bg1YScrollPos: .res $2
 
 .export evenFrameHdmaTable
-evenFrameHdmaTable: .res $5
+evenFrameHdmaTable: .res $7
 
 .export oddFrameHdmaTable
-oddFrameHdmaTable: .res $5
+oddFrameHdmaTable: .res $7
 
 .export controller1Input, controller1InputPrev
 controller1Input: .res $4
