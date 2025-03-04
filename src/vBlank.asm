@@ -164,6 +164,14 @@
 
   @inputBranchEnd:
 
+  ; Update bg1YScrollPos
+  rep #$20
+  .a16
+  lda terminalDownwardScroll
+  and #$00FF
+  asl
+  sta bg1YScrollPos
+
   ; Update BG1VOFS
   sep #$20
   .a8
@@ -172,36 +180,68 @@
   lda bg1YScrollPos + 1
   sta BG1VOFS
 
+  ; スクロール量に応じて HDMA テーブルを分岐
+  lda terminalDownwardScroll
+  sub #76
+  bpl @hdmaBranchPattern2
+
   ; Update HDMA table
   ; BG1 のY座標に合わせて、BG1 tile の開始位置の更新走査線の番号を変える
-  lda bg1YScrollPos
-  eor #$FF
-  add #152
-  lsr ; 76 lines
-  sta evenFrameHdmaTable + 0
-  stz evenFrameHdmaTable + 1
-  lda #56
+  @hdmaBranchPattern1:
+  ; 0 ～ 76 の範囲の場合
+    lda #75
+    sub terminalDownwardScroll
+    sta evenFrameHdmaTable + 0
+    ; dec ; odd frame で 1 行減らす（1行消えてしまうため）
+    sta oddFrameHdmaTable + 0
+    stz evenFrameHdmaTable + 1
+    stz oddFrameHdmaTable + 1
 
-  sta evenFrameHdmaTable + 2
-  lda #$03
-  sta evenFrameHdmaTable + 3
+    lda #56
+    sta evenFrameHdmaTable + 2
+    sta oddFrameHdmaTable + 2
+    lda #$03
+    sta evenFrameHdmaTable + 3
+    sta oddFrameHdmaTable + 3
 
-  stz evenFrameHdmaTable + 4
+    lda #1
+    sta evenFrameHdmaTable + 4
+    sta oddFrameHdmaTable + 4
+    stz evenFrameHdmaTable + 5
+    stz oddFrameHdmaTable + 5
 
-  lda bg1YScrollPos
-  eor #$FF
-  clc
-  adc #150
-  lsr ; 75 lines
-  sta oddFrameHdmaTable + 0
-  stz oddFrameHdmaTable + 1
-  lda #56
+    stz evenFrameHdmaTable + 6
+    stz oddFrameHdmaTable + 6
+    jmp @hdmaPatternBranchEnd
 
-  sta oddFrameHdmaTable + 2
-  lda #$03
-  sta oddFrameHdmaTable + 3
+  ; 77 ～ 132 の範囲の場合
+  @hdmaBranchPattern2:
+    lda #133
+    sub terminalDownwardScroll
+    sta evenFrameHdmaTable + 0
+    ; dec ; odd frame で 1 行減らす（1行消えてしまうため）
+    sta oddFrameHdmaTable + 0
+    lda #$03
+    sta evenFrameHdmaTable + 1
+    sta oddFrameHdmaTable + 1
 
-  stz oddFrameHdmaTable + 4
+    lda #76
+    sta evenFrameHdmaTable + 2
+    sta oddFrameHdmaTable + 2
+    stz evenFrameHdmaTable + 3
+    stz oddFrameHdmaTable + 3
+
+    lda #1
+    sta evenFrameHdmaTable + 4
+    sta oddFrameHdmaTable + 4
+    lda #$03
+    sta evenFrameHdmaTable + 5
+    sta oddFrameHdmaTable + 5
+
+    stz evenFrameHdmaTable + 6
+    stz oddFrameHdmaTable + 6
+
+  @hdmaPatternBranchEnd:
 
   plp
   ply
