@@ -6,6 +6,9 @@ frameCounter: .res $4
 .export terminalDownwardScroll
 terminalDownwardScroll: .res $1
 
+.export terminalScrollLineNumber
+terminalScrollLineNumber: .res $1
+
 .export bg1YScrollPos
 bg1YScrollPos: .res $2
 
