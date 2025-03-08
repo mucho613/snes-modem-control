@@ -48,7 +48,7 @@
   jmp @inputBranchEnd
 
   ; スクロール位置が 0 ～ 131 の範囲で遷移するようにする
-  ; 131 のときはスクロール位置を 0 に戻す
+  ; 0xff のときはスクロール位置を 0 に戻す
   @inputUp:
     lda terminalDownwardScroll
     dec
