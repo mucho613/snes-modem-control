@@ -55,4 +55,6 @@
   plp
   plb
   pla
+
+  rts
 .endproc
