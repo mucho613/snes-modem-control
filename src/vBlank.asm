@@ -6,6 +6,7 @@
 .segment "STARTUP"
 
 .import terminalDownwardScroll
+.import terminalScrollLineNumber
 .import evenFrameHdmaTable
 .import oddFrameHdmaTable
 .import bg1YScrollPos
@@ -57,7 +58,6 @@
     lda #131
     @upNegativeCheckEnd:
     sta terminalDownwardScroll
-
     jmp @inputBranchEnd
 
   ; 132 のときはスクロール位置を 0 に戻す
@@ -69,10 +69,26 @@
     lda #$00
     @downNegativeCheckEnd:
     sta terminalDownwardScroll
-
     jmp @inputBranchEnd
-
   @inputBranchEnd:
+
+  ; Update scroll line number
+  lda terminalDownwardScroll
+  asl
+  sta WRDIVL
+  stz WRDIVH
+  lda #11 ; 文字の高さは 11 px
+  sta WRDIVB
+  NOP
+  NOP
+  NOP
+  NOP
+  NOP
+  NOP
+  NOP
+  NOP
+  lda RDDIVL
+  sta terminalScrollLineNumber
 
   ; Update bg1YScrollPos
   rep #$20
