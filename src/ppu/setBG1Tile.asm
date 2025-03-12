@@ -39,9 +39,9 @@ Tilemap:
   sta A1T0H
   lda #.bankbyte(Tilemap)
   sta A1B0
-  lda #$7f
+  lda #$ff
   sta DAS0L
-  lda #$08
+  lda #$0f
   sta DAS0H
 
   lda #$01

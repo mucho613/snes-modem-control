@@ -21,7 +21,7 @@ fn main() -> Result<(), std::io::Error> {
     }
 
     address = 0x00dc;
-    for i in 0..0x01e0 {
+    for i in 0..0x01c0 {
         // 左右の空白は 0x0000 のタイルを指定
         if i % 32 <= 2 || i % 32 >= 29 {
             data.push(0);
@@ -47,7 +47,7 @@ fn main() -> Result<(), std::io::Error> {
     }
 
     address = 0x00dc;
-    for i in 0..0x01e0 {
+    for i in 0..0x01c0 {
         // 左右の空白は 0x0000 のタイルを指定
         if i % 32 <= 2 || i % 32 >= 29 {
             data.push(0);
