@@ -22,10 +22,13 @@ bufWH1: .res $1
 bg1YScrollPos: .res $2
 
 .export evenFrameHdmaTable
-evenFrameHdmaTable: .res $7
+evenFrameHdmaTable: .res $11
 
 .export oddFrameHdmaTable
-oddFrameHdmaTable: .res $7
+oddFrameHdmaTable: .res $11
+
+.export windowSettingsTable
+windowSettingsTable: .res $10
 
 .export controller1Input, controller1InputPrev
 controller1Input: .res $4

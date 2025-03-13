@@ -82,7 +82,7 @@
   stz WRDIVH
   lda #11 ; 文字の高さは 11 px
   sta WRDIVB
-  NOP
+  NOP ; Wait for divide calculation to complete
   NOP
   NOP
   NOP
@@ -99,6 +99,7 @@
   lda terminalDownwardScroll
   and #$00FF
   asl
+  sub #94
   sta bg1YScrollPos
 
   ; Update BG1VOFS
