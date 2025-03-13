@@ -15,6 +15,9 @@
   sep #$20
   .a8
 
+  ; TODO
+  ; - スクロール位置 4B のときにバグる
+
   ; スクロール量に応じて HDMA テーブルを分岐
   lda terminalDownwardScroll
   sub #76

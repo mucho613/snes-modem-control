@@ -13,6 +13,9 @@
 .import frameCounter
 .import updateHdmaTable
 .import enableHdma
+.import bufW12SEL
+.import bufWH0
+.import bufWH1
 
 .export VBlank
 .proc VBlank
@@ -108,6 +111,22 @@
 
   jsr updateHdmaTable
   jsr enableHdma
+
+  ; Window settings
+  lda bufW12SEL
+  sta W12SEL
+
+  lda bufWH0
+  sta WH0
+
+  lda bufWH1
+  sta WH1
+
+  lda #$01
+  sta TMW
+
+  lda #$01
+  sta TSW
 
   plp
   ply

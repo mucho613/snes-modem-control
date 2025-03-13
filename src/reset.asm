@@ -8,10 +8,14 @@
 .import VBlank
 .import initializeModem
 .import clearRamAll
+.import bufW12SEL
+.import bufWH0
+.import bufWH1
 
 .include "./registers.inc"
 .include "./common/utility.asm"
 .include "./ram/clearAll.inc"
+
 
 .segment "STARTUP"
 
@@ -88,6 +92,14 @@
   lda #$81
   sta NMITIMEN ; NMI, V/H Count, and Joypad Enable
   cli
+
+  ; Set window settings
+  lda #$03 ; Window 1 Enable and inverted
+  sta bufW12SEL
+  lda #$18
+  sta bufWH0 ; Window 1 Position 1 = 24
+  lda #$E4
+  sta bufWH1 ; Window 1 Position 2 = 228
 
   @waitNmi:
   jmp @waitNmi
