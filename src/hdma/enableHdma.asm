@@ -4,7 +4,7 @@
 
 .macpack generic
 
-.import terminalDownwardScroll
+.import terminalScrollLineNumber
 .import evenFrameHdmaTable
 .import oddFrameHdmaTable
 
@@ -12,40 +12,59 @@
 .proc enableHdma
   pha
   phb
+  phd
+  phx
+  phy
   php
 
   sep #$20
   .a8
+  rep #$10
+  .i16
+
+  stz DMAP0
+  lda #.lobyte(BG12NBA)
+  sta BBAD0
 
   lda STAT78
   bit #%10000000
-  beq @oddFrameHdma ; If odd frame, skip HDMA
+  beq @oddFrameHdma
 
-  ; Even frame HDMA settings
-  stz DMAP0
-  lda #.lobyte(BG12NBA)
-  sta BBAD0
-  lda #.lobyte(evenFrameHdmaTable)
-  sta A1T0L
-  lda #.hibyte(evenFrameHdmaTable)
-  sta A1T0H
-  lda #.bankbyte(evenFrameHdmaTable)
-  sta A1B0
-  jmp @hdmaBranchEnd
+  @evenFrameHdma: ; Even frame HDMA settings
+    rep #$20
+    .a16
+    lda terminalScrollLineNumber
+    and #$00ff
+    asl ; x2
+    asl ; x4
+    asl ; x8
+    asl ; x16
 
-  @oddFrameHdma:
+    add #.loword(evenFrameHdmaTable)
+    sta A1T0L
+    sep #$20
+    .a8
+    lda #.bankbyte(evenFrameHdmaTable)
+    sta A1B0
+    jmp @hdmaBranchEnd
 
-  ; Even frame HDMA settings
-  stz DMAP0
-  lda #.lobyte(BG12NBA)
-  sta BBAD0
-  lda #.lobyte(oddFrameHdmaTable)
-  sta A1T0L
-  lda #.hibyte(oddFrameHdmaTable)
-  sta A1T0H
-  lda #.bankbyte(oddFrameHdmaTable)
-  sta A1B0
-  jmp @hdmaBranchEnd
+  @oddFrameHdma: ; Odd frame HDMA settings
+    rep #$20
+    .a16
+    lda terminalScrollLineNumber
+    and #$00ff
+    asl ; x2
+    asl ; x4
+    asl ; x8
+    asl ; x16
+
+    add #.loword(oddFrameHdmaTable)
+    sta A1T0L
+    sep #$20
+    .a8
+    lda #.bankbyte(oddFrameHdmaTable)
+    sta A1B0
+    jmp @hdmaBranchEnd
 
   @hdmaBranchEnd:
 
@@ -53,6 +72,9 @@
   sta HDMAEN ; Enable HDMA channel 1
 
   plp
+  ply
+  plx
+  pld
   plb
   pla
 

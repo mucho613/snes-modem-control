@@ -16,6 +16,10 @@
 .import bufW12SEL
 .import bufWH0
 .import bufWH1
+.import controller1Input
+.import controller1InputPrev
+.import controller1InputPulse
+.import scrollPositionTable
 
 .export VBlank
 .proc VBlank
@@ -38,12 +42,19 @@
   sep #$20
   .a8
 
+  lda controller1Input
+  sta controller1InputPrev
+
   @joypadRead:
     lda HVBJOY
     and #$01
     bne @joypadRead
 
   lda JOY1H
+  sta controller1Input
+  eor controller1InputPrev
+  and controller1Input
+  sta controller1InputPulse
 
   bit #$08
   bne @inputUp
@@ -51,56 +62,38 @@
   bne @inputDown
   jmp @inputBranchEnd
 
-  ; スクロール位置が 0 ～ 131 の範囲で遷移するようにする
-  ; 0xff のときはスクロール位置を 0 に戻す
+  ; スクロール行数を 0 ～ 23 の範囲で遷移するようにする
+  ; 0xff のときは 23 に補正
   @inputUp:
-    lda terminalDownwardScroll
+    lda terminalScrollLineNumber
     dec
     cmp #$FF
     bne @upNegativeCheckEnd
-    lda #131
+    lda #23
     @upNegativeCheckEnd:
-    sta terminalDownwardScroll
+    sta terminalScrollLineNumber
     jmp @inputBranchEnd
 
-  ; 132 のときはスクロール位置を 0 に戻す
+  ; 24行目に達したら 0 に戻す
   @inputDown:
-    lda terminalDownwardScroll
+    lda terminalScrollLineNumber
     inc
-    cmp #132
+    cmp #24
     bne @downNegativeCheckEnd
-    lda #$00
+    lda #0
     @downNegativeCheckEnd:
-    sta terminalDownwardScroll
+    sta terminalScrollLineNumber
     jmp @inputBranchEnd
   @inputBranchEnd:
 
-  ; Update scroll line number
-  lda terminalDownwardScroll
+  ; Update scroll position
+  lda terminalScrollLineNumber
   asl
-  sta WRDIVL
-  stz WRDIVH
-  lda #11 ; 文字の高さは 11 px
-  sta WRDIVB
-  NOP ; Wait for divide calculation to complete
-  NOP
-  NOP
-  NOP
-  NOP
-  NOP
-  NOP
-  NOP
-  lda RDDIVL
-  sta terminalScrollLineNumber
-
-  ; Update bg1YScrollPos
-  rep #$20
-  .a16
-  lda terminalDownwardScroll
-  and #$00FF
-  asl
-  sub #94
+  tax
+  lda scrollPositionTable, x
   sta bg1YScrollPos
+  lda scrollPositionTable + 1, x
+  sta bg1YScrollPos + 1
 
   ; Update BG1VOFS
   sep #$20
@@ -110,7 +103,6 @@
   lda bg1YScrollPos + 1
   sta BG1VOFS
 
-  jsr updateHdmaTable
   jsr enableHdma
 
   ; Window settings
