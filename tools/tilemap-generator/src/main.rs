@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::Write;
 
 fn main() -> Result<(), std::io::Error> {
-    let mut file = File::create("tilemap.bin")?;
+    let mut file = File::create("../../assets/tilemap.bin")?;
 
     let mut data: Vec<u8> = Vec::new();
     let mut address: u16;
