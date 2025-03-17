@@ -3,11 +3,11 @@
 .export frameCounter
 frameCounter: .res $4
 
-.export terminalDownwardScroll
-terminalDownwardScroll: .res $1
-
 .export terminalScrollLineNumber
 terminalScrollLineNumber: .res $1
+
+.export bg1YScrollPos
+bg1YScrollPos: .res $2
 
 .export bufW12SEL
 bufW12SEL: .res $1
@@ -17,9 +17,6 @@ bufWH0: .res $1
 
 .export bufWH1
 bufWH1: .res $1
-
-.export bg1YScrollPos
-bg1YScrollPos: .res $2
 
 .export controller1Input, controller1InputPrev, controller1InputPulse
 controller1Input: .res $4

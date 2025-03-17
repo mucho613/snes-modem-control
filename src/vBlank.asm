@@ -5,7 +5,6 @@
 
 .segment "STARTUP"
 
-.import terminalDownwardScroll
 .import terminalScrollLineNumber
 .import evenFrameHdmaTable
 .import oddFrameHdmaTable
