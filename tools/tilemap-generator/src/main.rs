@@ -8,7 +8,7 @@ fn main() -> Result<(), std::io::Error> {
     let mut address: u16;
 
     address = 0x0000;
-    for i in 0..0x0260 {
+    for i in 0..0x0220 {
         // 左右の空白は 0x0000 のタイルを指定
         if i % 32 <= 2 || i % 32 >= 29 {
             data.push(0);
@@ -20,8 +20,8 @@ fn main() -> Result<(), std::io::Error> {
         address += 2;
     }
 
-    address = 0x00dc;
-    for i in 0..0x01c0 {
+    address = 0x0074;
+    for i in 0..0x0200 {
         // 左右の空白は 0x0000 のタイルを指定
         if i % 32 <= 2 || i % 32 >= 29 {
             data.push(0);
@@ -34,7 +34,7 @@ fn main() -> Result<(), std::io::Error> {
     }
 
     address = 0x0000;
-    for i in 0..0x0260 {
+    for i in 0..0x0220 {
         // 左右の空白は 0x0000 のタイルを指定
         if i % 32 <= 2 || i % 32 >= 29 {
             data.push(0);
@@ -46,8 +46,8 @@ fn main() -> Result<(), std::io::Error> {
         address += 2;
     }
 
-    address = 0x00dc;
-    for i in 0..0x01c0 {
+    address = 0x0074;
+    for i in 0..0x0200 {
         // 左右の空白は 0x0000 のタイルを指定
         if i % 32 <= 2 || i % 32 >= 29 {
             data.push(0);

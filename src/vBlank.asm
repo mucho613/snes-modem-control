@@ -9,6 +9,7 @@
 .import evenFrameHdmaTable
 .import oddFrameHdmaTable
 .import bg1YScrollPos
+.import updateLine23TileMap
 .import frameCounter
 .import updateHdmaTable
 .import enableHdma
@@ -40,6 +41,44 @@
 
   sep #$20
   .a8
+
+  ; Update BG1 tile map
+  jsr updateLine23TileMap
+
+  ; Update scroll position
+  lda terminalScrollLineNumber
+  asl
+  tax
+  lda scrollPositionTable, x
+  sta bg1YScrollPos
+  lda scrollPositionTable + 1, x
+  sta bg1YScrollPos + 1
+
+  ; Update BG1VOFS
+  sep #$20
+  .a8
+  lda bg1YScrollPos
+  sta BG1VOFS
+  lda bg1YScrollPos + 1
+  sta BG1VOFS
+
+  jsr enableHdma
+
+  ; Window settings
+  lda bufW12SEL
+  sta W12SEL
+
+  lda bufWH0
+  sta WH0
+
+  lda bufWH1
+  sta WH1
+
+  lda #$01
+  sta TMW
+
+  lda #$01
+  sta TSW
 
   lda controller1Input
   sta controller1InputPrev
@@ -84,41 +123,6 @@
     sta terminalScrollLineNumber
     jmp @inputBranchEnd
   @inputBranchEnd:
-
-  ; Update scroll position
-  lda terminalScrollLineNumber
-  asl
-  tax
-  lda scrollPositionTable, x
-  sta bg1YScrollPos
-  lda scrollPositionTable + 1, x
-  sta bg1YScrollPos + 1
-
-  ; Update BG1VOFS
-  sep #$20
-  .a8
-  lda bg1YScrollPos
-  sta BG1VOFS
-  lda bg1YScrollPos + 1
-  sta BG1VOFS
-
-  jsr enableHdma
-
-  ; Window settings
-  lda bufW12SEL
-  sta W12SEL
-
-  lda bufWH0
-  sta WH0
-
-  lda bufWH1
-  sta WH1
-
-  lda #$01
-  sta TMW
-
-  lda #$01
-  sta TSW
 
   plp
   ply
