@@ -94,12 +94,16 @@
   cli
 
   ; Set window settings
-  lda #$03 ; Window 1 Enable and inverted
-  sta bufW12SEL
+  lda #$03
+  sta W12SEL ; Window 1 Enable and inverted
   lda #$18
-  sta bufWH0 ; Window 1 Position 1 = 24
+  sta WH0 ; Window 1 Position 1 = 24
   lda #$E4
-  sta bufWH1 ; Window 1 Position 2 = 228
+  sta WH1 ; Window 1 Position 2 = 228
+  lda #$01
+  sta TMW ; Window 1 Enable (Main Screen)
+  lda #$01
+  sta TSW ; Window 1 Enable (Sub Screen)
 
   @waitNmi:
   jmp @waitNmi

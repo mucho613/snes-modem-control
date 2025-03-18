@@ -64,22 +64,7 @@
 
   jsr enableHdma
 
-  ; Window settings
-  lda bufW12SEL
-  sta W12SEL
-
-  lda bufWH0
-  sta WH0
-
-  lda bufWH1
-  sta WH1
-
-  lda #$01
-  sta TMW
-
-  lda #$01
-  sta TSW
-
+  ; Controller input
   lda controller1Input
   sta controller1InputPrev
 
