@@ -12,7 +12,8 @@
 .import updateLine23TileMap
 .import frameCounter
 .import updateHdmaTable
-.import enableHdma
+.import enableBg1TileHdma
+.import enableBg1WindowHdma
 .import bufW12SEL
 .import bufWH0
 .import bufWH1
@@ -62,7 +63,13 @@
   lda bg1YScrollPos + 1
   sta BG1VOFS
 
-  jsr enableHdma
+  ; HDMA settings
+  jsr enableBg1TileHdma
+  jsr enableBg1WindowHdma
+
+  ; Enable HDMA
+  lda #%00000011
+  sta HDMAEN ; Enable HDMA channel 1 & 2
 
   ; Controller input
   lda controller1Input

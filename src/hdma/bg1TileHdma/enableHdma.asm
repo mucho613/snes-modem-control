@@ -1,6 +1,6 @@
 .segment "STARTUP"
 
-.include "../registers.inc"
+.include "../../registers.inc"
 
 .macpack generic
 
@@ -8,8 +8,9 @@
 .import evenFrameHdmaTable
 .import oddFrameHdmaTable
 
-.export enableHdma
-.proc enableHdma
+; BG1 Tile の Base address を mid-frame で切り替えるための HDMA を有効化する
+.export enableBg1TileHdma
+.proc enableBg1TileHdma
   pha
   phb
   phd
@@ -67,9 +68,6 @@
     jmp @hdmaBranchEnd
 
   @hdmaBranchEnd:
-
-  lda #$01
-  sta HDMAEN ; Enable HDMA channel 1
 
   plp
   ply
