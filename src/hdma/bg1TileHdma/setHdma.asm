@@ -5,12 +5,12 @@
 .macpack generic
 
 .import terminalScrollLineNumber
-.import evenFrameHdmaTable
-.import oddFrameHdmaTable
+.import bg1TileHdmaEvenFrameTable
+.import bg1TileHdmaOddFrameTable
 
 ; BG1 Tile の Base address を mid-frame で切り替えるための HDMA を有効化する
-.export enableBg1TileHdma
-.proc enableBg1TileHdma
+.export setBg1TileHdma
+.proc setBg1TileHdma
   pha
   phb
   phd
@@ -41,11 +41,11 @@
     asl ; x8
     asl ; x16
 
-    add #.loword(evenFrameHdmaTable)
+    add #.loword(bg1TileHdmaEvenFrameTable)
     sta A1T0L
     sep #$20
     .a8
-    lda #.bankbyte(evenFrameHdmaTable)
+    lda #.bankbyte(bg1TileHdmaEvenFrameTable)
     sta A1B0
     jmp @hdmaBranchEnd
 
@@ -59,11 +59,11 @@
     asl ; x8
     asl ; x16
 
-    add #.loword(oddFrameHdmaTable)
+    add #.loword(bg1TileHdmaOddFrameTable)
     sta A1T0L
     sep #$20
     .a8
-    lda #.bankbyte(oddFrameHdmaTable)
+    lda #.bankbyte(bg1TileHdmaOddFrameTable)
     sta A1B0
     jmp @hdmaBranchEnd
 

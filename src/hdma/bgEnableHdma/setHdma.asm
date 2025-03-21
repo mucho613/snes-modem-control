@@ -4,10 +4,10 @@
 
 .macpack generic
 
-.import bg1WindowHdmaTable
+.import bgEnableHdmaTable
 
-.export enableBg1WindowHdma
-.proc enableBg1WindowHdma
+.export setBgEnableHdma
+.proc setBgEnableHdma
   pha
   phb
   php
@@ -20,11 +20,11 @@
   lda #.lobyte(TM) ; TM と TS は連続して並んでいるので、HDMA Pattern 1 で 2バイトを同時に書き換える
   sta BBAD1
 
-  lda #.lobyte(bg1WindowHdmaTable)
+  lda #.lobyte(bgEnableHdmaTable)
   sta A1T1L
-  lda #.hibyte(bg1WindowHdmaTable)
+  lda #.hibyte(bgEnableHdmaTable)
   sta A1T1H
-  lda #.bankbyte(bg1WindowHdmaTable)
+  lda #.bankbyte(bgEnableHdmaTable)
   sta A1B1
 
   plp

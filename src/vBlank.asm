@@ -6,14 +6,14 @@
 .segment "STARTUP"
 
 .import terminalScrollLineNumber
-.import evenFrameHdmaTable
-.import oddFrameHdmaTable
+.import bg1TileHdmaEvenFrameTable
+.import bg1TileHdmaOddFrameTable
 .import bg1YScrollPos
 .import updateLine23TileMap
 .import frameCounter
 .import updateHdmaTable
-.import enableBg1TileHdma
-.import enableBg1WindowHdma
+.import setBg1TileHdma
+.import setBgEnableHdma
 .import bufW12SEL
 .import bufWH0
 .import bufWH1
@@ -64,8 +64,8 @@
   sta BG1VOFS
 
   ; HDMA settings
-  jsr enableBg1TileHdma
-  jsr enableBg1WindowHdma
+  jsr setBg1TileHdma
+  jsr setBgEnableHdma
 
   ; Enable HDMA
   lda #%00000011

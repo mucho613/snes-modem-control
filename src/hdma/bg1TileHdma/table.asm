@@ -2,8 +2,8 @@
 
 .align 16
 
-.export evenFrameHdmaTable
-evenFrameHdmaTable:
+.export bg1TileHdmaEvenFrameTable
+bg1TileHdmaEvenFrameTable:
 .byte 46, 0, 68, 0, 64, 3, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0
 .byte 46, 0, 63, 0, 64, 3, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0
 .byte 46, 0, 57, 0, 64, 3, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0
@@ -29,8 +29,8 @@ evenFrameHdmaTable:
 .byte 46, 0, 11, 3, 68, 0, 1, 3, 0, 0, 0, 0, 0, 0, 0, 0
 .byte 46, 0, 6, 3, 68, 0, 1, 3, 0, 0, 0, 0, 0, 0, 0, 0
 
-.export oddFrameHdmaTable
-oddFrameHdmaTable:
+.export bg1TileHdmaOddFrameTable
+bg1TileHdmaOddFrameTable:
 .byte 46, 0, 68, 0, 64, 3, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0
 .byte 46, 0, 62, 0, 64, 3, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0
 .byte 46, 0, 57, 0, 64, 3, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0
