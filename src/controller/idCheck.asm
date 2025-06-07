@@ -1,4 +1,4 @@
-.segment "STARTUP"
+.code
 
 .import controller2InputData1
 .import pleaseConnectModemMessage

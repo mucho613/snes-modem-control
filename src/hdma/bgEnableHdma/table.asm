@@ -1,4 +1,4 @@
-.segment "STARTUP"
+.code
 
 ; BG の表示 / 非表示を切り替えるテーブル
 .export bgEnableHdmaTable

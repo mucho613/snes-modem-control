@@ -1,12 +1,12 @@
 .include "../registers.inc"
 .include "../common/utility.asm"
 
-.segment "ASSETS"
+.data
 
 Tilemap:
   .incbin "../../assets/tilemap.bin"
 
-.segment "STARTUP"
+.code
 
 .export setBG1Tile
 .proc setBG1Tile

@@ -1,4 +1,4 @@
-.segment "STARTUP"
+.code
 
 .import print
 .import controller1Input

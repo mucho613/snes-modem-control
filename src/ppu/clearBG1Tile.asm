@@ -1,7 +1,7 @@
 .include "../registers.inc"
 .include "../common/utility.asm"
 
-.segment "STARTUP"
+.code
 
 vramResetByte: .byte $00
 

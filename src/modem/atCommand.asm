@@ -1,4 +1,4 @@
-.segment "STARTUP"
+.code
 
 .export at
 .export atz

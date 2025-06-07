@@ -1,4 +1,4 @@
-.segment "STARTUP"
+.code
 
 ramResetByte: .byte $00
 

@@ -5,7 +5,7 @@
 
 .import terminalTextPointer
 
-.segment "STARTUP"
+.code
 
 ; args:
 ; 0: string terminated with 0x00

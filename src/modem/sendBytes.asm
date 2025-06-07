@@ -5,7 +5,7 @@
 .import modemTransmitBuffer
 .import modemTransmitBufferCount
 
-.segment "STARTUP"
+.code
 
 .export sendBytesToModem
 .proc sendBytesToModem

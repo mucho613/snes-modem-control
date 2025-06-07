@@ -2,7 +2,7 @@
 
 .include "./registers.inc"
 
-.segment "STARTUP"
+.code
 
 .proc initializeRegisters
   sep #$20

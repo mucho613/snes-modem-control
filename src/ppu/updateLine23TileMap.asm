@@ -3,7 +3,7 @@
 
 .import terminalScrollLineNumber
 
-.segment "STARTUP"
+.code
 
 line0_22TileMap:
   .byte $00, $00, $02, $00, $04, $00, $06, $00, $08, $00, $0A, $00, $0C, $00, $0E, $00

@@ -16,8 +16,7 @@
 .include "./common/utility.asm"
 .include "./ram/clearAll.inc"
 
-
-.segment "STARTUP"
+.code
 
 .export EmptyInt
 .proc EmptyInt

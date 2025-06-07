@@ -1,6 +1,6 @@
 .include "../registers.inc"
 
-.segment "STARTUP"
+.code
 
 .export initializeModem
 .proc initializeModem

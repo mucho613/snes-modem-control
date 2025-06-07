@@ -3,7 +3,7 @@
 .include "./common/utility.asm"
 .include "./registers.inc"
 
-.segment "STARTUP"
+.code
 
 .import terminalScrollLineNumber
 .import bg1TileHdmaEvenFrameTable

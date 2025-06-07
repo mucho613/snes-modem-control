@@ -1,4 +1,4 @@
-.segment "STARTUP"
+.code
 
 .align 16
 

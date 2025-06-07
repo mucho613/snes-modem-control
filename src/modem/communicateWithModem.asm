@@ -3,7 +3,7 @@
 .include "../common/utility.asm"
 .include "nop.inc"
 
-.segment "STARTUP"
+.code
 
 .import copyNameTable
 .import controller1Input
