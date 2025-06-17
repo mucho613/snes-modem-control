@@ -1,5 +1,5 @@
 .include "../registers.inc"
-.include "../common/utility.asm"
+.include "../macro/utility.asm"
 
 .code
 

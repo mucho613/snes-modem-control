@@ -13,7 +13,7 @@
 .import bufWH1
 
 .include "./registers.inc"
-.include "./common/utility.asm"
+.include "./macro/utility.asm"
 .include "./ram/clearAll.inc"
 
 .code

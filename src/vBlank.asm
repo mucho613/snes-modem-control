@@ -1,6 +1,6 @@
 .macpack generic
 
-.include "./common/utility.asm"
+.include "./macro/utility.asm"
 .include "./registers.inc"
 
 .code

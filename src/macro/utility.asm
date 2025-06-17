@@ -1,9 +1,9 @@
-.macro a16
+.macro m16
   rep #$20
   .a16
 .endmacro
 
-.macro a8
+.macro m8
   sep #$20
   .a8
 .endmacro
@@ -18,21 +18,20 @@
   .i8
 .endmacro
 
-.macro ai16
+.macro mi16
   rep #$30
   .a16
   .i16
 .endmacro
 
-.macro ai8
+.macro mi8
   sep #$30
   .a8
   .i8
 .endmacro
 
 .macro inc32 address
-  rep #$20
-  .a16
+  m16
 
   inc address
   bne @end
