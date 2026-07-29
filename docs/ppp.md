@@ -165,6 +165,35 @@ cargo run -p ndm24-tools -- ppp-monitor
 
 短いheader、4未満または入力末尾を越えるpacket Length、2未満または残り領域を越えるoption Lengthは、状態機械が黙って破棄する判断を行えるよう個別のerrorとして返します。
 
+## Rust LCP Configure状態機械
+
+`crates/ndm24-ppp/src/lcp/negotiation.rs` は [RFC 1661 section 4](https://www.rfc-editor.org/rfc/rfc1661.html) のestablishment部分を参照実装します。今回の対象は `Request-Sent`、`Ack-Received`、`Ack-Sent`、`Opened` と、Configure用restart timerです。Link termination、Echo、PAP packet、IPCPはまだ含みません。
+
+状態機械への入力と出力は分離しています。
+
+- 入力: lower layerのopen/down、現在時刻、受信LCP packet
+- 出力: 送信LCP packet、`ThisLayerUp`、`ThisLayerDown`、`ThisLayerFinished`
+- Configure-RequestのIdentifierは内容変更または有効な応答後に更新
+- timeout再送は同じIdentifierとoption列を使用
+- restart intervalの既定値は3秒、Max-Configureは10回
+- Configure-AckはIdentifierと送信済みoption列が完全一致した場合だけ受理
+- 不正Length、不正option、out-of-sequence応答は状態を変えずに破棄
+
+最初のSFC実装ではlocal Configure-Requestを空optionにできます。これは既定MRU 1500と既定ACCM `$FFFFFFFF` を維持し、未実装の圧縮を要求しない構成です。peer側Configure-Requestには次の保守的方針で応答します。
+
+| peer option | 現在の応答 |
+|---|---|
+| MRU | 正しいLengthかつ0以外ならAck |
+| ACCM | 32bit値ならAckし、送信ACCMとして保存 |
+| Authentication-Protocol | PAPならAck、CHAP等にはPAPをNak |
+| Magic-Number | 正しいLengthかつ0以外ならAck |
+| PFC / ACFC | 65816 framingが未対応のためReject |
+| Quality-Protocol / unknown / duplicate | Reject |
+
+Configure-Rejectが必要なoptionとConfigure-Nak候補が同じRequestに含まれる場合は、RFCの優先関係に従ってReject対象だけを順序・内容を変えず返します。受理したMRU、ACCM、PAP要求、peer Magic-Numberは双方のConfigure-Ackが成立した `ThisLayerUp` と同時に上位層へ渡します。
+
+固定transcript試験では、Ackの到着順が前後する2経路、Opened到達、timeout再送と回数超過、Nakによるlocal option置換、Rejectによる除去、Opened中の再交渉を検査します。状態機械が返すpacketはLCPの `Code` から始まるInformation部分であり、Address `$FF`、Control `$03`、Protocol `$C021` とRFC 1662 framingの付加は下位層の責務です。
+
 ## 次の実装
 
-次はこのcodec上にConfigure-Request/Ack/Nak/Rejectの状態機械とrestart timerをRustで実装し、固定peer transcriptで交渉を再現します。LCPの実回線試験を始める時点で対向PPPサーバーが必要になります。
+次はLCP packet parserとestablishment状態を65816へ移植し、既存の受信frame所有権・送信encoder・PPP診断blockへ接続します。その常設セルフテストまでは対向PPPサーバーを必要としません。実際のpeerとのLCP交渉を始める段階で対向PPPサーバーを用意します。

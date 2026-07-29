@@ -1,5 +1,7 @@
 //! Allocation-free RFC 1661 Link Control Protocol packet codec.
 
+pub mod negotiation;
+
 pub const PROTOCOL: u16 = 0xc021;
 pub const HEADER_LENGTH: usize = 4;
 
@@ -121,10 +123,7 @@ impl<'a> Packet<'a> {
     }
 
     pub fn configuration_options(&self) -> ConfigurationOptions<'a> {
-        ConfigurationOptions {
-            remaining: self.data,
-            failed: false,
-        }
+        configuration_options(self.data)
     }
 
     /// Configure-Ack is valid only when Identifier and Options exactly match
@@ -133,6 +132,13 @@ impl<'a> Packet<'a> {
         self.known_code() == Some(Code::ConfigureAck)
             && self.identifier == identifier
             && self.data == options
+    }
+}
+
+pub fn configuration_options(data: &[u8]) -> ConfigurationOptions<'_> {
+    ConfigurationOptions {
+        remaining: data,
+        failed: false,
     }
 }
 
