@@ -6,6 +6,7 @@
 
 .import modemDriverState
 .import modemQueueByte
+.import pppSnapshotBegin, pppSnapshotEnd
 .import pppTransmitActive, pppTransmitStage, pppTransmitEscapeSecond
 .import pppTransmitLength, pppTransmitPosition, pppTransmitFcs
 .import pppTransmitLogicalByte, pppTransmitFillRemaining
@@ -75,6 +76,13 @@
   rep #$20
   .a16
   pla
+  pha
+  sep #$20
+  .a8
+  jsr pppSnapshotBegin
+  rep #$20
+  .a16
+  pla
   sta pppTransmitLength
   stz pppTransmitPosition
   lda #PPP_INITIAL_FCS16
@@ -86,6 +94,7 @@
   sta pppTransmitStage
   lda #$01
   sta pppTransmitActive
+  jsr pppSnapshotEnd
   rep #$20
   .a16
   plb
@@ -122,11 +131,13 @@ invalid:
   beq connected
   lda pppTransmitActive
   beq done
+  jsr pppSnapshotBegin
   stz pppTransmitActive
   stz pppTransmitEscapeSecond
   lda #PPP_TRANSMIT_STAGE_IDLE
   sta pppTransmitStage
   pppIncrement32 pppTransmitAbortCount
+  jsr pppSnapshotEnd
   bra done
 
 connected:
@@ -144,7 +155,9 @@ fill:
   bcs done
   jsr modemQueueByte
   bcc accepted
+  jsr pppSnapshotBegin
   pppIncrement32 pppTransmitBackpressureCount
+  jsr pppSnapshotEnd
   bra done
 
 accepted:
@@ -252,8 +265,9 @@ ready:
   setDBR $7e
   jsr pppTransmitPeek
   bcc :+
-  jmp return
+  jmp inactiveReturn
 :
+  jsr pppSnapshotBegin
   sta pppTransmitLastWireByte
   pppIncrement32 pppTransmitWireByteCount
 
@@ -332,6 +346,8 @@ finishClosing:
   pppIncrement32 pppTransmitFrameCount
 
 return:
+  jsr pppSnapshotEnd
+inactiveReturn:
   plx
   plb
   rts

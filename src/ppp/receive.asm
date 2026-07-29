@@ -8,6 +8,7 @@
 .import modemReadByte
 .import pppDecoderReset, pppDecoderPush
 .import pppLastInvalidReason
+.import pppSnapshotBegin, pppSnapshotEnd
 .import pppReceiveEnabled, pppReceiveActive, pppFrameReady, pppReceiveLastEvent
 .import pppReceiveLastInvalidReason, pppReceiveDrainRemaining
 .import pppReceiveByteCount, pppReceiveFrameCount, pppReceiveFcsErrorCount
@@ -79,19 +80,28 @@
   .i8
   lda pppReceiveEnabled
   bne @checkConnected
+  lda pppReceiveActive
+  beq done
+  jsr pppSnapshotBegin
   stz pppReceiveActive
+  jsr pppSnapshotEnd
   jmp done
 
 @checkConnected:
   lda modemDriverState
   cmp #MODEM_STATE_CONNECTED
   beq connected
+  lda pppReceiveActive
+  beq done
+  jsr pppSnapshotBegin
   stz pppReceiveActive
+  jsr pppSnapshotEnd
   jmp done
 
 connected:
   lda pppReceiveActive
   bne checkFrameOwnership
+  jsr pppSnapshotBegin
   lda #$01
   sta pppReceiveActive
   stz pppFrameReady
@@ -100,6 +110,7 @@ connected:
   jsr pppDecoderReset
   sep #$10
   .i8
+  jsr pppSnapshotEnd
 
 checkFrameOwnership:
   lda pppFrameReady
@@ -121,7 +132,9 @@ drain:
   bne done
   dec pppReceiveDrainRemaining
   bne drain
+  jsr pppSnapshotBegin
   pppIncrement32 pppReceiveDrainBudgetYieldCount
+  jsr pppSnapshotEnd
 
 done:
   rep #$30
@@ -142,10 +155,12 @@ done:
 
   phb
   setDBR $7e
+  jsr pppSnapshotBegin
   lda #$01
   sta pppReceiveEnabled
   stz pppReceiveActive
   stz pppFrameReady
+  jsr pppSnapshotEnd
   plb
   rts
 .endproc
@@ -156,9 +171,11 @@ done:
 
   phb
   setDBR $7e
+  jsr pppSnapshotBegin
   stz pppReceiveEnabled
   stz pppReceiveActive
   stz pppFrameReady
+  jsr pppSnapshotEnd
   plb
   rts
 .endproc
@@ -172,6 +189,7 @@ done:
 
   phb
   setDBR $7e
+  jsr pppSnapshotBegin
   jsr pppDecoderPush
   pppIncrement32 pppReceiveByteCount
   cmp #PPP_EVENT_NONE
@@ -212,6 +230,7 @@ overflow:
   lda #PPP_EVENT_OVERFLOW
 
 return:
+  jsr pppSnapshotEnd
   plb
   rts
 .endproc
@@ -223,7 +242,9 @@ return:
 
   phb
   setDBR $7e
+  jsr pppSnapshotBegin
   stz pppFrameReady
+  jsr pppSnapshotEnd
   plb
   rts
 .endproc

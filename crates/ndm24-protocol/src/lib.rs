@@ -153,6 +153,101 @@ impl DiagnosticSnapshot {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PppDiagnosticSnapshot {
+    pub snapshot_sequence: u32,
+    pub receive_enabled: bool,
+    pub receive_active: bool,
+    pub frame_ready: bool,
+    pub receive_last_event: u8,
+    pub receive_last_invalid_reason: u8,
+    pub decoder_flags: u8,
+    pub transmit_active: bool,
+    pub transmit_stage: u8,
+    pub transmit_escape_second: bool,
+    pub transmit_last_wire_byte: u8,
+    pub last_protocol: u16,
+    pub last_frame_length: u16,
+    pub decoder_length: u16,
+    pub decoder_fcs: u16,
+    pub transmit_length: u16,
+    pub transmit_position: u16,
+    pub transmit_fcs: u16,
+    pub receive_byte_count: u32,
+    pub receive_frame_count: u32,
+    pub receive_fcs_error_count: u32,
+    pub receive_invalid_count: u32,
+    pub receive_overflow_count: u32,
+    pub receive_drain_budget_yield_count: u32,
+    pub transmit_wire_byte_count: u32,
+    pub transmit_frame_count: u32,
+    pub transmit_backpressure_count: u32,
+    pub transmit_abort_count: u32,
+}
+
+impl PppDiagnosticSnapshot {
+    pub fn decode(data: &[u8]) -> Result<Self> {
+        ensure!(
+            data.len() >= PPP_DIAGNOSTIC_SIZE,
+            "PPP diagnostic block is {} bytes; expected at least {}",
+            data.len(),
+            PPP_DIAGNOSTIC_SIZE
+        );
+        ensure!(
+            data[PPP_DIAG_MAGIC..PPP_DIAG_MAGIC + 4] == PPP_DIAGNOSTIC_MAGIC,
+            "PPP diagnostic magic does not match PPP1"
+        );
+        ensure!(
+            read_u16(data, PPP_DIAG_VERSION)? == PPP_DIAGNOSTIC_VERSION,
+            "unsupported PPP diagnostic ABI version"
+        );
+        ensure!(
+            read_u16(data, PPP_DIAG_SIZE)? as usize == PPP_DIAGNOSTIC_SIZE,
+            "PPP diagnostic size field does not match the generated ABI"
+        );
+
+        let sequence = read_u32(data, PPP_DIAG_SNAPSHOT_SEQUENCE)?;
+        ensure!(
+            sequence & 1 == 0,
+            "PPP diagnostic snapshot is being updated"
+        );
+
+        Ok(Self {
+            snapshot_sequence: sequence,
+            receive_enabled: data[PPP_DIAG_RECEIVE_ENABLED] != 0,
+            receive_active: data[PPP_DIAG_RECEIVE_ACTIVE] != 0,
+            frame_ready: data[PPP_DIAG_FRAME_READY] != 0,
+            receive_last_event: data[PPP_DIAG_RECEIVE_LAST_EVENT],
+            receive_last_invalid_reason: data[PPP_DIAG_RECEIVE_LAST_INVALID_REASON],
+            decoder_flags: data[PPP_DIAG_DECODER_FLAGS],
+            transmit_active: data[PPP_DIAG_TRANSMIT_ACTIVE] != 0,
+            transmit_stage: data[PPP_DIAG_TRANSMIT_STAGE],
+            transmit_escape_second: data[PPP_DIAG_TRANSMIT_ESCAPE_SECOND] != 0,
+            transmit_last_wire_byte: data[PPP_DIAG_TRANSMIT_LAST_WIRE_BYTE],
+            last_protocol: read_u16(data, PPP_DIAG_LAST_PROTOCOL)?,
+            last_frame_length: read_u16(data, PPP_DIAG_LAST_FRAME_LENGTH)?,
+            decoder_length: read_u16(data, PPP_DIAG_DECODER_LENGTH)?,
+            decoder_fcs: read_u16(data, PPP_DIAG_DECODER_FCS)?,
+            transmit_length: read_u16(data, PPP_DIAG_TRANSMIT_LENGTH)?,
+            transmit_position: read_u16(data, PPP_DIAG_TRANSMIT_POSITION)?,
+            transmit_fcs: read_u16(data, PPP_DIAG_TRANSMIT_FCS)?,
+            receive_byte_count: read_u32(data, PPP_DIAG_RECEIVE_BYTE_COUNT)?,
+            receive_frame_count: read_u32(data, PPP_DIAG_RECEIVE_FRAME_COUNT)?,
+            receive_fcs_error_count: read_u32(data, PPP_DIAG_RECEIVE_FCS_ERROR_COUNT)?,
+            receive_invalid_count: read_u32(data, PPP_DIAG_RECEIVE_INVALID_COUNT)?,
+            receive_overflow_count: read_u32(data, PPP_DIAG_RECEIVE_OVERFLOW_COUNT)?,
+            receive_drain_budget_yield_count: read_u32(
+                data,
+                PPP_DIAG_RECEIVE_DRAIN_BUDGET_YIELD_COUNT,
+            )?,
+            transmit_wire_byte_count: read_u32(data, PPP_DIAG_TRANSMIT_WIRE_BYTE_COUNT)?,
+            transmit_frame_count: read_u32(data, PPP_DIAG_TRANSMIT_FRAME_COUNT)?,
+            transmit_backpressure_count: read_u32(data, PPP_DIAG_TRANSMIT_BACKPRESSURE_COUNT)?,
+            transmit_abort_count: read_u32(data, PPP_DIAG_TRANSMIT_ABORT_COUNT)?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TraceEvent {
     pub sequence: u32,
     pub frame: u32,
@@ -310,5 +405,47 @@ mod tests {
         let legacy = current.replace("poll_budget_yield = 7", "poll_limit = 7");
         let decoded: DiagnosticSnapshot = toml::from_str(&legacy).unwrap();
         assert_eq!(decoded.poll_budget_yield, 7);
+    }
+
+    #[test]
+    fn ppp_diagnostic_decodes_versioned_snapshot() {
+        let mut data = vec![0; PPP_DIAGNOSTIC_SIZE];
+        data[PPP_DIAG_MAGIC..PPP_DIAG_MAGIC + 4].copy_from_slice(&PPP_DIAGNOSTIC_MAGIC);
+        data[PPP_DIAG_VERSION..PPP_DIAG_VERSION + 2]
+            .copy_from_slice(&PPP_DIAGNOSTIC_VERSION.to_le_bytes());
+        data[PPP_DIAG_SIZE..PPP_DIAG_SIZE + 2]
+            .copy_from_slice(&(PPP_DIAGNOSTIC_SIZE as u16).to_le_bytes());
+        data[PPP_DIAG_SNAPSHOT_SEQUENCE..PPP_DIAG_SNAPSHOT_SEQUENCE + 4]
+            .copy_from_slice(&8_u32.to_le_bytes());
+        data[PPP_DIAG_RECEIVE_ENABLED] = 1;
+        data[PPP_DIAG_FRAME_READY] = 1;
+        data[PPP_DIAG_LAST_PROTOCOL..PPP_DIAG_LAST_PROTOCOL + 2]
+            .copy_from_slice(&0xc021_u16.to_le_bytes());
+        data[PPP_DIAG_RECEIVE_FRAME_COUNT..PPP_DIAG_RECEIVE_FRAME_COUNT + 4]
+            .copy_from_slice(&0x1234_5678_u32.to_le_bytes());
+        data[PPP_DIAG_TRANSMIT_BACKPRESSURE_COUNT..PPP_DIAG_TRANSMIT_BACKPRESSURE_COUNT + 4]
+            .copy_from_slice(&7_u32.to_le_bytes());
+
+        let snapshot = PppDiagnosticSnapshot::decode(&data).unwrap();
+        assert_eq!(snapshot.snapshot_sequence, 8);
+        assert!(snapshot.receive_enabled);
+        assert!(snapshot.frame_ready);
+        assert_eq!(snapshot.last_protocol, 0xc021);
+        assert_eq!(snapshot.receive_frame_count, 0x1234_5678);
+        assert_eq!(snapshot.transmit_backpressure_count, 7);
+    }
+
+    #[test]
+    fn ppp_diagnostic_rejects_an_update_in_progress() {
+        let mut data = vec![0; PPP_DIAGNOSTIC_SIZE];
+        data[PPP_DIAG_MAGIC..PPP_DIAG_MAGIC + 4].copy_from_slice(&PPP_DIAGNOSTIC_MAGIC);
+        data[PPP_DIAG_VERSION..PPP_DIAG_VERSION + 2]
+            .copy_from_slice(&PPP_DIAGNOSTIC_VERSION.to_le_bytes());
+        data[PPP_DIAG_SIZE..PPP_DIAG_SIZE + 2]
+            .copy_from_slice(&(PPP_DIAGNOSTIC_SIZE as u16).to_le_bytes());
+        data[PPP_DIAG_SNAPSHOT_SEQUENCE..PPP_DIAG_SNAPSHOT_SEQUENCE + 4]
+            .copy_from_slice(&3_u32.to_le_bytes());
+
+        assert!(PppDiagnosticSnapshot::decode(&data).is_err());
     }
 }

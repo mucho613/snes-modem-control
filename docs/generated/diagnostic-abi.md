@@ -42,6 +42,44 @@ ABI version: `2`. Block size: `128` bytes.
 | `0x4F` | 1 | `u8` | `session_line_length` | Bytes currently accumulated by the AT line parser |
 | `0x50` | 4 | `u32` | `at_start_frame` | Frame at which the current generic AT transaction started |
 
+## PPP Diagnostic ABI
+
+ABI version: `1`. Block size: `96` bytes.
+
+| Offset | Size | Type | Field | Meaning |
+|---:|---:|---|---|---|
+| `0x00` | 4 | `bytes` | `magic` | ASCII PPP1 |
+| `0x04` | 2 | `u16` | `version` | PPP diagnostic ABI version |
+| `0x06` | 2 | `u16` | `size` | PPP diagnostic block size |
+| `0x08` | 4 | `u32` | `snapshot_sequence` | Even when the PPP snapshot is stable |
+| `0x0C` | 1 | `u8` | `receive_enabled` | Non-zero when PPP owns the NDM24 RX ring |
+| `0x0D` | 1 | `u8` | `receive_active` | Non-zero after PPP entered CONNECTED receive mode |
+| `0x0E` | 1 | `u8` | `frame_ready` | Non-zero while the completed receive frame is owned by the upper layer |
+| `0x0F` | 1 | `u8` | `receive_last_event` | Most recent non-zero decoder event |
+| `0x10` | 1 | `u8` | `receive_last_invalid_reason` | Reason for the most recent invalid receive frame |
+| `0x11` | 1 | `u8` | `decoder_flags` | Current RFC 1662 decoder flags |
+| `0x12` | 1 | `u8` | `transmit_active` | Non-zero while a frame is being encoded |
+| `0x13` | 1 | `u8` | `transmit_stage` | Current RFC 1662 encoder stage |
+| `0x14` | 1 | `u8` | `transmit_escape_second` | Non-zero when the escaped value follows the escape prefix |
+| `0x15` | 1 | `u8` | `transmit_last_wire_byte` | Most recent encoded byte accepted by the NDM24 TX ring |
+| `0x16` | 2 | `u16` | `last_protocol` | Protocol of the most recent valid receive frame |
+| `0x18` | 2 | `u16` | `last_frame_length` | Length of the most recent valid receive frame, excluding FCS |
+| `0x1A` | 2 | `u16` | `decoder_length` | Current unescaped receive length, including any received FCS |
+| `0x1C` | 2 | `u16` | `decoder_fcs` | Current receive FCS accumulator |
+| `0x1E` | 2 | `u16` | `transmit_length` | Unescaped transmit frame length, excluding FCS |
+| `0x20` | 2 | `u16` | `transmit_position` | Current offset in the unescaped transmit frame |
+| `0x22` | 2 | `u16` | `transmit_fcs` | Current transmit FCS accumulator |
+| `0x24` | 4 | `u32` | `receive_byte_count` | Raw bytes delivered to the PPP decoder |
+| `0x28` | 4 | `u32` | `receive_frame_count` | Valid receive frames |
+| `0x2C` | 4 | `u32` | `receive_fcs_error_count` | Receive frames rejected by FCS |
+| `0x30` | 4 | `u32` | `receive_invalid_count` | Structurally invalid receive frames |
+| `0x34` | 4 | `u32` | `receive_overflow_count` | Receive frames exceeding the frame buffer |
+| `0x38` | 4 | `u32` | `receive_drain_budget_yield_count` | Receive polls that consumed the complete drain budget |
+| `0x3C` | 4 | `u32` | `transmit_wire_byte_count` | Encoded bytes accepted by the NDM24 TX ring |
+| `0x40` | 4 | `u32` | `transmit_frame_count` | Completed transmit frames |
+| `0x44` | 4 | `u32` | `transmit_backpressure_count` | NDM24 TX ring rejections that paused the encoder |
+| `0x48` | 4 | `u32` | `transmit_abort_count` | Transmit frames aborted after leaving CONNECTED |
+
 ## Mailbox ABI
 
 ABI version: `6`. Block size: `96` bytes.

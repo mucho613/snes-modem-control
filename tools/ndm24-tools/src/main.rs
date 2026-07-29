@@ -83,6 +83,16 @@ enum Command {
         #[arg(long)]
         once: bool,
     },
+    PppMonitor {
+        #[arg(long, default_value = "ws://localhost:23074")]
+        websocket: String,
+        #[arg(long, default_value = "build/smoke/modem-control.lbl")]
+        labels: PathBuf,
+        #[arg(long, default_value_t = 250)]
+        interval_ms: u64,
+        #[arg(long)]
+        once: bool,
+    },
     Peer {
         #[arg(long)]
         port: String,
@@ -225,6 +235,20 @@ async fn main() -> Result<()> {
             once,
         } => {
             qusb2snes::monitor(
+                &websocket,
+                &labels,
+                Duration::from_millis(interval_ms),
+                once,
+            )
+            .await
+        }
+        Command::PppMonitor {
+            websocket,
+            labels,
+            interval_ms,
+            once,
+        } => {
+            qusb2snes::ppp_monitor(
                 &websocket,
                 &labels,
                 Duration::from_millis(interval_ms),

@@ -53,6 +53,12 @@ cargo run -p ndm24-tools -- monitor --once
 # 継続監視（1 行 1 JSON）
 cargo run -p ndm24-tools -- monitor
 
+# PPP framing の状態を一度だけ表示
+cargo run -p ndm24-tools -- ppp-monitor --once
+
+# PPP framing の状態を継続監視（1 行 1 JSON）
+cargo run -p ndm24-tools -- ppp-monitor
+
 # メールボックス経由の AT クイックテスト
 cargo run -p ndm24-tools -- test
 

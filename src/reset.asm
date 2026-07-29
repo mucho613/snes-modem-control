@@ -9,6 +9,7 @@
 .import modemInitializeDiagnostics
 .import modemInitialize
 .import modemPoll, modemSessionPoll, modemMailboxPoll
+.import pppDiagnosticInitialize
 .import pppReceiveInitialize, pppReceivePoll
 .import pppTransmitInitialize, pppTransmitPoll
 .import nmitimenShadow
@@ -62,6 +63,7 @@
   jsr modemInitializeDiagnostics
   rep #$10
   .i16
+  jsr pppDiagnosticInitialize
   jsr pppReceiveInitialize
   jsr pppTransmitInitialize
   sep #$10

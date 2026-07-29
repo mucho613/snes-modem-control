@@ -97,7 +97,7 @@ cargo run -p ndm24-tools -- mailbox ppp-receive-stop
 
 有効化後、`pppReceivePoll` はNDM24がCONNECTEDの間だけ、1回につき最大32byteをRX ringからdecoderへ渡します。FCS検証済みframeが完成すると `pppFrameReady` を立て、そのframeを上位層が `pppReleaseFrame` で解放するまで追加のRX byteを消費しません。これにより、完成frameを次の入力で上書きしません。
 
-常設カウンタとしてraw受信byte、正常frame、FCS error、invalid、overflow、32byte drain budget到達回数をWRAMに保持します。各値は `pppReceive*` のlink labelとしてQUsb2Snesから確認できます。versionedなホスト表示用PPP診断blockへの統合は次の診断マイルストーンで行います。
+常設カウンタとしてraw受信byte、正常frame、FCS error、invalid、overflow、32byte drain budget到達回数をWRAMに保持します。これらは後述のversioned PPP診断blockからQUsb2Snes経由で確認できます。
 
 ## NDM24 TX ringとの接続
 
@@ -125,17 +125,32 @@ Address 1 + Control 1 + Protocol 2 + Information 1500 + FCS 2
 
 送信側はescape後の全frameを別bufferへ複製しません。unescaped frameとFCSを順に読み、escape状態を保持しながらNDM24 TX ringの空きに応じて再開できるstate machineです。最悪時にescapeで約2倍になるframeをWRAMへ二重保持しません。
 
-常設診断には少なくとも次を追加する予定です。
+## 常設PPP診断
+
+`pppDiagnosticState` はmagic `PPP1`、ABI version 1、96byteの公開診断blockです。レイアウトの正本は `spec/ndm24.toml` で、AssemblyとRustのoffset定数および[生成済みABI表](generated/diagnostic-abi.md)を同時に生成します。
+
+PC側では次のコマンドでJSON Linesとして読み取れます。
+
+```powershell
+cargo run -p ndm24-tools -- ppp-monitor --once
+cargo run -p ndm24-tools -- ppp-monitor
+```
+
+診断blockはsequence lock方式です。SFCは公開状態を変更する前後に32bitの `snapshot_sequence` を更新し、PC側は偶数の同じsequenceで2回読めたblockだけを採用します。入れ子更新も深さを管理するため、常設セルフテストの途中状態を安定したsnapshotとして誤認しません。
+
+公開する内容は次の通りです。
 
 - 正常受信frame数
 - FCS error数
 - invalid frame数
 - frame buffer overflow数
 - 最後に受信したPPP protocol
-- decoderとencoderの内部stage
+- decoderのflags、長さ、FCS
+- encoderのstage、長さ、位置、FCS
+- 送受信byte数、TX ring backpressure数、carrier喪失によるabort数
 
 認証frameには利用者IDやpasswordが含まれ得るため、常設traceへpayload全体は保存しません。protocol、code、identifier、length、エラー理由までを診断対象とし、credential byte列は記録対象外とします。
 
 ## 次の実装
 
-次はversionedなPPP診断blockをホストtoolへ公開し、その後LCPを実装します。LCPの実回線試験を始める時点で対向PPPサーバーが必要になります。
+次はLCPのpacket parserとConfigure-Request/Ack/Nak/Rejectの状態機械をRust参照実装から作ります。LCPの実回線試験を始める時点で対向PPPサーバーが必要になります。

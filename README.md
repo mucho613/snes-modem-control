@@ -36,6 +36,7 @@ cargo xtask deploy --smoke
 cargo run -p ndm24-tools -- test
 cargo run -p ndm24-tools -- mailbox ppp-self-test
 cargo run -p ndm24-tools -- monitor
+cargo run -p ndm24-tools -- ppp-monitor
 cargo run -p ndm24-tools -- identify --revision B
 cargo run -p ndm24-tools -- connect-test --revision B --port COM5
 cargo run -p ndm24-tools -- binary-test --revision B --port COM5
@@ -45,7 +46,7 @@ cargo run -p ndm24-tools -- binary-test --revision B --port COM5
 
 ## 仕様と生成物の同期
 
-プロトコル定数、状態、診断 ABI、メールボックス ABI、ターミナル配色の正本は [`spec/ndm24.toml`](spec/ndm24.toml)です。フォント原本は固定コミットの [`font8x8_basic.h`](third_party/font8x8/font8x8_basic.h)です。変更後は次を実行します。
+プロトコル定数、状態、モデム・PPP診断 ABI、メールボックス ABI、ターミナル配色の正本は [`spec/ndm24.toml`](spec/ndm24.toml)です。フォント原本は固定コミットの [`font8x8_basic.h`](third_party/font8x8/font8x8_basic.h)です。変更後は次を実行します。
 
 ```powershell
 cargo xtask generate
@@ -62,6 +63,6 @@ cargo xtask check
 - [32文字幅ターミナル](docs/terminal.md)
 - [font8x8の出所・生成・確認手順](docs/font.md)
 - [Windows 開発環境](docs/windows-development.md)
-- [生成済み診断・メールボックス ABI](docs/generated/diagnostic-abi.md)
+- [生成済みモデム・PPP診断／メールボックス ABI](docs/generated/diagnostic-abi.md)
 - [JRA PAT モデム設定プロファイル](profiles/jra-pat.toml)
 - [第三者由来データの通知](THIRD_PARTY_NOTICES.md)

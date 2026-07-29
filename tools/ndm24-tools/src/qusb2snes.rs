@@ -10,7 +10,8 @@ use ndm24_protocol::{
     MODEM_MAILBOX_OFFSET_HOST_SEQUENCE, MODEM_MAILBOX_OFFSET_PROCESSED_SEQUENCE,
     MODEM_MAILBOX_OFFSET_RESULT, MODEM_MAILBOX_OFFSET_STATUS, MODEM_MAILBOX_SIZE,
     MODEM_MAILBOX_STATUS_FAILED, MODEM_MAILBOX_STATUS_PASSED, MODEM_MAILBOX_VERSION,
-    MODEM_RING_STORAGE_SIZE, MODEM_TRACE_EVENT_SIZE, MODEM_TRACE_SIZE, TraceEvent,
+    MODEM_RING_STORAGE_SIZE, MODEM_TRACE_EVENT_SIZE, MODEM_TRACE_SIZE, PPP_DIAG_SNAPSHOT_SEQUENCE,
+    PPP_DIAGNOSTIC_SIZE, PppDiagnosticSnapshot, TraceEvent,
 };
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
@@ -114,6 +115,31 @@ pub async fn monitor(
 
     loop {
         let snapshot = read_stable_snapshot(&mut client, offset).await?;
+        println!("{}", serde_json::to_string(&snapshot)?);
+        if once {
+            return Ok(());
+        }
+        tokio::time::sleep(interval).await;
+    }
+}
+
+pub async fn ppp_monitor(
+    websocket: &str,
+    label_path: &Path,
+    interval: Duration,
+    once: bool,
+) -> Result<()> {
+    let labels = read_labels(label_path)?;
+    let state = labels
+        .get("pppDiagnosticState")
+        .copied()
+        .context("label file does not contain pppDiagnosticState")?;
+    let offset = wram_to_usb2snes(state)?;
+    let mut client = Client::connect(websocket).await?;
+    eprintln!("attached to {}", client.device);
+
+    loop {
+        let snapshot = read_stable_ppp_snapshot(&mut client, offset).await?;
         println!("{}", serde_json::to_string(&snapshot)?);
         if once {
             return Ok(());
@@ -429,6 +455,32 @@ async fn read_stable_snapshot(client: &mut Client, offset: usize) -> Result<Diag
             continue;
         }
         return DiagnosticSnapshot::decode(&second);
+    }
+}
+
+async fn read_stable_ppp_snapshot(
+    client: &mut Client,
+    offset: usize,
+) -> Result<PppDiagnosticSnapshot> {
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        ensure!(
+            Instant::now() < deadline,
+            "PPP diagnostic snapshot did not stabilize; confirm that the running ROM matches the label file"
+        );
+        let first = client.read_address(offset, PPP_DIAGNOSTIC_SIZE).await?;
+        let first_sequence = read_u32(&first, PPP_DIAG_SNAPSHOT_SEQUENCE)?;
+        if first_sequence & 1 != 0 {
+            tokio::task::yield_now().await;
+            continue;
+        }
+        let second = client.read_address(offset, PPP_DIAGNOSTIC_SIZE).await?;
+        let second_sequence = read_u32(&second, PPP_DIAG_SNAPSHOT_SEQUENCE)?;
+        if second_sequence != first_sequence {
+            tokio::task::yield_now().await;
+            continue;
+        }
+        return PppDiagnosticSnapshot::decode(&second);
     }
 }
 

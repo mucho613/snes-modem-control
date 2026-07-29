@@ -13,6 +13,7 @@
 .import pppTransmitActive, pppTransmitLastWireByte
 .import pppTransmitWireByteCount, pppTransmitFrameCount
 .import pppTransmitBuffer
+.import pppSnapshotBegin, pppSnapshotEnd
 
 .export pppRunSelfTest
 
@@ -30,6 +31,8 @@
   phy
   rep #$10
   .i16
+  setDBR $7e
+  jsr pppSnapshotBegin
 
   ; Decode the fixed empty-option LCP Configure-Request from docs/ppp.md.
   setDBR .bankbyte(pppSelfTestEncoded)
@@ -403,6 +406,12 @@
   sec
 
 @return:
+  php
+  pha
+  setDBR $7e
+  jsr pppSnapshotEnd
+  pla
+  plp
   sep #$10
   .i8
   ply

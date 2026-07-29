@@ -50,6 +50,7 @@ struct SpecFile {
     driver: BTreeMap<String, toml::Value>,
     terminal: BTreeMap<String, toml::Value>,
     diagnostic: Diagnostic,
+    ppp_diagnostic: PppDiagnostic,
     mailbox: Mailbox,
     states: BTreeMap<String, u8>,
     flags: BTreeMap<String, u8>,
@@ -73,6 +74,14 @@ struct Diagnostic {
     trace_event_size: usize,
     trace_capacity: usize,
     trace_size: usize,
+    fields: Vec<Field>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PppDiagnostic {
+    magic: Vec<u8>,
+    version: u16,
+    size: usize,
     fields: Vec<Field>,
 }
 
@@ -222,7 +231,16 @@ fn validate_spec(spec: &SpecFile) -> Result<()> {
         spec.mailbox.magic.len() == 4,
         "mailbox magic must be 4 bytes"
     );
+    ensure!(
+        spec.ppp_diagnostic.magic.len() == 4,
+        "PPP diagnostic magic must be 4 bytes"
+    );
     validate_fields(&spec.diagnostic.fields, spec.diagnostic.size, "diagnostic")?;
+    validate_fields(
+        &spec.ppp_diagnostic.fields,
+        spec.ppp_diagnostic.size,
+        "PPP diagnostic",
+    )?;
     validate_fields(&spec.mailbox.fields, spec.mailbox.size, "mailbox")?;
     ensure!(
         spec.diagnostic.trace_event_size * spec.diagnostic.trace_capacity
@@ -691,6 +709,27 @@ fn render_assembly(spec: &SpecFile) -> Result<String> {
             ),
         );
     }
+    writeln(
+        &mut out,
+        &format!(
+            "PPP_DIAGNOSTIC_VERSION = ${:04X}",
+            spec.ppp_diagnostic.version
+        ),
+    );
+    writeln(
+        &mut out,
+        &format!("PPP_DIAGNOSTIC_SIZE = ${:04X}", spec.ppp_diagnostic.size),
+    );
+    for field in &spec.ppp_diagnostic.fields {
+        writeln(
+            &mut out,
+            &format!(
+                "PPP_DIAG_{} = ${:04X}",
+                screaming(&field.name),
+                field.offset
+            ),
+        );
+    }
     for field in &spec.mailbox.fields {
         writeln(
             &mut out,
@@ -717,6 +756,7 @@ fn render_assembly(spec: &SpecFile) -> Result<String> {
         ),
     );
     byte_array_asm(&mut out, "MODEM_DIAGNOSTIC_MAGIC", &spec.diagnostic.magic);
+    byte_array_asm(&mut out, "PPP_DIAGNOSTIC_MAGIC", &spec.ppp_diagnostic.magic);
     byte_array_asm(&mut out, "MODEM_MAILBOX_MAGIC", &spec.mailbox.magic);
     enum_map_asm(&mut out, "MODEM_STATE", &spec.states);
     enum_map_asm(&mut out, "MODEM_FLAG", &spec.flags);
@@ -788,6 +828,37 @@ fn render_rust(spec: &SpecFile) -> Result<String> {
             ),
         );
     }
+    writeln(
+        &mut out,
+        &format!(
+            "pub const PPP_DIAGNOSTIC_MAGIC: [u8; 4] = {:?};",
+            spec.ppp_diagnostic.magic
+        ),
+    );
+    writeln(
+        &mut out,
+        &format!(
+            "pub const PPP_DIAGNOSTIC_VERSION: u16 = {};",
+            spec.ppp_diagnostic.version
+        ),
+    );
+    writeln(
+        &mut out,
+        &format!(
+            "pub const PPP_DIAGNOSTIC_SIZE: usize = {};",
+            spec.ppp_diagnostic.size
+        ),
+    );
+    for field in &spec.ppp_diagnostic.fields {
+        writeln(
+            &mut out,
+            &format!(
+                "pub const PPP_DIAG_{}: usize = {};",
+                screaming(&field.name),
+                field.offset
+            ),
+        );
+    }
     for field in &spec.mailbox.fields {
         writeln(
             &mut out,
@@ -846,6 +917,19 @@ fn render_markdown(spec: &SpecFile) -> String {
     out.push_str("| Offset | Size | Type | Field | Meaning |\n");
     out.push_str("|---:|---:|---|---|---|\n");
     for field in &spec.diagnostic.fields {
+        out.push_str(&format!(
+            "| `0x{:02X}` | {} | `{}` | `{}` | {} |\n",
+            field.offset, field.size, field.field_type, field.name, field.description
+        ));
+    }
+    out.push_str("\n## PPP Diagnostic ABI\n\n");
+    out.push_str(&format!(
+        "ABI version: `{}`. Block size: `{}` bytes.\n\n",
+        spec.ppp_diagnostic.version, spec.ppp_diagnostic.size
+    ));
+    out.push_str("| Offset | Size | Type | Field | Meaning |\n");
+    out.push_str("|---:|---:|---|---|---|\n");
+    for field in &spec.ppp_diagnostic.fields {
         out.push_str(&format!(
             "| `0x{:02X}` | {} | `{}` | `{}` | {} |\n",
             field.offset, field.size, field.field_type, field.name, field.description

@@ -287,6 +287,228 @@ size = 4
 type = "u32"
 description = "Frame at which the current generic AT transaction started"
 
+[ppp_diagnostic]
+magic = [0x50, 0x50, 0x50, 0x31]
+version = 1
+size = 96
+
+[[ppp_diagnostic.fields]]
+name = "magic"
+offset = 0
+size = 4
+type = "bytes"
+description = "ASCII PPP1"
+
+[[ppp_diagnostic.fields]]
+name = "version"
+offset = 4
+size = 2
+type = "u16"
+description = "PPP diagnostic ABI version"
+
+[[ppp_diagnostic.fields]]
+name = "size"
+offset = 6
+size = 2
+type = "u16"
+description = "PPP diagnostic block size"
+
+[[ppp_diagnostic.fields]]
+name = "snapshot_sequence"
+offset = 8
+size = 4
+type = "u32"
+description = "Even when the PPP snapshot is stable"
+
+[[ppp_diagnostic.fields]]
+name = "receive_enabled"
+offset = 12
+size = 1
+type = "u8"
+description = "Non-zero when PPP owns the NDM24 RX ring"
+
+[[ppp_diagnostic.fields]]
+name = "receive_active"
+offset = 13
+size = 1
+type = "u8"
+description = "Non-zero after PPP entered CONNECTED receive mode"
+
+[[ppp_diagnostic.fields]]
+name = "frame_ready"
+offset = 14
+size = 1
+type = "u8"
+description = "Non-zero while the completed receive frame is owned by the upper layer"
+
+[[ppp_diagnostic.fields]]
+name = "receive_last_event"
+offset = 15
+size = 1
+type = "u8"
+description = "Most recent non-zero decoder event"
+
+[[ppp_diagnostic.fields]]
+name = "receive_last_invalid_reason"
+offset = 16
+size = 1
+type = "u8"
+description = "Reason for the most recent invalid receive frame"
+
+[[ppp_diagnostic.fields]]
+name = "decoder_flags"
+offset = 17
+size = 1
+type = "u8"
+description = "Current RFC 1662 decoder flags"
+
+[[ppp_diagnostic.fields]]
+name = "transmit_active"
+offset = 18
+size = 1
+type = "u8"
+description = "Non-zero while a frame is being encoded"
+
+[[ppp_diagnostic.fields]]
+name = "transmit_stage"
+offset = 19
+size = 1
+type = "u8"
+description = "Current RFC 1662 encoder stage"
+
+[[ppp_diagnostic.fields]]
+name = "transmit_escape_second"
+offset = 20
+size = 1
+type = "u8"
+description = "Non-zero when the escaped value follows the escape prefix"
+
+[[ppp_diagnostic.fields]]
+name = "transmit_last_wire_byte"
+offset = 21
+size = 1
+type = "u8"
+description = "Most recent encoded byte accepted by the NDM24 TX ring"
+
+[[ppp_diagnostic.fields]]
+name = "last_protocol"
+offset = 22
+size = 2
+type = "u16"
+description = "Protocol of the most recent valid receive frame"
+
+[[ppp_diagnostic.fields]]
+name = "last_frame_length"
+offset = 24
+size = 2
+type = "u16"
+description = "Length of the most recent valid receive frame, excluding FCS"
+
+[[ppp_diagnostic.fields]]
+name = "decoder_length"
+offset = 26
+size = 2
+type = "u16"
+description = "Current unescaped receive length, including any received FCS"
+
+[[ppp_diagnostic.fields]]
+name = "decoder_fcs"
+offset = 28
+size = 2
+type = "u16"
+description = "Current receive FCS accumulator"
+
+[[ppp_diagnostic.fields]]
+name = "transmit_length"
+offset = 30
+size = 2
+type = "u16"
+description = "Unescaped transmit frame length, excluding FCS"
+
+[[ppp_diagnostic.fields]]
+name = "transmit_position"
+offset = 32
+size = 2
+type = "u16"
+description = "Current offset in the unescaped transmit frame"
+
+[[ppp_diagnostic.fields]]
+name = "transmit_fcs"
+offset = 34
+size = 2
+type = "u16"
+description = "Current transmit FCS accumulator"
+
+[[ppp_diagnostic.fields]]
+name = "receive_byte_count"
+offset = 36
+size = 4
+type = "u32"
+description = "Raw bytes delivered to the PPP decoder"
+
+[[ppp_diagnostic.fields]]
+name = "receive_frame_count"
+offset = 40
+size = 4
+type = "u32"
+description = "Valid receive frames"
+
+[[ppp_diagnostic.fields]]
+name = "receive_fcs_error_count"
+offset = 44
+size = 4
+type = "u32"
+description = "Receive frames rejected by FCS"
+
+[[ppp_diagnostic.fields]]
+name = "receive_invalid_count"
+offset = 48
+size = 4
+type = "u32"
+description = "Structurally invalid receive frames"
+
+[[ppp_diagnostic.fields]]
+name = "receive_overflow_count"
+offset = 52
+size = 4
+type = "u32"
+description = "Receive frames exceeding the frame buffer"
+
+[[ppp_diagnostic.fields]]
+name = "receive_drain_budget_yield_count"
+offset = 56
+size = 4
+type = "u32"
+description = "Receive polls that consumed the complete drain budget"
+
+[[ppp_diagnostic.fields]]
+name = "transmit_wire_byte_count"
+offset = 60
+size = 4
+type = "u32"
+description = "Encoded bytes accepted by the NDM24 TX ring"
+
+[[ppp_diagnostic.fields]]
+name = "transmit_frame_count"
+offset = 64
+size = 4
+type = "u32"
+description = "Completed transmit frames"
+
+[[ppp_diagnostic.fields]]
+name = "transmit_backpressure_count"
+offset = 68
+size = 4
+type = "u32"
+description = "NDM24 TX ring rejections that paused the encoder"
+
+[[ppp_diagnostic.fields]]
+name = "transmit_abort_count"
+offset = 72
+size = 4
+type = "u32"
+description = "Transmit frames aborted after leaving CONNECTED"
+
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]
 version = 6
