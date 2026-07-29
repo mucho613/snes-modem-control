@@ -14,6 +14,7 @@
 .import pppTransmitWireByteCount, pppTransmitFrameCount
 .import pppTransmitBuffer
 .import pppSnapshotBegin, pppSnapshotEnd
+.import pppLcpRunSelfTest
 
 .export pppRunSelfTest
 
@@ -383,6 +384,11 @@
   bne @fail17_16
   sep #$20
   .a8
+
+  jsr pppLcpRunSelfTest
+  bcc :+
+  jmp @fail
+:
 
   jsr pppReceiveInitialize
   jsr pppTransmitInitialize

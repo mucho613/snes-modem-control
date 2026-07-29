@@ -182,6 +182,18 @@ pub struct PppDiagnosticSnapshot {
     pub transmit_frame_count: u32,
     pub transmit_backpressure_count: u32,
     pub transmit_abort_count: u32,
+    pub lcp_state: u8,
+    pub lcp_last_code: u8,
+    pub lcp_last_identifier: u8,
+    pub lcp_last_error: u8,
+    pub lcp_request_identifier: u8,
+    pub lcp_restart_remaining: u8,
+    pub lcp_peer_flags: u8,
+    pub lcp_pending_action: u8,
+    pub lcp_packet_length: u16,
+    pub lcp_peer_mru: u16,
+    pub lcp_peer_accm: u32,
+    pub lcp_receive_count: u32,
 }
 
 impl PppDiagnosticSnapshot {
@@ -243,6 +255,18 @@ impl PppDiagnosticSnapshot {
             transmit_frame_count: read_u32(data, PPP_DIAG_TRANSMIT_FRAME_COUNT)?,
             transmit_backpressure_count: read_u32(data, PPP_DIAG_TRANSMIT_BACKPRESSURE_COUNT)?,
             transmit_abort_count: read_u32(data, PPP_DIAG_TRANSMIT_ABORT_COUNT)?,
+            lcp_state: data[PPP_DIAG_LCP_STATE],
+            lcp_last_code: data[PPP_DIAG_LCP_LAST_CODE],
+            lcp_last_identifier: data[PPP_DIAG_LCP_LAST_IDENTIFIER],
+            lcp_last_error: data[PPP_DIAG_LCP_LAST_ERROR],
+            lcp_request_identifier: data[PPP_DIAG_LCP_REQUEST_IDENTIFIER],
+            lcp_restart_remaining: data[PPP_DIAG_LCP_RESTART_REMAINING],
+            lcp_peer_flags: data[PPP_DIAG_LCP_PEER_FLAGS],
+            lcp_pending_action: data[PPP_DIAG_LCP_PENDING_ACTION],
+            lcp_packet_length: read_u16(data, PPP_DIAG_LCP_PACKET_LENGTH)?,
+            lcp_peer_mru: read_u16(data, PPP_DIAG_LCP_PEER_MRU)?,
+            lcp_peer_accm: read_u32(data, PPP_DIAG_LCP_PEER_ACCM)?,
+            lcp_receive_count: read_u32(data, PPP_DIAG_LCP_RECEIVE_COUNT)?,
         })
     }
 }
@@ -425,6 +449,17 @@ mod tests {
             .copy_from_slice(&0x1234_5678_u32.to_le_bytes());
         data[PPP_DIAG_TRANSMIT_BACKPRESSURE_COUNT..PPP_DIAG_TRANSMIT_BACKPRESSURE_COUNT + 4]
             .copy_from_slice(&7_u32.to_le_bytes());
+        data[PPP_DIAG_LCP_STATE] = 6;
+        data[PPP_DIAG_LCP_LAST_CODE] = 1;
+        data[PPP_DIAG_LCP_LAST_IDENTIFIER] = 0x42;
+        data[PPP_DIAG_LCP_PACKET_LENGTH..PPP_DIAG_LCP_PACKET_LENGTH + 2]
+            .copy_from_slice(&10_u16.to_le_bytes());
+        data[PPP_DIAG_LCP_PEER_MRU..PPP_DIAG_LCP_PEER_MRU + 2]
+            .copy_from_slice(&1500_u16.to_le_bytes());
+        data[PPP_DIAG_LCP_PEER_ACCM..PPP_DIAG_LCP_PEER_ACCM + 4]
+            .copy_from_slice(&u32::MAX.to_le_bytes());
+        data[PPP_DIAG_LCP_RECEIVE_COUNT..PPP_DIAG_LCP_RECEIVE_COUNT + 4]
+            .copy_from_slice(&6_u32.to_le_bytes());
 
         let snapshot = PppDiagnosticSnapshot::decode(&data).unwrap();
         assert_eq!(snapshot.snapshot_sequence, 8);
@@ -433,6 +468,13 @@ mod tests {
         assert_eq!(snapshot.last_protocol, 0xc021);
         assert_eq!(snapshot.receive_frame_count, 0x1234_5678);
         assert_eq!(snapshot.transmit_backpressure_count, 7);
+        assert_eq!(snapshot.lcp_state, 6);
+        assert_eq!(snapshot.lcp_last_code, 1);
+        assert_eq!(snapshot.lcp_last_identifier, 0x42);
+        assert_eq!(snapshot.lcp_packet_length, 10);
+        assert_eq!(snapshot.lcp_peer_mru, 1500);
+        assert_eq!(snapshot.lcp_peer_accm, u32::MAX);
+        assert_eq!(snapshot.lcp_receive_count, 6);
     }
 
     #[test]

@@ -44,7 +44,7 @@ ABI version: `2`. Block size: `128` bytes.
 
 ## PPP Diagnostic ABI
 
-ABI version: `1`. Block size: `96` bytes.
+ABI version: `2`. Block size: `96` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|
@@ -79,6 +79,18 @@ ABI version: `1`. Block size: `96` bytes.
 | `0x40` | 4 | `u32` | `transmit_frame_count` | Completed transmit frames |
 | `0x44` | 4 | `u32` | `transmit_backpressure_count` | NDM24 TX ring rejections that paused the encoder |
 | `0x48` | 4 | `u32` | `transmit_abort_count` | Transmit frames aborted after leaving CONNECTED |
+| `0x4C` | 1 | `u8` | `lcp_state` | Current RFC 1661 LCP state |
+| `0x4D` | 1 | `u8` | `lcp_last_code` | Code of the most recently parsed LCP packet |
+| `0x4E` | 1 | `u8` | `lcp_last_identifier` | Identifier of the most recently parsed LCP packet |
+| `0x4F` | 1 | `u8` | `lcp_last_error` | Most recent LCP parser or negotiation error |
+| `0x50` | 1 | `u8` | `lcp_request_identifier` | Identifier of the outstanding local Configure-Request |
+| `0x51` | 1 | `u8` | `lcp_restart_remaining` | Remaining LCP Configure retransmissions |
+| `0x52` | 1 | `u8` | `lcp_peer_flags` | Accepted peer LCP option flags |
+| `0x53` | 1 | `u8` | `lcp_pending_action` | LCP transmit action waiting for the shared PPP encoder |
+| `0x54` | 2 | `u16` | `lcp_packet_length` | Length field of the most recently parsed LCP packet |
+| `0x56` | 2 | `u16` | `lcp_peer_mru` | Peer MRU accepted for local transmission |
+| `0x58` | 4 | `u32` | `lcp_peer_accm` | Peer ACCM accepted for local transmission |
+| `0x5C` | 4 | `u32` | `lcp_receive_count` | LCP packets presented to the packet parser |
 
 ## Mailbox ABI
 

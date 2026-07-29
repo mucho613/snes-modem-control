@@ -12,6 +12,7 @@
 .import pppDiagnosticInitialize
 .import pppReceiveInitialize, pppReceivePoll
 .import pppTransmitInitialize, pppTransmitPoll
+.import pppLcpInitialize
 .import nmitimenShadow
 
 .include "./registers.inc"
@@ -66,6 +67,7 @@
   jsr pppDiagnosticInitialize
   jsr pppReceiveInitialize
   jsr pppTransmitInitialize
+  jsr pppLcpInitialize
   sep #$10
   .i8
 

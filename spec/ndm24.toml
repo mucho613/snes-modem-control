@@ -289,7 +289,7 @@ description = "Frame at which the current generic AT transaction started"
 
 [ppp_diagnostic]
 magic = [0x50, 0x50, 0x50, 0x31]
-version = 1
+version = 2
 size = 96
 
 [[ppp_diagnostic.fields]]
@@ -508,6 +508,90 @@ offset = 72
 size = 4
 type = "u32"
 description = "Transmit frames aborted after leaving CONNECTED"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_state"
+offset = 76
+size = 1
+type = "u8"
+description = "Current RFC 1661 LCP state"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_last_code"
+offset = 77
+size = 1
+type = "u8"
+description = "Code of the most recently parsed LCP packet"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_last_identifier"
+offset = 78
+size = 1
+type = "u8"
+description = "Identifier of the most recently parsed LCP packet"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_last_error"
+offset = 79
+size = 1
+type = "u8"
+description = "Most recent LCP parser or negotiation error"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_request_identifier"
+offset = 80
+size = 1
+type = "u8"
+description = "Identifier of the outstanding local Configure-Request"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_restart_remaining"
+offset = 81
+size = 1
+type = "u8"
+description = "Remaining LCP Configure retransmissions"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_peer_flags"
+offset = 82
+size = 1
+type = "u8"
+description = "Accepted peer LCP option flags"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_pending_action"
+offset = 83
+size = 1
+type = "u8"
+description = "LCP transmit action waiting for the shared PPP encoder"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_packet_length"
+offset = 84
+size = 2
+type = "u16"
+description = "Length field of the most recently parsed LCP packet"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_peer_mru"
+offset = 86
+size = 2
+type = "u16"
+description = "Peer MRU accepted for local transmission"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_peer_accm"
+offset = 88
+size = 4
+type = "u32"
+description = "Peer ACCM accepted for local transmission"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_receive_count"
+offset = 92
+size = 4
+type = "u32"
+description = "LCP packets presented to the packet parser"
 
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]

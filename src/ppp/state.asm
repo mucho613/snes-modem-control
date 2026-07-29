@@ -20,6 +20,10 @@
 .export pppReceiveDrainBudgetYieldCount
 .export pppTransmitWireByteCount, pppTransmitFrameCount
 .export pppTransmitBackpressureCount, pppTransmitAbortCount
+.export pppLcpState, pppLcpLastCode, pppLcpLastIdentifier
+.export pppLcpLastError, pppLcpRequestIdentifier, pppLcpRestartRemaining
+.export pppLcpPeerFlags, pppLcpPendingAction, pppLcpPacketLength
+.export pppLcpPeerMru, pppLcpPeerAccm, pppLcpReceiveCount
 
 pppDiagnosticState:
 pppDiagnosticMagic: .res $4
@@ -53,6 +57,18 @@ pppTransmitWireByteCount: .res $4
 pppTransmitFrameCount: .res $4
 pppTransmitBackpressureCount: .res $4
 pppTransmitAbortCount: .res $4
+pppLcpState: .res $1
+pppLcpLastCode: .res $1
+pppLcpLastIdentifier: .res $1
+pppLcpLastError: .res $1
+pppLcpRequestIdentifier: .res $1
+pppLcpRestartRemaining: .res $1
+pppLcpPeerFlags: .res $1
+pppLcpPendingAction: .res $1
+pppLcpPacketLength: .res $2
+pppLcpPeerMru: .res $2
+pppLcpPeerAccm: .res $4
+pppLcpReceiveCount: .res $4
 .res PPP_DIAGNOSTIC_SIZE - (* - pppDiagnosticState)
 pppDiagnosticStateEnd:
 
@@ -87,6 +103,18 @@ pppDiagnosticStateEnd:
 .assert pppTransmitFrameCount - pppDiagnosticState = PPP_DIAG_TRANSMIT_FRAME_COUNT, error, "PPP transmit frame count offset"
 .assert pppTransmitBackpressureCount - pppDiagnosticState = PPP_DIAG_TRANSMIT_BACKPRESSURE_COUNT, error, "PPP transmit backpressure count offset"
 .assert pppTransmitAbortCount - pppDiagnosticState = PPP_DIAG_TRANSMIT_ABORT_COUNT, error, "PPP transmit abort count offset"
+.assert pppLcpState - pppDiagnosticState = PPP_DIAG_LCP_STATE, error, "PPP LCP state offset"
+.assert pppLcpLastCode - pppDiagnosticState = PPP_DIAG_LCP_LAST_CODE, error, "PPP LCP code offset"
+.assert pppLcpLastIdentifier - pppDiagnosticState = PPP_DIAG_LCP_LAST_IDENTIFIER, error, "PPP LCP identifier offset"
+.assert pppLcpLastError - pppDiagnosticState = PPP_DIAG_LCP_LAST_ERROR, error, "PPP LCP error offset"
+.assert pppLcpRequestIdentifier - pppDiagnosticState = PPP_DIAG_LCP_REQUEST_IDENTIFIER, error, "PPP LCP request identifier offset"
+.assert pppLcpRestartRemaining - pppDiagnosticState = PPP_DIAG_LCP_RESTART_REMAINING, error, "PPP LCP restart offset"
+.assert pppLcpPeerFlags - pppDiagnosticState = PPP_DIAG_LCP_PEER_FLAGS, error, "PPP LCP peer flags offset"
+.assert pppLcpPendingAction - pppDiagnosticState = PPP_DIAG_LCP_PENDING_ACTION, error, "PPP LCP pending action offset"
+.assert pppLcpPacketLength - pppDiagnosticState = PPP_DIAG_LCP_PACKET_LENGTH, error, "PPP LCP packet length offset"
+.assert pppLcpPeerMru - pppDiagnosticState = PPP_DIAG_LCP_PEER_MRU, error, "PPP LCP peer MRU offset"
+.assert pppLcpPeerAccm - pppDiagnosticState = PPP_DIAG_LCP_PEER_ACCM, error, "PPP LCP peer ACCM offset"
+.assert pppLcpReceiveCount - pppDiagnosticState = PPP_DIAG_LCP_RECEIVE_COUNT, error, "PPP LCP receive count offset"
 .assert pppDiagnosticStateEnd - pppDiagnosticState = PPP_DIAGNOSTIC_SIZE, error, "PPP diagnostic ABI size"
 
 ; Decoder and pump scratch fields are private and intentionally excluded from
@@ -94,12 +122,15 @@ pppDiagnosticStateEnd:
 .export pppLastEvent, pppLastInvalidReason, pppDecoderScratchByte
 .export pppReceiveDrainRemaining
 .export pppTransmitLogicalByte, pppTransmitFillRemaining
+.export pppLcpPacketEnd, pppLcpOptionLength
 pppLastEvent: .res $1
 pppLastInvalidReason: .res $1
 pppDecoderScratchByte: .res $1
 pppReceiveDrainRemaining: .res $1
 pppTransmitLogicalByte: .res $1
 pppTransmitFillRemaining: .res $1
+pppLcpPacketEnd: .res $2
+pppLcpOptionLength: .res $2
 
 ; A nesting count lets the permanent self-test wrap lower-level routines that
 ; also publish state without ever exposing an even sequence mid-operation.
