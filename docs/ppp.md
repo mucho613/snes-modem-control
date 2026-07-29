@@ -151,6 +151,20 @@ cargo run -p ndm24-tools -- ppp-monitor
 
 認証frameには利用者IDやpasswordが含まれ得るため、常設traceへpayload全体は保存しません。protocol、code、identifier、length、エラー理由までを診断対象とし、credential byte列は記録対象外とします。
 
+## Rust LCP packet codec
+
+`crates/ndm24-ppp/src/lcp.rs` は [RFC 1661 section 5および6](https://www.rfc-editor.org/rfc/rfc1661.html) と、非同期回線用ACCMを追加する [RFC 1662 section 7](https://www.rfc-editor.org/rfc/rfc1662.html) に対応する、allocation-freeのLCP packet参照codecです。現時点では状態遷移やtimerを持たず、次の構文処理だけを担当します。
+
+- `Code`、`Identifier`、network byte orderの16bit `Length`、`Data` の解析
+- `Length` より後ろにあるpaddingの除外
+- 未知のCodeをCode-Reject用にraw値のまま保持
+- Configuration Optionの `Type`、`Length`、`Data` をcopyせず順次走査
+- 未知のOption TypeをConfigure-Reject用にencoded byte列のまま保持
+- Configure-AckのIdentifierとOptionsが送信済みConfigure-Requestに完全一致するかの検査
+- 呼び出し側bufferへLCP packetを直接構築するencoder
+
+短いheader、4未満または入力末尾を越えるpacket Length、2未満または残り領域を越えるoption Lengthは、状態機械が黙って破棄する判断を行えるよう個別のerrorとして返します。
+
 ## 次の実装
 
-次はLCPのpacket parserとConfigure-Request/Ack/Nak/Rejectの状態機械をRust参照実装から作ります。LCPの実回線試験を始める時点で対向PPPサーバーが必要になります。
+次はこのcodec上にConfigure-Request/Ack/Nak/Rejectの状態機械とrestart timerをRustで実装し、固定peer transcriptで交渉を再現します。LCPの実回線試験を始める時点で対向PPPサーバーが必要になります。

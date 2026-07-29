@@ -1,10 +1,13 @@
 //! Reference implementation of the asynchronous PPP framing used above the
 //! NDM24 byte transport.
 //!
-//! This crate intentionally stops at RFC 1662 framing. LCP, authentication,
-//! IPCP, and network-layer protocols are separate state machines.
+//! RFC 1662 framing and the allocation-free LCP packet codec live here.
+//! Authentication, IPCP, and network-layer protocols remain separate state
+//! machines.
 
 use std::mem;
+
+pub mod lcp;
 
 pub const FLAG_SEQUENCE: u8 = 0x7e;
 pub const CONTROL_ESCAPE: u8 = 0x7d;
