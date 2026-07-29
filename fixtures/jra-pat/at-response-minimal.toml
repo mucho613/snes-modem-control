@@ -1,0 +1,26 @@
+name = "JRA PAT AT response receive decisions"
+source = "NTT_Data_Modem_NDM24.md; minimal fixture pending raw logic-analyzer export"
+
+[[samples]]
+kind = "full16"
+data_report = 0x0000
+status_report = 0x0000
+expected_discard_reason = 1
+
+[[samples]]
+kind = "transfer9"
+data_report = 0x0d80
+status_report = 0x0000
+expected_discard_reason = 2
+
+[[samples]]
+kind = "transfer9"
+data_report = 0x0d80
+status_report = 0x4000
+expected_discard_reason = 0
+
+[[samples]]
+kind = "transfer9"
+data_report = 0x0000
+status_report = 0x4000
+expected_discard_reason = 3

@@ -6,8 +6,10 @@
 .import copyPalette
 .import copyPattern
 .import VBlank
-.import initializeModem
 .import clearRamAll
+.import readController1
+.import modemInitializeDiagnostics
+.import modemInitialize, modemPoll, modemSessionPoll, modemMailboxPoll
 .import bufW12SEL
 .import bufWH0
 .import bufWH1
@@ -20,7 +22,7 @@
 
 .export EmptyInt
 .proc EmptyInt
-  @infiniteLoop:
+@infiniteLoop:
   jmp @infiniteLoop
 .endproc
 
@@ -34,26 +36,21 @@
   xce
 
   rep #$ff
-  sep #$24 ; Disable IRQ and NMI
+  sep #$24
   .a8
   .i16
 
   ldx #$1fff
-  txs ; Stack pointer value set
-
+  txs
   setDP $0000
 
   rep #$20
   .a16
-
   clearRamAll
-
-  ; Reset PPU
   jsr initializeRegisters
 
   rep #$20
   .a16
-
   jsr clearBG1Tile
   jsr setBG1Tile
   jsr copyPalette
@@ -62,48 +59,52 @@
   sep #$30
   .a8
   .i8
+  jsr modemInitializeDiagnostics
 
   lda #$fa
-  sta BG1SC ; BG 1 Address and Size
-
+  sta BG1SC
   lda #$01
-  sta TM ; Background and Object Enable (Main Screen)
-  sta TS ; Background and Object Enable (Sub Screen)
-
+  sta TM
+  sta TS
   lda #$0f
-  sta $2100 ; Screen Display Register
+  sta INIDISP
 
   rep #$30
   .a16
   .i16
-
-  ; Reset BG1 scroll position
-  lda #$01FF
+  lda #$01ff
   sta bg1YScrollPos
 
-  ; jsr initializeModem
+  .ifdef MODEM_SMOKE_TEST
+    jsr modemInitialize
+  .endif
 
   sep #$30
   .a8
   .i8
 
-  ; Enable NMI
-  lda #$81
-  sta NMITIMEN ; NMI, V/H Count, and Joypad Enable
+  ; NMI enabled, automatic joypad reading disabled.
+  lda #$80
+  sta NMITIMEN
   cli
 
-  ; Set window settings
   lda #$03
-  sta W12SEL ; Window 1 Enable and inverted
+  sta W12SEL
   lda #$18
-  sta WH0 ; Window 1 Position 1 = 24
-  lda #$E4
-  sta WH1 ; Window 1 Position 2 = 228
+  sta WH0
+  lda #$e4
+  sta WH1
   lda #$01
-  sta TMW ; Window 1 Enable (Main Screen)
-  lda #$01
-  sta TSW ; Window 1 Enable (Sub Screen)
+  sta TMW
+  sta TSW
 
-  @waitNmi:
-  jmp @waitNmi
+@mainLoop:
+  rep #$30
+  .a16
+  .i16
+  jsr readController1
+  jsr modemMailboxPoll
+  jsr modemPoll
+  jsr modemSessionPoll
+  bra @mainLoop
 .endproc

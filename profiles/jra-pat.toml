@@ -1,0 +1,24 @@
+# JRA PAT で観測された NDM24 設定列。
+# 発信先は環境固有なので、このファイルにも source code にも保存しない。
+
+name = "JRA PAT observed modem setup"
+terminator = [0x0d, 0x0a]
+
+commands = [
+  "AT",
+  "ATZ",
+  "AT&F",
+  "ATS7=60",
+  "ATS8=3",
+  "ATT",
+  "ATL0",
+  "AT%B2400",
+  "ATS6=4",
+  "ATS9=6",
+  "ATS10=14",
+  "ATS11=95",
+  "ATS91=15",
+  "ATX4",
+]
+
+dial_command = "ATD<runtime-supplied-number>"

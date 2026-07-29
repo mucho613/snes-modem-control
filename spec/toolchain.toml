@@ -1,0 +1,4 @@
+[cc65.windows_x86_64]
+snapshot_date = "2026-07-11"
+url = "https://sourceforge.net/projects/cc65/files/cc65-snapshot-win64.zip/download"
+sha256 = "a4682b7264ad062dc3b05a814c892d112bf925361ece9d9c944ac32187b86d85"

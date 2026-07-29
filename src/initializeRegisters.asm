@@ -17,7 +17,10 @@
   lda #$01
   sta MEMSEL ; set FastROM mode
 
-  lda #$FF
+  ; JRA PAT initializes the NDM24 controller-port I/O line with an explicit
+  ; low-to-high transition.
+  stz WRIO
+  lda #$80
   sta WRIO
 
   stz OBJSEL

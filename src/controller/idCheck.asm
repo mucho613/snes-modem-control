@@ -1,6 +1,6 @@
 .code
 
-.import controller2InputData1
+.import modemLastDataReport
 .import pleaseConnectModemMessage
 .import print
 
@@ -11,7 +11,7 @@
 
   pha
 
-  lda controller2InputData1
+  lda modemLastDataReport
   and #$0f
   cmp #$03
   beq @ok
@@ -26,4 +26,3 @@
 
   rts
 .endproc
-

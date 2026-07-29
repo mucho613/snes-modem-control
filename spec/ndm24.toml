@@ -1,0 +1,352 @@
+[spec]
+name = "NTT DATA NDM24"
+version = 1
+
+[protocol]
+latch_assert = 0x01
+tx_assert = 0x00
+tx_release = 0x80
+rx_present_mask = 0x80
+status_ready_mask = 0x40
+reset_command = 0x52
+
+[driver]
+poll_budget = 32
+ring_storage_size = 256
+ring_capacity = 255
+reset_guard_frames = 120
+probe_timeout_frames = 300
+probe_retry_limit = 3
+
+[diagnostic]
+magic = [0x4e, 0x44, 0x4d, 0x32]
+version = 1
+size = 128
+trace_event_size = 16
+trace_capacity = 256
+trace_size = 4096
+
+[[diagnostic.fields]]
+name = "magic"
+offset = 0
+size = 4
+type = "bytes"
+description = "ASCII NDM2"
+
+[[diagnostic.fields]]
+name = "version"
+offset = 4
+size = 2
+type = "u16"
+description = "Diagnostic ABI version"
+
+[[diagnostic.fields]]
+name = "size"
+offset = 6
+size = 2
+type = "u16"
+description = "Diagnostic block size"
+
+[[diagnostic.fields]]
+name = "snapshot_sequence"
+offset = 8
+size = 4
+type = "u32"
+description = "Even when the snapshot is stable"
+
+[[diagnostic.fields]]
+name = "driver_state"
+offset = 12
+size = 1
+type = "u8"
+description = "Current modem state"
+
+[[diagnostic.fields]]
+name = "flags"
+offset = 13
+size = 1
+type = "u8"
+description = "Sticky driver flags"
+
+[[diagnostic.fields]]
+name = "last_error"
+offset = 14
+size = 1
+type = "u8"
+description = "Last error code"
+
+[[diagnostic.fields]]
+name = "last_discard_reason"
+offset = 15
+size = 1
+type = "u8"
+description = "Reason the most recent RX candidate was discarded"
+
+[[diagnostic.fields]]
+name = "poll_tick"
+offset = 16
+size = 1
+type = "u8"
+description = "Advisory VBlank poll request; may change outside the snapshot sequence"
+
+[[diagnostic.fields]]
+name = "trace_frozen"
+offset = 17
+size = 1
+type = "u8"
+description = "Non-zero when trace recording is frozen"
+
+[[diagnostic.fields]]
+name = "rx_read_index"
+offset = 18
+size = 1
+type = "u8"
+description = "RX ring read index"
+
+[[diagnostic.fields]]
+name = "rx_write_index"
+offset = 19
+size = 1
+type = "u8"
+description = "RX ring write index"
+
+[[diagnostic.fields]]
+name = "tx_read_index"
+offset = 20
+size = 1
+type = "u8"
+description = "TX ring read index"
+
+[[diagnostic.fields]]
+name = "tx_write_index"
+offset = 21
+size = 1
+type = "u8"
+description = "TX ring write index"
+
+[[diagnostic.fields]]
+name = "last_rx_byte"
+offset = 22
+size = 1
+type = "u8"
+description = "Last accepted RX byte"
+
+[[diagnostic.fields]]
+name = "last_tx_byte"
+offset = 23
+size = 1
+type = "u8"
+description = "Last transmitted byte"
+
+[[diagnostic.fields]]
+name = "last_data_report"
+offset = 24
+size = 2
+type = "u16"
+description = "Raw Data1 report"
+
+[[diagnostic.fields]]
+name = "last_status_report"
+offset = 26
+size = 2
+type = "u16"
+description = "Raw Data2 report"
+
+[[diagnostic.fields]]
+name = "trace_next_sequence"
+offset = 28
+size = 4
+type = "u32"
+description = "Sequence assigned to the next trace event"
+
+[[diagnostic.fields]]
+name = "rx_accepted"
+offset = 32
+size = 4
+type = "u32"
+description = "Accepted receive bytes"
+
+[[diagnostic.fields]]
+name = "rx_discarded"
+offset = 36
+size = 4
+type = "u32"
+description = "Discarded receive candidates"
+
+[[diagnostic.fields]]
+name = "tx_bytes"
+offset = 40
+size = 4
+type = "u32"
+description = "Transmitted bytes"
+
+[[diagnostic.fields]]
+name = "rx_overflow"
+offset = 44
+size = 4
+type = "u32"
+description = "RX ring overflow count"
+
+[[diagnostic.fields]]
+name = "tx_overflow"
+offset = 48
+size = 4
+type = "u32"
+description = "TX ring overflow count"
+
+[[diagnostic.fields]]
+name = "poll_limit"
+offset = 52
+size = 4
+type = "u32"
+description = "Poll budget exhaustion count"
+
+[[diagnostic.fields]]
+name = "timeout"
+offset = 56
+size = 4
+type = "u32"
+description = "Timeout count"
+
+[[diagnostic.fields]]
+name = "reinitialize"
+offset = 60
+size = 4
+type = "u32"
+description = "Initialization request count"
+
+[[diagnostic.fields]]
+name = "trace_overwritten"
+offset = 64
+size = 4
+type = "u32"
+description = "Trace events written after the first full ring"
+
+[[diagnostic.fields]]
+name = "reset_start_frame"
+offset = 68
+size = 4
+type = "u32"
+description = "Frame at which the R command was sent"
+
+[mailbox]
+magic = [0x4e, 0x44, 0x4d, 0x43]
+version = 1
+size = 64
+argument_size = 32
+
+[[mailbox.fields]]
+name = "magic"
+offset = 0
+size = 4
+type = "bytes"
+description = "ASCII NDMC"
+
+[[mailbox.fields]]
+name = "version"
+offset = 4
+size = 2
+type = "u16"
+description = "Mailbox ABI version"
+
+[[mailbox.fields]]
+name = "block_size"
+offset = 6
+size = 2
+type = "u16"
+description = "Mailbox block size"
+
+[[mailbox.fields]]
+name = "host_sequence"
+offset = 8
+size = 4
+type = "u32"
+description = "Sequence written last by the host"
+
+[[mailbox.fields]]
+name = "processed_sequence"
+offset = 12
+size = 4
+type = "u32"
+description = "Last command accepted by the SFC"
+
+[[mailbox.fields]]
+name = "command"
+offset = 16
+size = 1
+type = "u8"
+description = "Requested command"
+
+[[mailbox.fields]]
+name = "status"
+offset = 17
+size = 1
+type = "u8"
+description = "Command status"
+
+[[mailbox.fields]]
+name = "result"
+offset = 18
+size = 2
+type = "u16"
+description = "Command-specific result"
+
+[[mailbox.fields]]
+name = "arguments"
+offset = 20
+size = 32
+type = "bytes"
+description = "Command arguments"
+
+[[mailbox.fields]]
+name = "reserved"
+offset = 52
+size = 12
+type = "bytes"
+description = "Reserved; must be zero"
+
+[states]
+off = 0
+resetting = 1
+probing = 2
+ready = 3
+error = 4
+
+[flags]
+poll_limit = 0x01
+rx_overflow = 0x02
+tx_overflow = 0x04
+timeout = 0x08
+trace_overwrite = 0x10
+
+[discard_reasons]
+none = 0
+full_report = 1
+status_not_ready = 2
+no_data = 3
+rx_overflow = 4
+
+[trace_events]
+none = 0
+poll16 = 1
+transfer9 = 2
+rx_accepted = 3
+rx_discarded = 4
+tx = 5
+state = 6
+error = 7
+
+[mailbox_commands]
+none = 0
+initialize = 1
+quick_test = 2
+clear_trace = 3
+freeze_trace = 4
+resume_trace = 5
+
+[mailbox_status]
+idle = 0
+pending = 1
+running = 2
+passed = 3
+failed = 4

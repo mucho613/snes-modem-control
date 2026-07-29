@@ -2,8 +2,8 @@
 
 .import print
 .import controller1Input
-.import controller2InputData1
-.import controller2InputData2
+.import modemLastDataReport
+.import modemLastStatusReport
 .import terminalTextWriteBuffer
 
 .macpack generic
@@ -50,10 +50,10 @@
   sep #$20
   .a8
 
-  setCharacterToBuffer controller2InputData1, $00
-  setCharacterToBuffer controller2InputData1, $01
-  setCharacterToBuffer controller2InputData1, $02
-  setCharacterToBuffer controller2InputData1, $03
+  setCharacterToBuffer modemLastDataReport, $00
+  setCharacterToBuffer modemLastDataReport, $01
+  setCharacterToBuffer modemLastStatusReport, $00
+  setCharacterToBuffer modemLastStatusReport, $01
 
   lda #$0a
   sta terminalTextWriteBuffer + 8
