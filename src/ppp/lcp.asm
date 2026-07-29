@@ -86,6 +86,7 @@
   jmp @fail
 
 @checkHeader:
+  .a16
   lda pppLastFrameLength
   cmp #PPP_LCP_MINIMUM_FRAME_LENGTH
   bcs @readHeader
@@ -95,6 +96,7 @@
   jmp @fail
 
 @readHeader:
+  .a16
   sep #$20
   .a8
   lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET
@@ -117,6 +119,7 @@
   jmp @fail
 
 @checkAvailable:
+  .a16
   clc
   adc #PPP_LCP_FRAME_OFFSET
   sta pppLcpPacketEnd
@@ -129,6 +132,7 @@
   jmp @fail
 
 @checkConfigure:
+  .a16
   sep #$20
   .a8
   lda pppLcpLastCode
@@ -143,6 +147,7 @@
   .a16
   ldx #PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH
 @optionLoop:
+  .a16
   cpx pppLcpPacketEnd
   beq @success16
   txa
@@ -157,6 +162,7 @@
   jmp @fail
 
 @readOptionLength:
+  .a16
   sep #$20
   .a8
   lda pppFrameBuffer + 1, x
@@ -166,6 +172,7 @@
   jmp @fail
 
 @checkOptionEnd:
+  .a8
   rep #$20
   .a16
   and #$00ff
@@ -182,10 +189,12 @@
   jmp @fail
 
 @advanceOption:
+  .a16
   tax
   bra @optionLoop
 
 @success16:
+  .a16
   sep #$20
   .a8
 @success:
