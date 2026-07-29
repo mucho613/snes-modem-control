@@ -26,6 +26,7 @@ nopcomp
 
 auth
 require-pap
+pap-timeout 120
 refuse-chap
 refuse-mschap
 refuse-mschap-v2

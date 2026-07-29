@@ -20,6 +20,13 @@ done
 
 systemctl stop ndm24-ppp-server.service 2>/dev/null || true
 systemctl disable ndm24-ppp-server.service 2>/dev/null || true
+systemctl reset-failed ndm24-ppp-server.service 2>/dev/null || true
+
+# This workstation previously used the same DFM-56U for a serial login.
+# The user has retired that use, so prevent mgetty's Restart=always service
+# from reclaiming ttyACM0 after the PPP server attaches it.
+systemctl disable --now mgetty.service 2>/dev/null || true
+systemctl reset-failed mgetty.service 2>/dev/null || true
 
 install -d -o root -g root -m 0755 /etc/ppp/peers
 install -o root -g root -m 0600 "${peer_file}" /etc/ppp/peers/ndm24-lcp
@@ -53,7 +60,16 @@ fi
 systemctl daemon-reload
 
 # Parse and resolve all options without opening the modem or starting a link.
-pppd call ndm24-lcp dryrun >/dev/null
+# pppd only recognizes a serial-device token when that path currently exists;
+# use /dev/null for this dry run so installation also works while USB is
+# detached back to Windows.
+dryrun_peer="$(mktemp /tmp/ndm24-lcp.XXXXXX)"
+trap 'rm -f -- "${dryrun_peer}"' EXIT
+sed 's#^/dev/ttyACM0$#/dev/null#' \
+  /etc/ppp/peers/ndm24-lcp >"${dryrun_peer}"
+pppd file "${dryrun_peer}" dryrun >/dev/null
+rm -f -- "${dryrun_peer}"
+trap - EXIT
 
 echo "installed NDM24 PPP server configuration"
 echo "service is installed but not enabled or started"

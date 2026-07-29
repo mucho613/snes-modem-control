@@ -77,7 +77,9 @@ PowerShellから実行します。
 ```
 
 `Install`は設定を`/etc/ppp`と`/etc/systemd/system`へ配置し、`pppd
-dryrun`で全optionを検査します。serviceのenableやstartは行いません。
+dryrun`で全optionを検査します。DFM-56UがWindows側にあり、
+`/dev/ttyACM0`が存在しない状態でも実行できます。serviceのenableやstartは
+行いません。
 
 `Probe`はUSB IDからDFM-56Uの現在のBUSIDを見つけ、必要ならWSL2へ
 attachして、`AT`、`ATI`、`ATI3`、`AT+GMI`、`AT+GMM`、`AT+GMR`を
@@ -86,6 +88,12 @@ attachして、`AT`、`ATI`、`ATI3`、`AT+GMI`、`AT+GMM`、`AT+GMR`を
 `Stop`はserviceを停止してUSBIPをdetachし、DFM-56UがWindowsのCOMポート
 へ再列挙されるまで最大10秒待ちます。USBIPのshareは永続ですが、attachは
 WindowsやWSLの再起動、USBの抜き差し後に必要です。
+
+確認したWSL環境には、以前のシリアルログイン用`mgetty.service`もあり、
+`Restart=always`で同じ`ttyACM0`を取得していました。この用途は終了したため、
+`Install`はmgettyを停止して自動起動も無効化します。`Probe`と`Start`も、
+古い導入状態から直接実行して安全に移行できるよう同じ無効化を行います。
+設定ファイルは削除しません。
 
 ## LCP接続試験
 
@@ -111,6 +119,8 @@ DFM-56Uは次の条件へ固定します。
 
 `pppd`はPAPを要求し、CHAP、MS-CHAP、EAP、PFC、ACFC、VJ、CCP、
 BSD-Compress、Deflate、IPv6を無効にします。LCP Echo-Requestも無効です。
+SFC側のLCP診断と切断試験を行う時間を確保するため、PAP Authenticate-Request
+の待ち時間は120秒です。SFC側へPAPを実装するまでは時間切れが正常です。
 
 Ubuntuの`pppd`はpeer profileより前に`/etc/ppp/options`も読みます。確認した
 環境には`passive`が設定されているため、Configure-Requestの規定回数を使い
@@ -150,6 +160,26 @@ cargo run -p ndm24-tools -- trace-live
 対向ログは`Logs` actionと、WSL内の`/var/log/ndm24-pppd.log`へ残ります。
 `debug`はLCPなどの制御packetを記録しますが、`show-password`は設定せず、
 PAP passwordをログへ出しません。
+
+## 2026-07-30 revision A 初回結果
+
+revision AのNDM24とDFM-56UをV.22bis 2400 bit/sで接続し、最初の実回線LCP
+交渉を行いました。SFC診断と`pppd`ログの双方で次を確認しています。
+
+- SFCは空optionのConfigure-Request（Identifier 0）を送信した。
+- `pppd`はACCM 0、PAP、Magic-Numberを含むConfigure-Requestを送信した。
+- SFCはpeer RequestをConfigure-Ackし、peer optionを確定した。
+- `pppd`はSFC RequestをConfigure-Ackした。
+- SFCは受信2frame、送信2frame、FCS error 0、invalid 0で`Opened`へ到達した。
+- 確定したpeer MRUは1500、ACCMは0、Magic-Numberは`0x4900EFB9`だった。
+
+この結果によりLCP確立部分は合格とします。一方、SFC側PAPが未実装のため、
+当時の30秒PAP待ちが切れると`pppd`がTerminate-Requestを送り、回線を切断
+しました。PPP decoderがRXを所有したままNDM24の`NO CARRIER`を消費したため、
+後から開始したAT result待ちはtimeoutし、明示的な再初期化が必要でした。
+切断境界でFCS errorも1回記録されています。この問題はLCP確立中の欠損では
+ありませんが、正常切断の合格条件は未達です。以後の切断試験時間を確保する
+ためPAP待ちを120秒へ延長しています。
 
 試験終了時は必ず停止します。
 

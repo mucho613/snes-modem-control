@@ -58,14 +58,26 @@ function Connect-Dfm56u {
         )
     }
 
+    $deviceReady = $false
     for ($attempt = 0; $attempt -lt 20; $attempt++) {
         & wsl.exe -d $Distribution -u root --exec test -c /dev/ttyACM0
         if ($LASTEXITCODE -eq 0) {
-            return
+            $deviceReady = $true
+            break
         }
         Start-Sleep -Milliseconds 500
     }
-    throw "DFM-56U did not appear as /dev/ttyACM0"
+    if (-not $deviceReady) {
+        throw "DFM-56U did not appear as /dev/ttyACM0"
+    }
+
+    # mgetty's former serial-login use has been retired. Disable it
+    # defensively here too, so Start and Probe work before a reinstall.
+    Invoke-NativeChecked "wsl.exe" @(
+        "-d", $Distribution, "-u", "root",
+        "--exec", "sh", "-c",
+        "systemctl disable --now mgetty.service 2>/dev/null || true"
+    )
 }
 
 function Install-PppServer {

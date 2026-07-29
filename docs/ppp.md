@@ -4,7 +4,7 @@
 
 最初のPPPマイルストーンは、NDM24から受け取る任意位置で分割されたbyte列を、FCS検証済みのPPPフレームへ復元する層です。`crates/ndm24-ppp` を仕様の参照実装とし、同じ状態遷移と試験ベクトルを65816へ移植しています。
 
-現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP packet parser、Configure交渉、peer option方針、restart timer、main-loop pollまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。実対向とのLCP試験、認証、IPCP、IPv4、UDP、TCP、NTPはまだSFC上で動作しません。
+現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP packet parser、Configure交渉、peer option方針、restart timer、main-loop pollまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向で双方のConfigure-Request/Ackと`Opened`到達まで確認しました。認証、IPCP、IPv4、UDP、TCP、NTPはまだSFC上で動作しません。
 
 PPP接続は次の順序で進みます。
 
@@ -238,8 +238,7 @@ Opened中にpeer Configure-Requestを受けた場合は応答packetと新しいl
 
 ## 次の実装
 
-オフラインで確定できるLCP処理はmain-loop接続まで完了しました。疑似PSTNの
-対向には[WSL2 PPPサーバー](ppp-server.md)を用意し、DFM-56UをV.22bis
-2400 bit/sへ固定してPAPを要求します。次は実際の回線上で
-Configure-Request/Ack、PAP要求option、timer、診断snapshotを照合する
-接続試験です。
+オフラインで確定できるLCP処理と、実対向での`Opened`到達まで完了しました。
+次は、PPP decoderがRXを所有している間に回線が切れた場合にも、NDM24の
+`NO CARRIER`をAT sessionへ引き渡して`Ready`へ戻す切断境界を整理します。
+その後、PAP Authenticate-Requestの送信と認証結果処理へ進みます。
