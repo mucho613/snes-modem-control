@@ -14,6 +14,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use ndm24_protocol::{
     MODEM_MAILBOX_COMMAND_AT_TRANSACTION, MODEM_MAILBOX_COMMAND_CLEAR_TRACE,
     MODEM_MAILBOX_COMMAND_FREEZE_TRACE, MODEM_MAILBOX_COMMAND_INITIALIZE,
+    MODEM_MAILBOX_COMMAND_PPP_RECEIVE_START, MODEM_MAILBOX_COMMAND_PPP_RECEIVE_STOP,
     MODEM_MAILBOX_COMMAND_PPP_SELF_TEST, MODEM_MAILBOX_COMMAND_QUICK_TEST,
     MODEM_MAILBOX_COMMAND_RESUME_TRACE, MODEM_SESSION_RESULT_OK,
 };
@@ -136,6 +137,8 @@ enum MailboxCommand {
     FreezeTrace,
     ResumeTrace,
     PppSelfTest,
+    PppReceiveStart,
+    PppReceiveStop,
 }
 
 impl MailboxCommand {
@@ -147,6 +150,8 @@ impl MailboxCommand {
             Self::FreezeTrace => MODEM_MAILBOX_COMMAND_FREEZE_TRACE,
             Self::ResumeTrace => MODEM_MAILBOX_COMMAND_RESUME_TRACE,
             Self::PppSelfTest => MODEM_MAILBOX_COMMAND_PPP_SELF_TEST,
+            Self::PppReceiveStart => MODEM_MAILBOX_COMMAND_PPP_RECEIVE_START,
+            Self::PppReceiveStop => MODEM_MAILBOX_COMMAND_PPP_RECEIVE_STOP,
         }
     }
 }

@@ -26,3 +26,16 @@ PPP_INVALID_NONE = $00
 PPP_INVALID_TOO_SHORT = $01
 PPP_INVALID_ESCAPE_BEFORE_FLAG = $02
 
+PPP_RECEIVE_DRAIN_BUDGET = 32
+
+.macro pppIncrement32 address
+  .local done
+  rep #$20
+  .a16
+  inc address
+  bne done
+  inc address + 2
+done:
+  sep #$20
+  .a8
+.endmacro

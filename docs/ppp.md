@@ -4,7 +4,7 @@
 
 最初のPPPマイルストーンは、NDM24から受け取る任意位置で分割されたbyte列を、FCS検証済みのPPPフレームへ復元する層です。`crates/ndm24-ppp` を仕様の参照実装とし、同じ状態遷移と試験ベクトルを65816へ移植しています。
 
-現時点で実装済みなのはRFC 1662の非同期HDLC-like受信framingです。Rust参照実装に加えて、65816版のFCS計算、unescape、Flag境界、最大長判定、再同期を実装しています。NDM24受信リングとの接続、送信encoder、LCP、認証、IPCP、IPv4、UDP、TCP、NTPはまだSFC上で動作しません。
+現時点で実装済みなのはRFC 1662の非同期HDLC-like受信framingです。Rust参照実装に加えて、65816版のFCS計算、unescape、Flag境界、最大長判定、再同期、NDM24受信リングからのdrainを実装しています。送信encoder、LCP、認証、IPCP、IPv4、UDP、TCP、NTPはまだSFC上で動作しません。
 
 PPP接続は次の順序で進みます。
 
@@ -62,6 +62,7 @@ Rust参照実装は全入力分割位置、破損FCSからの再同期、Flag直
 - `src/ppp/constants.inc`: RFC 1662の定数、event、invalid理由
 - `src/ppp/state.asm`: decoder状態とframe buffer
 - `src/ppp/framing.asm`: byte単位の受信状態機械
+- `src/ppp/receive.asm`: NDM24 RX ringの所有権と上限付きdrain
 - `src/ppp/selfTest.asm`: 固定fixtureによる常設セルフテスト
 
 `pppDecoderPush` はraw byteを1byteずつ受け取り、次のeventを返します。
@@ -83,6 +84,19 @@ cargo run -p ndm24-tools -- mailbox ppp-self-test
 ```
 
 正常frameとProtocol `$C021` の復元、破損FCS、Flag直前のescape、receive ACCMによるXON除去をSFC上で検査します。失敗時のmailbox resultは、`src/ppp/selfTest.asm` 内の失敗step番号です。
+
+## NDM24 RX ringとの接続
+
+PPP受信は通常無効です。これにより、既存の `binary_receive` を使ったraw転送試験がCONNECTED状態でも従来どおりRX ringを所有できます。PPP受信を試すときだけ明示的に所有権を切り替えます。
+
+```powershell
+cargo run -p ndm24-tools -- mailbox ppp-receive-start
+cargo run -p ndm24-tools -- mailbox ppp-receive-stop
+```
+
+有効化後、`pppReceivePoll` はNDM24がCONNECTEDの間だけ、1回につき最大32byteをRX ringからdecoderへ渡します。FCS検証済みframeが完成すると `pppFrameReady` を立て、そのframeを上位層が `pppReleaseFrame` で解放するまで追加のRX byteを消費しません。これにより、完成frameを次の入力で上書きしません。
+
+常設カウンタとしてraw受信byte、正常frame、FCS error、invalid、overflow、32byte drain budget到達回数をWRAMに保持します。各値は `pppReceive*` のlink labelとしてQUsb2Snesから確認できます。versionedなホスト表示用PPP診断blockへの統合は次の診断マイルストーンで行います。
 
 ## SFC のメモリと接続境界
 
@@ -109,4 +123,4 @@ Address 1 + Control 1 + Protocol 2 + Information 1500 + FCS 2
 
 ## 次の実装
 
-次はNDM24 RX ringをbyte単位で65816 decoderへdrainし、完成frameを上位層へ引き渡す境界を実装します。その後、TX ringの空きに応じて中断・再開できる送信encoderを追加します。LCPの実装と実回線試験は送受信framingの完成後に行います。
+次はTX ringの空きに応じて中断・再開できる送信encoderを追加します。その後、PPP診断blockとLCPを実装します。LCPの実回線試験を始める時点で対向PPPサーバーが必要になります。

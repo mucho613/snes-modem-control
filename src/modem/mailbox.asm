@@ -15,6 +15,7 @@
 .import modemQueueByte, modemReadByte
 .import modemClearTrace, modemFreezeTrace, modemResumeTrace
 .import pppRunSelfTest
+.import pppReceiveStart, pppReceiveStop
 
 .export modemMailboxPoll
 .proc modemMailboxPoll
@@ -146,6 +147,14 @@
   bne :+
   jmp @pppSelfTest
 :
+  cmp #MODEM_MAILBOX_COMMAND_PPP_RECEIVE_START
+  bne :+
+  jmp @pppReceiveStart
+:
+  cmp #MODEM_MAILBOX_COMMAND_PPP_RECEIVE_STOP
+  bne :+
+  jmp @pppReceiveStop
+:
   lda #MODEM_MAILBOX_STATUS_FAILED
   sta modemMailboxStatus
   lda #$ff
@@ -210,7 +219,9 @@
 @binaryTransmitLoop:
   lda modemMailboxArguments + MODEM_BINARY_ARGUMENT_DATA, x
   jsr modemQueueByte
-  bcs @binaryInvalid
+  bcc :+
+  jmp @binaryInvalid
+:
   inx
   dey
   bne @binaryTransmitLoop
@@ -274,6 +285,18 @@
 @pppSelfTestFailed:
   sta modemMailboxResult
   lda #MODEM_MAILBOX_STATUS_FAILED
+  sta modemMailboxStatus
+  bra @commitCommand
+
+@pppReceiveStart:
+  jsr pppReceiveStart
+  lda #MODEM_MAILBOX_STATUS_PASSED
+  sta modemMailboxStatus
+  bra @commitCommand
+
+@pppReceiveStop:
+  jsr pppReceiveStop
+  lda #MODEM_MAILBOX_STATUS_PASSED
   sta modemMailboxStatus
   bra @commitCommand
 

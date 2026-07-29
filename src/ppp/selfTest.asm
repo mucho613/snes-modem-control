@@ -4,7 +4,10 @@
 .code
 
 .import pppDecoderReset, pppDecoderPush
+.import pppReceiveInitialize, pppReceivePushByte
 .import pppLastFrameLength, pppLastProtocol, pppFrameBuffer
+.import pppFrameReady, pppReceiveLastEvent
+.import pppReceiveByteCount, pppReceiveFrameCount
 
 .export pppRunSelfTest
 
@@ -202,14 +205,85 @@
   jmp @fail
 :
 
+  ; Exercise the receive-owner wrapper used by the NDM24 RX drain.
+  setDBR .bankbyte(pppSelfTestEncoded)
+  jsr pppReceiveInitialize
+  ldx #$0000
+@receiveLoop:
+  lda pppSelfTestEncoded, x
+  jsr pppReceivePushByte
+  cpx #(pppSelfTestEncodedEnd - pppSelfTestEncoded - 1)
+  beq @receiveFinal
+  cmp #PPP_EVENT_NONE
+  beq :+
+  lda #$0c
+  jmp @fail
+:
+  inx
+  bra @receiveLoop
+
+@receiveFinal:
+  cmp #PPP_EVENT_FRAME
+  beq :+
+  lda #$0d
+  jmp @fail
+:
+  setDBR $7e
+  lda pppFrameReady
+  cmp #$01
+  beq :+
+  lda #$0e
+  jmp @fail
+:
+  lda pppReceiveLastEvent
+  cmp #PPP_EVENT_FRAME
+  beq :+
+  lda #$0f
+  jmp @fail
+:
+  rep #$20
+  .a16
+  lda pppReceiveByteCount
+  cmp #(pppSelfTestEncodedEnd - pppSelfTestEncoded)
+  beq :+
+  sep #$20
+  .a8
+  lda #$10
+  jmp @fail
+:
+  .a16
+  lda pppReceiveByteCount + 2
+  bne @fail10_16
+  lda pppReceiveFrameCount
+  cmp #$0001
+  bne @fail11_16
+  lda pppReceiveFrameCount + 2
+  bne @fail11_16
+  sep #$20
+  .a8
+
+  jsr pppReceiveInitialize
   lda #$00
   clc
   bra @return
 
+@fail10_16:
+  sep #$20
+  .a8
+  lda #$10
+  bra @fail
+@fail11_16:
+  sep #$20
+  .a8
+  lda #$11
+  bra @fail
 @fail05:
   lda #$05
 
 @fail:
+  pha
+  jsr pppReceiveInitialize
+  pla
   sec
 
 @return:

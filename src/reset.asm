@@ -9,6 +9,7 @@
 .import modemInitializeDiagnostics
 .import modemInitialize
 .import modemPoll, modemSessionPoll, modemMailboxPoll
+.import pppReceiveInitialize, pppReceivePoll
 .import nmitimenShadow
 
 .include "./registers.inc"
@@ -58,6 +59,11 @@
   .a8
   .i8
   jsr modemInitializeDiagnostics
+  rep #$10
+  .i16
+  jsr pppReceiveInitialize
+  sep #$10
+  .i8
 
   ; BG1 tilemap at VRAM $4000, 32x64 tiles.
   lda #TERMINAL_BG1SC
@@ -101,6 +107,7 @@
     jsr modemMailboxPoll
     jsr modemPoll
     jsr modemSessionPoll
+    jsr pppReceivePoll
   .endif
   bra @mainLoop
 .endproc
