@@ -8,6 +8,7 @@
 use std::mem;
 
 pub mod lcp;
+pub mod pap;
 
 pub const FLAG_SEQUENCE: u8 = 0x7e;
 pub const CONTROL_ESCAPE: u8 = 0x7d;
