@@ -16,7 +16,8 @@ use ndm24_protocol::{
     MODEM_MAILBOX_COMMAND_FREEZE_TRACE, MODEM_MAILBOX_COMMAND_INITIALIZE,
     MODEM_MAILBOX_COMMAND_PPP_RECEIVE_START, MODEM_MAILBOX_COMMAND_PPP_RECEIVE_STOP,
     MODEM_MAILBOX_COMMAND_PPP_SELF_TEST, MODEM_MAILBOX_COMMAND_QUICK_TEST,
-    MODEM_MAILBOX_COMMAND_RESUME_TRACE, MODEM_SESSION_RESULT_OK,
+    MODEM_MAILBOX_COMMAND_RESUME_TRACE, MODEM_SESSION_RESULT_CONNECT,
+    MODEM_SESSION_RESULT_NO_CARRIER, MODEM_SESSION_RESULT_OK,
 };
 
 #[derive(Debug, Parser)]
@@ -66,6 +67,10 @@ enum Command {
     },
     At {
         command: String,
+        #[arg(long, value_enum, default_value_t = AtExpectedResult::Ok)]
+        expect: AtExpectedResult,
+        #[arg(long, default_value_t = 300)]
+        timeout_frames: u16,
         #[arg(long, default_value = "ws://localhost:23074")]
         websocket: String,
         #[arg(long, default_value = "build/smoke/modem-control.lbl")]
@@ -140,6 +145,31 @@ enum Command {
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
+enum AtExpectedResult {
+    Ok,
+    Connect,
+    NoCarrier,
+}
+
+impl AtExpectedResult {
+    fn value(self) -> u8 {
+        match self {
+            Self::Ok => MODEM_SESSION_RESULT_OK,
+            Self::Connect => MODEM_SESSION_RESULT_CONNECT,
+            Self::NoCarrier => MODEM_SESSION_RESULT_NO_CARRIER,
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::Ok => "OK",
+            Self::Connect => "CONNECT",
+            Self::NoCarrier => "NO CARRIER",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
 enum MailboxCommand {
     Initialize,
     QuickTest,
@@ -206,12 +236,14 @@ async fn main() -> Result<()> {
         }
         Command::At {
             command,
+            expect,
+            timeout_frames,
             websocket,
             labels,
             timeout_seconds,
         } => {
             let arguments =
-                connect_test::at_arguments(command.as_bytes(), MODEM_SESSION_RESULT_OK, 300)?;
+                connect_test::at_arguments(command.as_bytes(), expect.value(), timeout_frames)?;
             let outcome = qusb2snes::mailbox_command_with_arguments(
                 &websocket,
                 &labels,
@@ -221,11 +253,17 @@ async fn main() -> Result<()> {
             )
             .await?;
             ensure!(
-                outcome.result == MODEM_SESSION_RESULT_OK as u16,
-                "NDM24 returned result {}, expected OK",
-                outcome.result
+                outcome.result == expect.value() as u16,
+                "NDM24 returned result {}, expected {}",
+                outcome.result,
+                expect.name()
             );
-            println!("{command}: OK");
+            let display_command = if command.is_empty() {
+                "<wait>"
+            } else {
+                &command
+            };
+            println!("{display_command}: {}", expect.name());
             Ok(())
         }
         Command::Monitor {

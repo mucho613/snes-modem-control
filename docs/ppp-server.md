@@ -130,6 +130,16 @@ Ubuntuの`pppd`はpeer profileより前に`/etc/ppp/options`も読みます。�
 5. `pppd`がPAP待ちへ進み、未実装のSFC側PAPによって認証完了しない。
 6. 切断後にSFC側LCPが`Closed`へ戻り、timerとpending送信を残さない。
 
+SFC側の発信と切断結果待ちは、期待するresult codeを明示します。
+
+```powershell
+cargo run -p ndm24-tools -- at ATDT0 --expect connect --timeout-frames 3900 --timeout-seconds 75
+cargo run -p ndm24-tools -- at "" --expect no-carrier --timeout-frames 900 --timeout-seconds 20
+```
+
+`timeout-frames`はSFC側のVBlank基準、`timeout-seconds`はPC側メールボックス
+待機の上限です。前者が必ず先に成立するようPC側を長く設定します。
+
 SFCの診断は別のPowerShellで取得します。
 
 ```powershell

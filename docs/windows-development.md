@@ -65,6 +65,10 @@ cargo run -p ndm24-tools -- test
 # 任意の AT コマンドを1回送り、OKまで確認（ATM0は通常の初期化で自動送信）
 cargo run -p ndm24-tools -- at ATM0
 
+# 発信時のCONNECTと切断時のNO CARRIERを正規parserで待つ
+cargo run -p ndm24-tools -- at ATDT0 --expect connect --timeout-frames 3900 --timeout-seconds 75
+cargo run -p ndm24-tools -- at "" --expect no-carrier --timeout-frames 900 --timeout-seconds 20
+
 # 有効な循環トレースを時系列 JSON で出力
 cargo run -p ndm24-tools -- trace-live
 
