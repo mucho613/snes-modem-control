@@ -9,8 +9,10 @@
 .import pppLcpState, pppLcpLastIdentifier, pppLcpLastError
 .import pppLcpRequestIdentifier, pppLcpRestartRemaining
 .import pppLcpPendingAction, pppLcpPacketLength
+.import pppLcpTimerActive
 .import pppFrameBuffer, pppTransmitBuffer, pppTransmitActive
 .import pppTransmitBegin, pppTransmitInitialize
+.import pppLcpArmRestartTimer
 .import pppLastProtocol, pppLastFrameLength
 
 .export pppLcpOpen, pppLcpReceiveFrame, pppLcpBuildPending
@@ -24,16 +26,21 @@
 
   phb
   setDBR $7e
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_OPENED
+  beq @return
   jsr pppSnapshotBegin
   lda #PPP_LCP_STATE_REQUEST_SENT
   sta pppLcpState
   stz pppLcpRequestIdentifier
-  lda #PPP_LCP_DEFAULT_MAX_CONFIGURE
+  lda #(PPP_LCP_DEFAULT_MAX_CONFIGURE - 1)
   sta pppLcpRestartRemaining
   lda #PPP_LCP_ACTION_CONFIGURE_REQUEST
   sta pppLcpPendingAction
   stz pppLcpLastError
   jsr pppSnapshotEnd
+@return:
+  .a8
   plb
   rts
 .endproc
@@ -119,7 +126,8 @@
   lda #PPP_LCP_STATE_OPENED
   sta pppLcpState
   stz pppLcpRestartRemaining
-  bra @returnSuccess
+  stz pppLcpTimerActive
+  jmp @returnSuccess
 
 @configureAck:
   .a8
@@ -158,6 +166,7 @@
   lda #PPP_LCP_STATE_OPENED
   sta pppLcpState
   stz pppLcpRestartRemaining
+  stz pppLcpTimerActive
   bra @returnSuccess
 
 @restartAfterDuplicateAck:
@@ -231,8 +240,9 @@
 @newRequest:
   .a8
   inc pppLcpRequestIdentifier
-  lda #PPP_LCP_DEFAULT_MAX_CONFIGURE
+  lda #(PPP_LCP_DEFAULT_MAX_CONFIGURE - 1)
   sta pppLcpRestartRemaining
+  stz pppLcpTimerActive
   lda #PPP_LCP_ACTION_CONFIGURE_REQUEST
   sta pppLcpPendingAction
   rts
@@ -337,6 +347,11 @@
   sep #$20
   .a8
   jsr pppSnapshotBegin
+  lda pppLcpPendingAction
+  cmp #PPP_LCP_ACTION_CONFIGURE_REQUEST
+  bne :+
+  jsr pppLcpArmRestartTimer
+:
   stz pppLcpPendingAction
   jsr pppSnapshotEnd
   ply

@@ -126,6 +126,7 @@ pppDiagnosticStateEnd:
 .export pppLcpOptionSeen, pppLcpOptionDuplicate
 .export pppLcpOptionOffset, pppLcpOutputCursor
 .export pppLcpHasReject, pppLcpHasNak, pppLcpPeerMagic
+.export pppLcpRestartDeadline, pppLcpTimerActive
 pppLastEvent: .res $1
 pppLastInvalidReason: .res $1
 pppDecoderScratchByte: .res $1
@@ -139,6 +140,8 @@ pppLcpOutputCursor: .res $2
 pppLcpHasReject: .res $1
 pppLcpHasNak: .res $1
 pppLcpPeerMagic: .res $4
+pppLcpRestartDeadline: .res $2
+pppLcpTimerActive: .res $1
 pppLcpOptionSeen: .res $100
 pppLcpOptionDuplicate: .res $100
 

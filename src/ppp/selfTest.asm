@@ -17,6 +17,7 @@
 .import pppLcpRunSelfTest
 .import pppLcpNegotiationRunSelfTest
 .import pppLcpOptionsRunSelfTest
+.import pppLcpTimerRunSelfTest
 
 .export pppRunSelfTest
 
@@ -396,6 +397,10 @@
   jmp @fail
 :
   jsr pppLcpOptionsRunSelfTest
+  bcc :+
+  jmp @fail
+:
+  jsr pppLcpTimerRunSelfTest
   bcc :+
   jmp @fail
 :

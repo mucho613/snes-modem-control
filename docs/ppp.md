@@ -67,6 +67,7 @@ Rust参照実装は全入力分割位置、破損FCSからの再同期、Flag直
 - `src/ppp/lcp.asm`: LCP packet parser
 - `src/ppp/lcpNegotiation.asm`: Configure交渉状態機械
 - `src/ppp/lcpOptions.asm`: peer option評価とNak/Reject生成
+- `src/ppp/lcpTimer.asm`: restart timer、Max-Configure、lower-down
 - `src/ppp/selfTest.asm`: 固定fixtureによる常設セルフテスト
 
 `pppDecoderPush` はraw byteを1byteずつ受け取り、次のeventを返します。
@@ -213,6 +214,14 @@ parserの最終Code、Identifier、Length、error、呼出回数はPPP診断ABI 
 
 常設セルフテストのstep `$30`～`$3A` は、Ack到着順が逆の2経路、Opened到達、不正Identifier、Nak後のIdentifier更新、共有encoderへのRequest/Ack構築を固定transcriptで検査します。step `$40`～`$43` は、全対応optionの受理と値の公開、MRU・CHAPのNak置換、RejectのNakに対する優先、重複optionを両方Rejectするbyte列を検査します。
 
+## 65816 LCP restart timer
+
+`src/ppp/lcpTimer.asm` はVBlankで進む16bit frame counterを使い、Configure-Requestが共有encoderに受理された時点から180frame（NTSCで約3秒）のrestart timerを開始します。期限前は状態を変えず、期限では同じIdentifierのConfigure-Requestを再送待ちにします。送信encoderがbusyの場合はtimerを先に再開せず、再送packetが実際にencoderへ受理された時点から次の180frameを数えます。
+
+Max-Configureは初回送信を含む10回です。初回Requestの後に9回まで再送し、次の期限で `Stopped` へ遷移します。`Ack-Received` で期限に達した場合は `Request-Sent` に戻ります。双方のAckが成立して `Opened` へ入った場合、またはcarrier喪失を表すlower-downではtimerを停止します。lower-downはpeer MRU、ACCM、PAP、Magic-Numberも既定値へ戻し、次の接続へ交渉結果を持ち越しません。
+
+16bit counterの比較は期限までの差が半周未満であることを利用した減算で行うため、`$FFFF` から `$0000` をまたぐ場合も同じです。常設セルフテストのstep `$50`～`$55` は、共有encoder受理時のtimer開始、wrap-around直前、期限ちょうど、同一Identifier再送、回数超過、`Ack-Received` fallback、lower-downによる初期化を実時間待ちなしで検査します。
+
 ## 次の実装
 
-次は3秒のrestart timer、Max-Configure、lower-layer down処理を65816へ移植します。その後、受信frameの所有権と解放を含むmain-loop pollへ接続します。ここまでは対向PPPサーバーを必要としません。実際のpeerとのLCP交渉を始める段階で対向PPPサーバーを用意します。
+次は受信frameの所有権と解放を含むLCP main-loop pollへ接続します。ここまでは対向PPPサーバーを必要としません。実際のpeerとのLCP交渉を始める段階で対向PPPサーバーを用意します。
