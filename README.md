@@ -4,7 +4,7 @@
 
 スーパーファミコンと NTT DATA NDM24 をコントローラーポート経由で通信させるための、実験用ドライバと Windows 向け開発ツールです。JRA PAT の実通信をロジックアナライザで観測した結果を基準に、初期化、非同期送受信、状態管理、常設診断機能を整理しています。
 
-現時点の到達点は、NDM24 固有の `R` 初期化、`ATM0` による応答確認とスピーカー無効化、256 バイトの送受信リング、32文字幅ターミナル、QUsb2Snes 経由の監視・テスト・ROM 転送です。PPP、TCP、NTP は次のマイルストーンであり、まだ実装していません。
+現時点の到達点は、NDM24 固有の `R` 初期化、`ATM0` による応答確認とスピーカー無効化、256 バイトの送受信リング、32文字幅ターミナル、QUsb2Snes 経由の監視・テスト・ROM 転送です。PPPはRFC 1662非同期フレーミングのRust参照実装まで着手しており、65816版、LCP、認証、IPCP、IPv4、UDP、TCP、NTPはまだ実装していません。
 
 ## Windows での開始
 
@@ -40,7 +40,7 @@ cargo run -p ndm24-tools -- connect-test --revision B --port COM5
 cargo run -p ndm24-tools -- binary-test --revision B --port COM5
 ```
 
-実機を使う手順と合格条件は [ハードウェアテスト手順](docs/hardware-test.md)、取得済みの機器情報は [NDM24 AT識別情報](docs/ndm24-hardware-identification.md)、ドライバ API は [NDM24 ドライバ設計](docs/ndm24-driver.md)を参照してください。
+実機を使う手順と合格条件は [ハードウェアテスト手順](docs/hardware-test.md)、取得済みの機器情報は [NDM24 AT識別情報](docs/ndm24-hardware-identification.md)、ドライバ API は [NDM24 ドライバ設計](docs/ndm24-driver.md)、次段階は [PPP実装方針](docs/ppp.md)を参照してください。
 
 ## 仕様と生成物の同期
 

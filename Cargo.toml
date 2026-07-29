@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/ndm24-ppp",
     "crates/ndm24-protocol",
     "tools/ndm24-tools",
     "xtask",

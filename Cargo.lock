@@ -762,6 +762,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "ndm24-ppp"
+version = "0.1.0"
+
+[[package]]
 name = "ndm24-protocol"
 version = "0.1.0"
 dependencies = [
