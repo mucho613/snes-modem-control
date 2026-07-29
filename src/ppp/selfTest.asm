@@ -15,6 +15,7 @@
 .import pppTransmitBuffer
 .import pppSnapshotBegin, pppSnapshotEnd
 .import pppLcpRunSelfTest
+.import pppLcpNegotiationRunSelfTest
 
 .export pppRunSelfTest
 
@@ -386,6 +387,10 @@
   .a8
 
   jsr pppLcpRunSelfTest
+  bcc :+
+  jmp @fail
+:
+  jsr pppLcpNegotiationRunSelfTest
   bcc :+
   jmp @fail
 :

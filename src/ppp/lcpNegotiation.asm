@@ -1,0 +1,665 @@
+.include "../macro/utility.asm"
+.include "constants.inc"
+
+.code
+
+.import pppSnapshotBegin, pppSnapshotEnd
+.import pppLcpParseFrame, pppLcpInitialize
+.import pppLcpState, pppLcpLastIdentifier, pppLcpLastError
+.import pppLcpRequestIdentifier, pppLcpRestartRemaining
+.import pppLcpPendingAction, pppLcpPacketLength
+.import pppFrameBuffer, pppTransmitBuffer, pppTransmitActive
+.import pppTransmitBegin, pppTransmitInitialize
+.import pppLastProtocol, pppLastFrameLength
+
+.export pppLcpOpen, pppLcpReceiveFrame, pppLcpBuildPending
+.export pppLcpNegotiationRunSelfTest
+
+; Start LCP establishment with the conservative empty local option list.
+; The pending request is built only after the shared PPP encoder is idle.
+.proc pppLcpOpen
+  .a8
+  .i16
+
+  phb
+  setDBR $7e
+  jsr pppSnapshotBegin
+  lda #PPP_LCP_STATE_REQUEST_SENT
+  sta pppLcpState
+  stz pppLcpRequestIdentifier
+  lda #PPP_LCP_DEFAULT_MAX_CONFIGURE
+  sta pppLcpRestartRemaining
+  lda #PPP_LCP_ACTION_CONFIGURE_REQUEST
+  sta pppLcpPendingAction
+  stz pppLcpLastError
+  jsr pppSnapshotEnd
+  plb
+  rts
+.endproc
+
+; Consume the parsed frame retained by the receive owner and update the
+; RFC 1661 establishment state. This core deliberately leaves frame release
+; and timer scheduling to the next main-loop integration layer.
+;
+; Output:
+;   Carry clear: packet was structurally valid (possibly ignored)
+;   Carry set: parser or Configure-response validation failed
+.proc pppLcpReceiveFrame
+  .a8
+  .i16
+
+  phb
+  phx
+  phy
+  setDBR $7e
+  jsr pppSnapshotBegin
+  jsr pppLcpParseFrame
+  bcc @parsed
+  jmp @returnFailure
+
+@parsed:
+  .a8
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_CLOSED
+  beq @notConfiguring
+  cmp #PPP_LCP_STATE_STOPPED
+  beq @notConfiguring
+
+  lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET
+  cmp #PPP_LCP_CODE_CONFIGURE_REQUEST
+  beq @configureRequest
+  cmp #PPP_LCP_CODE_CONFIGURE_ACK
+  beq @configureAck
+  cmp #PPP_LCP_CODE_CONFIGURE_NAK
+  bne :+
+  jmp @configureNegative
+:
+  cmp #PPP_LCP_CODE_CONFIGURE_REJECT
+  bne :+
+  jmp @configureNegative
+:
+
+  ; Termination, maintenance, and unknown Code processing are outside this
+  ; establishment-core milestone.
+  jmp @returnSuccess
+
+@notConfiguring:
+  .a8
+  lda #PPP_LCP_ERROR_NOT_CONFIGURING
+  sta pppLcpLastError
+  jmp @returnFailure
+
+@configureRequest:
+  .a8
+  ; Empty peer options are accepted. Until the option policy is moved from
+  ; the Rust reference, every non-empty option list is rejected verbatim.
+  rep #$20
+  .a16
+  lda pppLcpPacketLength
+  cmp #PPP_LCP_HEADER_LENGTH
+  beq @acceptableRequest
+
+  sep #$20
+  .a8
+  lda #PPP_LCP_ACTION_CONFIGURE_REJECT
+  sta pppLcpPendingAction
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_ACK_RECEIVED
+  bne :+
+  jmp @returnSuccess
+:
+  lda #PPP_LCP_STATE_REQUEST_SENT
+  sta pppLcpState
+  jmp @returnSuccess
+
+@acceptableRequest:
+  .a16
+  sep #$20
+  .a8
+  lda #PPP_LCP_ACTION_CONFIGURE_ACK
+  sta pppLcpPendingAction
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_ACK_RECEIVED
+  beq @requestCompletesOpen
+  lda #PPP_LCP_STATE_ACK_SENT
+  sta pppLcpState
+  jmp @returnSuccess
+
+@requestCompletesOpen:
+  .a8
+  lda #PPP_LCP_STATE_OPENED
+  sta pppLcpState
+  stz pppLcpRestartRemaining
+  bra @returnSuccess
+
+@configureAck:
+  .a8
+  lda pppLcpLastIdentifier
+  cmp pppLcpRequestIdentifier
+  bne @invalidResponse
+  rep #$20
+  .a16
+  lda pppLcpPacketLength
+  cmp #PPP_LCP_HEADER_LENGTH
+  bne @invalidResponse16
+
+  sep #$20
+  .a8
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_REQUEST_SENT
+  beq @ackReceived
+  cmp #PPP_LCP_STATE_ACK_SENT
+  beq @ackCompletesOpen
+  cmp #PPP_LCP_STATE_ACK_RECEIVED
+  beq @restartAfterDuplicateAck
+  cmp #PPP_LCP_STATE_OPENED
+  beq @restartAfterDuplicateAck
+  bra @returnSuccess
+
+@ackReceived:
+  .a8
+  lda #PPP_LCP_STATE_ACK_RECEIVED
+  sta pppLcpState
+  lda #PPP_LCP_DEFAULT_MAX_CONFIGURE
+  sta pppLcpRestartRemaining
+  bra @returnSuccess
+
+@ackCompletesOpen:
+  .a8
+  lda #PPP_LCP_STATE_OPENED
+  sta pppLcpState
+  stz pppLcpRestartRemaining
+  bra @returnSuccess
+
+@restartAfterDuplicateAck:
+  .a8
+  lda #PPP_LCP_STATE_REQUEST_SENT
+  sta pppLcpState
+  jsr @newRequest
+  bra @returnSuccess
+
+@configureNegative:
+  .a8
+  lda pppLcpLastIdentifier
+  cmp pppLcpRequestIdentifier
+  bne @invalidResponse
+  rep #$20
+  .a16
+  lda pppLcpPacketLength
+  cmp #PPP_LCP_HEADER_LENGTH
+  bne @invalidResponse16
+
+  sep #$20
+  .a8
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_ACK_SENT
+  beq @negativeKeepsAckSent
+  lda #PPP_LCP_STATE_REQUEST_SENT
+  sta pppLcpState
+  bra @negativeNewRequest
+
+@negativeKeepsAckSent:
+  .a8
+  lda #PPP_LCP_STATE_ACK_SENT
+  sta pppLcpState
+@negativeNewRequest:
+  .a8
+  jsr @newRequest
+  bra @returnSuccess
+
+@invalidResponse16:
+  .a16
+  sep #$20
+  .a8
+@invalidResponse:
+  .a8
+  lda #PPP_LCP_ERROR_INVALID_RESPONSE
+  sta pppLcpLastError
+  jmp @returnFailure
+
+@returnSuccess:
+  .a8
+  stz pppLcpLastError
+  jsr pppSnapshotEnd
+  ply
+  plx
+  plb
+  clc
+  rts
+
+@returnFailure:
+  .a8
+  jsr pppSnapshotEnd
+  ply
+  plx
+  plb
+  sec
+  rts
+
+; Allocate a fresh Identifier only when the request contents or a valid
+; response require a new Configure-Request. Timeout retransmission will keep
+; the current Identifier in the next milestone.
+@newRequest:
+  .a8
+  inc pppLcpRequestIdentifier
+  lda #PPP_LCP_DEFAULT_MAX_CONFIGURE
+  sta pppLcpRestartRemaining
+  lda #PPP_LCP_ACTION_CONFIGURE_REQUEST
+  sta pppLcpPendingAction
+  rts
+.endproc
+
+; Build the current pending LCP packet directly into the shared PPP transmit
+; buffer and start its restartable RFC 1662 encoder.
+;
+; Output carry clear when a packet was accepted by the encoder. Carry set
+; means there was no pending packet or the encoder was still busy.
+.proc pppLcpBuildPending
+  .a8
+  .i16
+
+  phb
+  phx
+  phy
+  setDBR $7e
+  lda pppLcpPendingAction
+  bne :+
+  jmp @busy
+:
+  lda pppTransmitActive
+  beq :+
+  jmp @busy
+:
+
+  lda #$ff
+  sta pppTransmitBuffer + 0
+  lda #$03
+  sta pppTransmitBuffer + 1
+  lda #$c0
+  sta pppTransmitBuffer + 2
+  lda #$21
+  sta pppTransmitBuffer + 3
+
+  lda pppLcpPendingAction
+  cmp #PPP_LCP_ACTION_CONFIGURE_REQUEST
+  beq @buildRequest
+  cmp #PPP_LCP_ACTION_CONFIGURE_ACK
+  beq @copyResponse
+  cmp #PPP_LCP_ACTION_CONFIGURE_REJECT
+  beq @copyResponse
+  bra @busy
+
+@buildRequest:
+  .a8
+  lda #PPP_LCP_CODE_CONFIGURE_REQUEST
+  sta pppTransmitBuffer + 4
+  lda pppLcpRequestIdentifier
+  sta pppTransmitBuffer + 5
+  stz pppTransmitBuffer + 6
+  lda #PPP_LCP_HEADER_LENGTH
+  sta pppTransmitBuffer + 7
+  rep #$20
+  .a16
+  lda #PPP_LCP_MINIMUM_FRAME_LENGTH
+  bra @begin
+
+@copyResponse:
+  .a8
+  rep #$20
+  .a16
+  ldx #$0000
+@copyLoop:
+  .a16
+  cpx pppLcpPacketLength
+  beq @selectResponseCode
+  sep #$20
+  .a8
+  lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET, x
+  sta pppTransmitBuffer + PPP_LCP_FRAME_OFFSET, x
+  rep #$20
+  .a16
+  inx
+  bra @copyLoop
+
+@selectResponseCode:
+  .a16
+  sep #$20
+  .a8
+  lda pppLcpPendingAction
+  cmp #PPP_LCP_ACTION_CONFIGURE_ACK
+  beq @responseAck
+  lda #PPP_LCP_CODE_CONFIGURE_REJECT
+  bra @storeResponseCode
+@responseAck:
+  .a8
+  lda #PPP_LCP_CODE_CONFIGURE_ACK
+@storeResponseCode:
+  .a8
+  sta pppTransmitBuffer + PPP_LCP_FRAME_OFFSET
+  rep #$20
+  .a16
+  lda pppLcpPacketLength
+  clc
+  adc #PPP_UNCOMPRESSED_HEADER_LENGTH
+
+@begin:
+  .a16
+  jsr pppTransmitBegin
+  bcs @busy16
+  sep #$20
+  .a8
+  jsr pppSnapshotBegin
+  stz pppLcpPendingAction
+  jsr pppSnapshotEnd
+  ply
+  plx
+  plb
+  clc
+  rts
+
+@busy16:
+  .a16
+  sep #$20
+  .a8
+@busy:
+  .a8
+  ply
+  plx
+  plb
+  sec
+  rts
+.endproc
+
+; Fixed transcript for the 65816 Configure core. The frame fixtures are
+; unescaped, FCS-verified frames exactly as retained by the receive decoder.
+;
+; Output:
+;   Carry clear, A=$00: passed
+;   Carry set, A=$30-$3f: failed step
+.proc pppLcpNegotiationRunSelfTest
+  .a8
+  .i16
+
+  phb
+  phx
+  phy
+  setDBR $7e
+  jsr pppLcpInitialize
+  jsr pppTransmitInitialize
+  jsr pppLcpOpen
+
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_REQUEST_SENT
+  beq :+
+  jmp @fail30
+:
+  lda pppLcpPendingAction
+  cmp #PPP_LCP_ACTION_CONFIGURE_REQUEST
+  beq :+
+  jmp @fail30
+:
+  jsr pppLcpBuildPending
+  bcc :+
+  jmp @fail31
+:
+  lda pppTransmitBuffer + 4
+  cmp #PPP_LCP_CODE_CONFIGURE_REQUEST
+  beq :+
+  jmp @fail31
+:
+  lda pppTransmitBuffer + 5
+  beq :+
+  jmp @fail31
+:
+  lda pppTransmitBuffer + 7
+  cmp #PPP_LCP_HEADER_LENGTH
+  beq :+
+  jmp @fail31
+:
+
+  ; Let the transcript inject a peer packet without polling wire output.
+  jsr pppTransmitInitialize
+  lda #PPP_LCP_CODE_CONFIGURE_REQUEST
+  ldx #$0007
+  jsr @writeEmptyPacket
+  jsr pppLcpReceiveFrame
+  bcc :+
+  jmp @fail32
+:
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_ACK_SENT
+  beq :+
+  jmp @fail32
+:
+  lda pppLcpPendingAction
+  cmp #PPP_LCP_ACTION_CONFIGURE_ACK
+  beq :+
+  jmp @fail32
+:
+  jsr pppLcpBuildPending
+  bcc :+
+  jmp @fail33
+:
+  lda pppTransmitBuffer + 4
+  cmp #PPP_LCP_CODE_CONFIGURE_ACK
+  beq :+
+  jmp @fail33
+:
+  lda pppTransmitBuffer + 5
+  cmp #$07
+  beq :+
+  jmp @fail33
+:
+
+  jsr pppTransmitInitialize
+  lda #PPP_LCP_CODE_CONFIGURE_ACK
+  ldx #$0000
+  jsr @writeEmptyPacket
+  jsr pppLcpReceiveFrame
+  bcc :+
+  jmp @fail34
+:
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_OPENED
+  beq :+
+  jmp @fail34
+:
+
+  ; Reverse Ack ordering: our request is Acked before the peer request.
+  jsr pppLcpInitialize
+  jsr pppTransmitInitialize
+  jsr pppLcpOpen
+  jsr pppLcpBuildPending
+  bcc :+
+  jmp @fail35
+:
+  jsr pppTransmitInitialize
+  lda #PPP_LCP_CODE_CONFIGURE_ACK
+  ldx #$0000
+  jsr @writeEmptyPacket
+  jsr pppLcpReceiveFrame
+  bcc :+
+  jmp @fail35
+:
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_ACK_RECEIVED
+  beq :+
+  jmp @fail35
+:
+  lda #PPP_LCP_CODE_CONFIGURE_REQUEST
+  ldx #$0009
+  jsr @writeEmptyPacket
+  jsr pppLcpReceiveFrame
+  bcc :+
+  jmp @fail36
+:
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_OPENED
+  beq :+
+  jmp @fail36
+:
+
+  ; Wrong Identifier does not advance the state.
+  jsr pppLcpInitialize
+  jsr pppTransmitInitialize
+  jsr pppLcpOpen
+  jsr pppLcpBuildPending
+  bcc :+
+  jmp @fail37
+:
+  jsr pppTransmitInitialize
+  lda #PPP_LCP_CODE_CONFIGURE_ACK
+  ldx #$0042
+  jsr @writeEmptyPacket
+  jsr pppLcpReceiveFrame
+  bcs :+
+  jmp @fail37
+:
+  lda pppLcpLastError
+  cmp #PPP_LCP_ERROR_INVALID_RESPONSE
+  beq :+
+  jmp @fail37
+:
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_REQUEST_SENT
+  bne @fail37
+
+  ; A valid empty Nak allocates a fresh request Identifier.
+  lda #PPP_LCP_CODE_CONFIGURE_NAK
+  ldx #$0000
+  jsr @writeEmptyPacket
+  jsr pppLcpReceiveFrame
+  bcs @fail38
+  lda pppLcpRequestIdentifier
+  cmp #$01
+  bne @fail38
+  lda pppLcpPendingAction
+  cmp #PPP_LCP_ACTION_CONFIGURE_REQUEST
+  bne @fail38
+
+  ; Until peer option policy is ported, a non-empty request is rejected
+  ; verbatim while the local request remains in Request-Sent.
+  jsr pppLcpBuildPending
+  bcs @fail39
+  jsr pppTransmitInitialize
+  lda #PPP_LCP_CODE_CONFIGURE_REQUEST
+  ldx #$000a
+  jsr @writeMruPacket
+  jsr pppLcpReceiveFrame
+  bcs @fail39
+  lda pppLcpPendingAction
+  cmp #PPP_LCP_ACTION_CONFIGURE_REJECT
+  bne @fail39
+  jsr pppLcpBuildPending
+  bcs @fail3a
+  lda pppTransmitBuffer + 4
+  cmp #PPP_LCP_CODE_CONFIGURE_REJECT
+  bne @fail3a
+  lda pppTransmitBuffer + 5
+  cmp #$0a
+  bne @fail3a
+  lda pppTransmitBuffer + 8
+  cmp #$01
+  bne @fail3a
+  lda pppTransmitBuffer + 9
+  cmp #$04
+  bne @fail3a
+
+  jsr pppLcpInitialize
+  jsr pppTransmitInitialize
+  lda #$00
+  clc
+  bra @return
+
+@fail30:
+  lda #$30
+  bra @fail
+@fail31:
+  lda #$31
+  bra @fail
+@fail32:
+  lda #$32
+  bra @fail
+@fail33:
+  lda #$33
+  bra @fail
+@fail34:
+  lda #$34
+  bra @fail
+@fail35:
+  lda #$35
+  bra @fail
+@fail36:
+  lda #$36
+  bra @fail
+@fail37:
+  lda #$37
+  bra @fail
+@fail38:
+  lda #$38
+  bra @fail
+@fail39:
+  lda #$39
+  bra @fail
+@fail3a:
+  lda #$3a
+
+@fail:
+  pha
+  jsr pppLcpInitialize
+  jsr pppTransmitInitialize
+  pla
+  sec
+
+@return:
+  ply
+  plx
+  plb
+  rts
+
+; Input A=Code, X low byte=Identifier.
+@writeEmptyPacket:
+  .a8
+  sta pppFrameBuffer + 4
+  txa
+  sta pppFrameBuffer + 5
+  stz pppFrameBuffer + 6
+  lda #PPP_LCP_HEADER_LENGTH
+  sta pppFrameBuffer + 7
+  rep #$20
+  .a16
+  lda #PPP_PROTOCOL_LCP
+  sta pppLastProtocol
+  lda #PPP_LCP_MINIMUM_FRAME_LENGTH
+  sta pppLastFrameLength
+  sep #$20
+  .a8
+  rts
+
+; Input A=Code, X low byte=Identifier. Adds MRU 1500.
+@writeMruPacket:
+  .a8
+  sta pppFrameBuffer + 4
+  txa
+  sta pppFrameBuffer + 5
+  stz pppFrameBuffer + 6
+  lda #$08
+  sta pppFrameBuffer + 7
+  lda #$01
+  sta pppFrameBuffer + 8
+  lda #$04
+  sta pppFrameBuffer + 9
+  lda #$05
+  sta pppFrameBuffer + 10
+  lda #$dc
+  sta pppFrameBuffer + 11
+  rep #$20
+  .a16
+  lda #PPP_PROTOCOL_LCP
+  sta pppLastProtocol
+  lda #$000c
+  sta pppLastFrameLength
+  sep #$20
+  .a8
+  rts
+.endproc

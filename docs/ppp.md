@@ -200,6 +200,16 @@ Configure-Rejectが必要なoptionとConfigure-Nak候補が同じRequestに含�
 
 parserの最終Code、Identifier、Length、error、呼出回数はPPP診断ABI version 2へ公開します。既存96byte blockの予約領域を利用しているため、frame bufferや低レベルNDM24転送用WRAMの配置は変わりません。`ppp-self-test` の失敗step `$20`～`$27` はLCP parser fixtureを表します。
 
+## 65816 LCP Configure交渉コア
+
+`src/ppp/lcpNegotiation.asm` は、Rust参照実装から `Request-Sent`、`Ack-Received`、`Ack-Sent`、`Opened` の基本遷移を移植しています。local Configure-Requestは既定MRU 1500と既定ACCM `$FFFFFFFF` を維持する空optionです。Identifierは有効なNak/Rejectまたは重複Ack後の新しいRequestで更新し、Identifierやoption列が一致しない応答は状態を変えません。
+
+交渉コアは共有送信encoderを直接上書きせず、`pppLcpPendingAction` にConfigure-Request/Ack/Rejectを保持します。`pppLcpBuildPending` はencoderがidleのときだけ `pppTransmitBuffer` を構築し、Ackでは受信packetのIdentifierとoption列をLength境界までそのまま複製します。
+
+この段階のpeer option方針は意図的に限定されています。空optionのConfigure-RequestだけをAckし、optionを含むRequestは全optionを順序・内容を変えずConfigure-Rejectします。MRU、ACCM、PAP、Magic-Numberを選別して受理する方針は、main-loop接続前に続けて移植します。
+
+常設セルフテストのstep `$30`～`$3A` は、Ack到着順が逆の2経路、Opened到達、不正Identifier、Nak後のIdentifier更新、共有encoderへのRequest/Ack/Reject構築を固定transcriptで検査します。
+
 ## 次の実装
 
-次はConfigure establishment状態とrestart timerを65816へ移植し、このparserを既存の受信frame所有権・送信encoderへ接続します。その常設セルフテストまでは対向PPPサーバーを必要としません。実際のpeerとのLCP交渉を始める段階で対向PPPサーバーを用意します。
+次はMRU、ACCM、PAP、Magic-Numberのpeer option方針とConfigure-Nakを65816へ移植します。その後、3秒のrestart timerとMax-Configure、受信frame解放を含むmain-loop pollへ接続します。ここまでは対向PPPサーバーを必要としません。実際のpeerとのLCP交渉を始める段階で対向PPPサーバーを用意します。
