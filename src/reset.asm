@@ -10,6 +10,7 @@
 .import modemInitialize
 .import modemPoll, modemSessionPoll, modemMailboxPoll
 .import pppReceiveInitialize, pppReceivePoll
+.import pppTransmitInitialize, pppTransmitPoll
 .import nmitimenShadow
 
 .include "./registers.inc"
@@ -62,6 +63,7 @@
   rep #$10
   .i16
   jsr pppReceiveInitialize
+  jsr pppTransmitInitialize
   sep #$10
   .i8
 
@@ -108,6 +110,7 @@
     jsr modemPoll
     jsr modemSessionPoll
     jsr pppReceivePoll
+    jsr pppTransmitPoll
   .endif
   bra @mainLoop
 .endproc

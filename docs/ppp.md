@@ -4,7 +4,7 @@
 
 最初のPPPマイルストーンは、NDM24から受け取る任意位置で分割されたbyte列を、FCS検証済みのPPPフレームへ復元する層です。`crates/ndm24-ppp` を仕様の参照実装とし、同じ状態遷移と試験ベクトルを65816へ移植しています。
 
-現時点で実装済みなのはRFC 1662の非同期HDLC-like受信framingです。Rust参照実装に加えて、65816版のFCS計算、unescape、Flag境界、最大長判定、再同期、NDM24受信リングからのdrainを実装しています。送信encoder、LCP、認証、IPCP、IPv4、UDP、TCP、NTPはまだSFC上で動作しません。
+現時点で実装済みなのはRFC 1662の非同期HDLC-like framingです。Rust参照実装に加えて、65816版の受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escape、NDM24のRX/TXリングへの上限付き接続を実装しています。LCP、認証、IPCP、IPv4、UDP、TCP、NTPはまだSFC上で動作しません。
 
 PPP接続は次の順序で進みます。
 
@@ -63,6 +63,7 @@ Rust参照実装は全入力分割位置、破損FCSからの再同期、Flag直
 - `src/ppp/state.asm`: decoder状態とframe buffer
 - `src/ppp/framing.asm`: byte単位の受信状態機械
 - `src/ppp/receive.asm`: NDM24 RX ringの所有権と上限付きdrain
+- `src/ppp/transmit.asm`: backpressure対応の送信encoderとTX ring充填
 - `src/ppp/selfTest.asm`: 固定fixtureによる常設セルフテスト
 
 `pppDecoderPush` はraw byteを1byteずつ受け取り、次のeventを返します。
@@ -98,6 +99,20 @@ cargo run -p ndm24-tools -- mailbox ppp-receive-stop
 
 常設カウンタとしてraw受信byte、正常frame、FCS error、invalid、overflow、32byte drain budget到達回数をWRAMに保持します。各値は `pppReceive*` のlink labelとしてQUsb2Snesから確認できます。versionedなホスト表示用PPP診断blockへの統合は次の診断マイルストーンで行います。
 
+## NDM24 TX ringとの接続
+
+上位層はAddress、Control、Protocol、Informationを `pppTransmitBuffer` へ構築し、FCSとFlagを含まない長さを `pppTransmitBegin` へ渡します。encoderは次のstageを保持します。
+
+```text
+opening Flag → frame → FCS low → FCS high → closing Flag
+```
+
+`pppTransmitPoll` はCONNECTED中に1回最大32wire byteをNDM24 TX ringへ追加します。TX ringが満杯なら現在byteをadvanceせずに戻るため、escape prefixをqueueした直後を含む任意位置から再開できます。完成frame全体をescape済みの別bufferへ複製しません。
+
+送信bufferは1504byteで、非圧縮Address、Control、Protocolとdefault MRU 1500byteを保持します。受信1506byte bufferとともにWRAM `$7E2000` 以降の `PPP_BSS` へ配置し、NDM24の低レベル転送がbank `$80` mirrorで参照する先頭8KiBから分離しています。
+
+送信wire byte、完成frame、TX ring backpressure、carrier喪失によるabortを常設カウンタへ残します。送信途中でCONNECTED以外へ遷移したframeは破棄し、次の接続へ持ち越しません。
+
 ## SFC のメモリと接続境界
 
 default MRUは1500byteです。非圧縮時にFlag間で必要な最大unescaped長は次の1506byteです。
@@ -108,7 +123,7 @@ Address 1 + Control 1 + Protocol 2 + Information 1500 + FCS 2
 
 受信側はNDM24の255byte RX ringを一度に保持領域として使わず、byte単位でPPP decoderへdrainします。完成前のフレームだけを専用WRAM bufferへ保持し、Flag到着時にFCSを判定します。これにより、回線上の1フレームがRX ring容量を超えても処理できます。
 
-送信側はescape後の全frameを別bufferへ複製しません。unescaped frameとFCSを順に読み、escape状態を保持しながらNDM24 TX ringの空きに応じて再開できるstate machineとします。最悪時にescapeで約2倍になるframeをWRAMへ二重保持しないためです。
+送信側はescape後の全frameを別bufferへ複製しません。unescaped frameとFCSを順に読み、escape状態を保持しながらNDM24 TX ringの空きに応じて再開できるstate machineです。最悪時にescapeで約2倍になるframeをWRAMへ二重保持しません。
 
 常設診断には少なくとも次を追加する予定です。
 
@@ -123,4 +138,4 @@ Address 1 + Control 1 + Protocol 2 + Information 1500 + FCS 2
 
 ## 次の実装
 
-次はTX ringの空きに応じて中断・再開できる送信encoderを追加します。その後、PPP診断blockとLCPを実装します。LCPの実回線試験を始める時点で対向PPPサーバーが必要になります。
+次はversionedなPPP診断blockをホストtoolへ公開し、その後LCPを実装します。LCPの実回線試験を始める時点で対向PPPサーバーが必要になります。

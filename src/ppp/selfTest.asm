@@ -8,6 +8,11 @@
 .import pppLastFrameLength, pppLastProtocol, pppFrameBuffer
 .import pppFrameReady, pppReceiveLastEvent
 .import pppReceiveByteCount, pppReceiveFrameCount
+.import pppTransmitInitialize, pppTransmitBegin
+.import pppTransmitPeek, pppTransmitAdvance
+.import pppTransmitActive, pppTransmitLastWireByte
+.import pppTransmitWireByteCount, pppTransmitFrameCount
+.import pppTransmitBuffer
 
 .export pppRunSelfTest
 
@@ -253,29 +258,139 @@
 :
   .a16
   lda pppReceiveByteCount + 2
-  bne @fail10_16
+  beq :+
+  sep #$20
+  .a8
+  lda #$10
+  jmp @fail
+:
+  .a16
   lda pppReceiveFrameCount
   cmp #$0001
-  bne @fail11_16
+  beq :+
+  sep #$20
+  .a8
+  lda #$11
+  jmp @fail
+:
+  .a16
   lda pppReceiveFrameCount + 2
-  bne @fail11_16
+  beq :+
+  sep #$20
+  .a8
+  lda #$11
+  jmp @fail
+:
+  .a16
+  sep #$20
+  .a8
+
+  ; Encode the same frame, including a repeated peek before the opening Flag
+  ; is accepted to model TX-ring backpressure.
+  setDBR $7e
+  jsr pppTransmitInitialize
+  lda #$ff
+  sta pppTransmitBuffer + 0
+  lda #$03
+  sta pppTransmitBuffer + 1
+  lda #$c0
+  sta pppTransmitBuffer + 2
+  lda #$21
+  sta pppTransmitBuffer + 3
+  lda #$01
+  sta pppTransmitBuffer + 4
+  sta pppTransmitBuffer + 5
+  stz pppTransmitBuffer + 6
+  lda #$04
+  sta pppTransmitBuffer + 7
+  rep #$20
+  .a16
+  lda #$0008
+  jsr pppTransmitBegin
+  sep #$20
+  .a8
+  bcc :+
+  lda #$12
+  jmp @fail
+:
+
+  setDBR .bankbyte(pppSelfTestEncoded)
+  jsr pppTransmitPeek
+  bcc :+
+  lda #$13
+  jmp @fail
+:
+  cmp #PPP_FLAG_SEQUENCE
+  beq :+
+  lda #$13
+  jmp @fail
+:
+  jsr pppTransmitPeek
+  cmp #PPP_FLAG_SEQUENCE
+  beq :+
+  lda #$13
+  jmp @fail
+:
+
+  ldx #$0000
+@transmitLoop:
+  jsr pppTransmitPeek
+  bcc :+
+  lda #$14
+  jmp @fail
+:
+  cmp pppSelfTestEncoded, x
+  beq :+
+  lda #$15
+  jmp @fail
+:
+  jsr pppTransmitAdvance
+  inx
+  cpx #(pppSelfTestEncodedEnd - pppSelfTestEncoded)
+  bne @transmitLoop
+
+  jsr pppTransmitPeek
+  bcs :+
+  lda #$16
+  jmp @fail
+:
+  setDBR $7e
+  lda pppTransmitActive
+  beq :+
+  lda #$16
+  jmp @fail
+:
+  lda pppTransmitLastWireByte
+  cmp #PPP_FLAG_SEQUENCE
+  beq :+
+  lda #$16
+  jmp @fail
+:
+  rep #$20
+  .a16
+  lda pppTransmitWireByteCount
+  cmp #(pppSelfTestEncodedEnd - pppSelfTestEncoded)
+  bne @fail17_16
+  lda pppTransmitWireByteCount + 2
+  bne @fail17_16
+  lda pppTransmitFrameCount
+  cmp #$0001
+  bne @fail17_16
+  lda pppTransmitFrameCount + 2
+  bne @fail17_16
   sep #$20
   .a8
 
   jsr pppReceiveInitialize
+  jsr pppTransmitInitialize
   lda #$00
   clc
   bra @return
 
-@fail10_16:
+@fail17_16:
   sep #$20
   .a8
-  lda #$10
-  bra @fail
-@fail11_16:
-  sep #$20
-  .a8
-  lda #$11
+  lda #$17
   bra @fail
 @fail05:
   lda #$05
@@ -283,6 +398,7 @@
 @fail:
   pha
   jsr pppReceiveInitialize
+  jsr pppTransmitInitialize
   pla
   sec
 
