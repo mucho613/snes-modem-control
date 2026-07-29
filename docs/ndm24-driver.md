@@ -23,7 +23,7 @@
 | `modemInitializeDiagnostics` | A/X/Y 8 bit | 起動時に一度だけ診断 ABI とメールボックスを初期化 |
 | `modemInitialize` | A/X/Y 16 bit | NDM24 固有初期化を開始し `RESETTING` へ遷移 |
 | `modemPoll` | A/X/Y 16 bit | 状態確認と上限付き全二重転送 |
-| `modemSessionPoll` | A/X/Y 16 bit | `AT` プローブの送信、行応答、タイムアウトを処理 |
+| `modemSessionPoll` | A/X/Y 16 bit | `ATM0` プローブの送信、行応答、タイムアウトを処理 |
 | `modemQueueByte` | A/X/Y 8 bit、入力 A=byte | TX リングへ追加。成功 Carry clear、満杯 Carry set |
 | `modemReadByte` | A/X/Y 8 bit | RX リングから取得。成功 Carry clear と A=byte、空 Carry set |
 | `modemMailboxPoll` | A/X/Y 16 bit | QUsb2Snes から受けたテスト命令を処理 |
@@ -39,7 +39,7 @@ stateDiagram-v2
     [*] --> OFF
     OFF --> RESETTING: modemInitialize / raw R
     RESETTING --> PROBING: raw Rから600 frames後
-    PROBING --> READY: AT response is OK
+    PROBING --> READY: ATM0 response is OK
     PROBING --> PROBING: finite retry
     PROBING --> ERROR: retries exhausted
     READY --> RESETTING: explicit reinitialize
@@ -50,11 +50,11 @@ SFC起動時の `$4201` は、全programmable I/O出力をreleaseする `$FF` �
 
 SFC起動中の `$4200` は0で、通常運転へ入る直前にNMI enableだけを立てた `$80` と、その値を `nmitimenShadow` へ同時に設定します。bit-bang区間が通常運転前や既にNMI無効の文脈から呼ばれても、終了時に無条件で `$80` を書かず、呼び出し前の値へ戻します。これにより起動時のraw `R`がNMIを予定より早く有効化することもありません。
 
-`R` (`$52`) は AT コマンドではなく、NDM24 固有の初期化バイトとして扱います。raw `R` 後は600フレーム（NTSCで約10秒）待ってから `AT CR LF` を送ります。1フレーム待機では300フレームのtimeoutを2回消費し、約10秒後の3回目だけが成功しました。600フレーム待機では最初のprobeで `OK` を受信し、timeout 0を実機確認済みです。`ERROR` または300フレームのタイムアウトは最大3回まで再試行し、その後 `ERROR` に固定します。エラー時は原因を保持するためトレースを自動凍結します。
+`R` (`$52`) は AT コマンドではなく、NDM24 固有の初期化バイトとして扱います。raw `R` 後は600フレーム（NTSCで約10秒）待ってから `ATM0 CR LF` を送ります。`M0` はスピーカーを常時無効にする設定で、電源再投入や `AT&F` で失われるため、起動時と明示的な再初期化時のprobeに含めます。疑似PSTN試験でも `AT&F` の直後に再度 `ATM0` を送ります。1フレーム待機では300フレームのtimeoutを2回消費し、約10秒後の3回目だけが成功しました。600フレーム待機では最初のprobeで `OK` を受信し、timeout 0を実機確認済みです。`ERROR` または300フレームのタイムアウトは最大3回まで再試行し、その後 `ERROR` に固定します。エラー時は原因を保持するためトレースを自動凍結します。
 
 `R` の直前は、過去の実機動作済み実装と同じく、latch後に16回の `JOYSER1` dummy readを連続して行います。この最初のレポートは診断値へ組み立てず、次の通常pollで完全なレポートを記録します。`R` の8データビットも通常の9-bit転送とは別の専用経路で送り、byteをstack上で `ROL`、carryを `ROR` で `$4201` bit 7へ移し、追加NOPを挟まず直後に `JOYSER1` を読みます。この波形で電源ランプの点滅を実機確認済みです。
 
-AT 行パーサーには `OK`、`ERROR`、`BUSY`、`CONNECT...`、`NO CARRIER`、`NO DIALTONE` の認識を残しています。echoの `AT` は無視し、行終端を受信した `OK` で `READY` へ遷移します。現段階では初期 `AT` プローブ中だけパーサーが RX を所有し、`READY` へ遷移した直後の残りのバイトは上位層へ残します。将来 PPP データを行パーサーが消費しないための境界です。
+AT 行パーサーには `OK`、`ERROR`、`BUSY`、`CONNECT...`、`NO CARRIER`、`NO DIALTONE` の認識を残しています。コマンドechoは結果として扱わず、行終端を受信した `OK` で `READY` へ遷移します。現段階では初期 `ATM0` プローブ中だけパーサーが RX を所有し、`READY` へ遷移した直後の残りのバイトは上位層へ残します。将来 PPP データを行パーサーが消費しないための境界です。
 
 メールボックスの `at_transaction` は、最大28byteの送信列、期待する結果コード、16bitのframe timeoutを受け取る汎用ATコマンド実行器です。トランザクション実行中だけ行パーサーがRX ringを所有し、期待した `OK`、`CONNECT...`、`NO CARRIER` の末尾LFまで消費すると完了します。`CONNECT` 完了後は `CONNECTED` としてパーサーを停止するため、将来のbinary/PPP層へ受信所有権を渡せます。接続確認モードではpayloadを送らず、別の空トランザクションで `NO CARRIER` を待ちます。
 
@@ -86,7 +86,7 @@ Data2 の `$40` は9-bit transferを開始するための暫定的なhintとし�
 
 したがって、いったん9-bit受信を開始した後はData2にかかわらず、RX-presentが成立する間は連続転送します。RX-presentが不成立になった時点で停止し、次回はData2 hintまたは送信待ちを契機に再開します。詳細な根拠は [JRA PAT の観測結果](jra-pat-observations.md)にあります。
 
-この変更後の実機smoke testでは、初回probeで9byteの `AT CR CR LF OK CR LF` を受理しました。状態は `READY`、送信4byte、timeout 0、最終受信byteはLFです。ATセッションparserも最後のLFを消費してから `READY` へ遷移し、`rx_read_index=rx_write_index=9` となるため、次の通信層のRX queueにLFを残しません。
+RX-present修正時の旧 `AT` probeによる実機smoke testでは、9byteの `AT CR CR LF OK CR LF` を受理しました。現在の `ATM0` probeでは11byteの `ATM0 CR CR LF OK CR LF` を受理し、送信6byte、timeout 0で `READY` へ遷移することを合格条件とします。ATセッションparserは最後のLFまで消費し、次の通信層のRX queueに残しません。
 
 ## 常設診断
 
@@ -99,6 +99,8 @@ Data2 の `$40` は9-bit transferを開始するための暫定的なhintとし�
 - 256 バイトの表示ミラーリング
 
 診断ブロックは sequence lock 方式です。ホストは偶数の `snapshot_sequence` を確認し、ブロックを再読して同じ値である場合だけ一貫したスナップショットとして使います。ただし、NMI が立てる advisory な `poll_tick` だけはこの sequence の対象外です。レイアウトの正本は `spec/ndm24.toml`、生成された表は [diagnostic-abi.md](generated/diagnostic-abi.md)です。
+
+`poll_budget_yield` は、1回の `modemPoll` が32回の9-bit transferを完了してメインループへ処理を返した回数です。カウンタとsticky flagは正常な協調動作を観測する情報であり、エラーではありません。yield後はコントローラー、mailbox、session処理を各1回通り、次のメインループで `modemPoll` を直ちに再開します。AT transactionの停止は既存のframe timeout、ホスト試験中の停止は各待機timeoutで検出します。旧名 `poll_limit` から名称と判定だけを変更し、offset `$34`、カウンタ動作、診断binary ABI version 2は維持しています。
 
 トレースは poll16、transfer9、RX accept/discard、TX、状態遷移、エラーを記録します。リングが一周した回数は診断カウンタへ残り、エラーイベント後は自動凍結します。QUsb2Snes メールボックスから消去、手動凍結、再開が可能です。
 

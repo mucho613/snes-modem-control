@@ -5,18 +5,20 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, ensure};
 use ndm24_protocol::{
-    DiagnosticSnapshot, DriverState, MODEM_FLAG_POLL_LIMIT, MODEM_FLAG_RX_OVERFLOW,
+    DiagnosticSnapshot, DriverState, MODEM_FLAG_POLL_BUDGET_YIELD, MODEM_FLAG_RX_OVERFLOW,
     MODEM_FLAG_TIMEOUT, MODEM_FLAG_TX_OVERFLOW, MODEM_MAILBOX_ARGUMENT_SIZE,
     MODEM_MAILBOX_COMMAND_AT_TRANSACTION, MODEM_MAILBOX_COMMAND_BINARY_RECEIVE,
     MODEM_MAILBOX_COMMAND_BINARY_STRESS_TRANSMIT, MODEM_MAILBOX_COMMAND_BINARY_TRANSMIT,
     MODEM_MAILBOX_COMMAND_CLEAR_TRACE, MODEM_MAILBOX_COMMAND_FREEZE_TRACE,
-    MODEM_MAILBOX_COMMAND_RESUME_TRACE, MODEM_SESSION_RESULT_CONNECT,
-    MODEM_SESSION_RESULT_NO_CARRIER, MODEM_SESSION_RESULT_OK, MODEM_POLL_BUDGET,
-    MODEM_RING_CAPACITY, TraceEvent,
+    MODEM_MAILBOX_COMMAND_RESUME_TRACE, MODEM_POLL_BUDGET, MODEM_RING_CAPACITY,
+    MODEM_SESSION_RESULT_CONNECT, MODEM_SESSION_RESULT_NO_CARRIER, MODEM_SESSION_RESULT_OK,
+    TraceEvent,
 };
 use serde::Serialize;
 
-use crate::connect_test::{at_arguments, normalize_hardware_revision, restore_peer};
+use crate::connect_test::{
+    NDM24_SETUP_COMMANDS, at_arguments, normalize_hardware_revision, restore_peer,
+};
 use crate::peer::PeerModem;
 use crate::qusb2snes;
 
@@ -29,7 +31,7 @@ const BINARY_CHUNK_MAX_LENGTH: usize = MODEM_MAILBOX_ARGUMENT_SIZE - 1;
 const LINE_BITS_PER_BYTE: u64 = 10;
 const LINE_BAUD: u64 = 2_400;
 const RX_SETTLE_MARGIN: Duration = Duration::from_millis(100);
-const STRESS_EXPECTED_POLL_LIMITS: u32 = (MODEM_RING_CAPACITY / MODEM_POLL_BUDGET) as u32;
+const STRESS_EXPECTED_POLL_BUDGET_YIELDS: u32 = (MODEM_RING_CAPACITY / MODEM_POLL_BUDGET) as u32;
 
 #[derive(Debug, Serialize)]
 struct BinaryReceiveChunk {
@@ -89,7 +91,7 @@ pub async fn run(
         .with_context(|| format!("create test output {}", output_dir.display()))?;
 
     let mut report = BinaryTestReport {
-        schema_version: 4,
+        schema_version: 5,
         test_id,
         started_unix_seconds,
         hardware_revision: revision_label,
@@ -170,7 +172,7 @@ async fn run_connected(
     );
     report.initial_snapshot = Some(initial);
 
-    for command in ["AT&F", "AT%B2400", "ATS7=60", "ATX3"] {
+    for command in NDM24_SETUP_COMMANDS {
         run_at(
             websocket,
             labels,
@@ -219,8 +221,8 @@ async fn run_connected(
 
     let stress_before = qusb2snes::read_snapshot(websocket, labels).await?;
     validate_snapshot(&stress_before)?;
-    let expected_stress_poll_limit =
-        stress_before.poll_limit + STRESS_EXPECTED_POLL_LIMITS;
+    let expected_stress_poll_budget_yield =
+        stress_before.poll_budget_yield + STRESS_EXPECTED_POLL_BUDGET_YIELDS;
     report.stress_before_snapshot = Some(stress_before);
 
     let stress_expected = stress_pattern();
@@ -240,7 +242,7 @@ async fn run_connected(
     );
     wait_for_tx_empty(websocket, labels, DATA_TIMEOUT).await?;
     let stress_after = qusb2snes::read_snapshot(websocket, labels).await?;
-    validate_snapshot_with_poll_limit(&stress_after, expected_stress_poll_limit)?;
+    validate_snapshot_with_poll_budget_yield(&stress_after, expected_stress_poll_budget_yield)?;
     report.stress_after_snapshot = Some(stress_after);
     report.stress_received = peer.read_data_exact(stress_expected.len(), DATA_TIMEOUT)?;
     report.stress_trace = capture_and_restart_trace(websocket, labels).await?;
@@ -259,7 +261,7 @@ async fn run_connected(
     }
 
     let transfer_snapshot = qusb2snes::read_snapshot(websocket, labels).await?;
-    validate_snapshot_with_poll_limit(&transfer_snapshot, expected_stress_poll_limit)?;
+    validate_snapshot(&transfer_snapshot)?;
     ensure!(
         transfer_snapshot.rx_read_index == transfer_snapshot.rx_write_index,
         "binary RX drain left bytes in the SFC ring"
@@ -287,7 +289,7 @@ async fn run_connected(
     .context("wait for NDM24 NO CARRIER")?;
 
     let final_snapshot = qusb2snes::read_snapshot(websocket, labels).await?;
-    validate_snapshot_with_poll_limit(&final_snapshot, expected_stress_poll_limit)?;
+    validate_snapshot(&final_snapshot)?;
     ensure!(
         final_snapshot.driver_state == DriverState::Ready,
         "SFC modem driver is {:?}, expected Ready after disconnect",
@@ -453,10 +455,7 @@ async fn wait_for_tx_empty(websocket: &str, labels: &Path, timeout: Duration) ->
 }
 
 fn validate_snapshot(snapshot: &DiagnosticSnapshot) -> Result<()> {
-    let fatal_flags = MODEM_FLAG_POLL_LIMIT
-        | MODEM_FLAG_RX_OVERFLOW
-        | MODEM_FLAG_TX_OVERFLOW
-        | MODEM_FLAG_TIMEOUT;
+    let fatal_flags = MODEM_FLAG_RX_OVERFLOW | MODEM_FLAG_TX_OVERFLOW | MODEM_FLAG_TIMEOUT;
     ensure!(snapshot.last_error == 0, "SFC last_error is non-zero");
     ensure!(
         snapshot.flags & fatal_flags == 0,
@@ -469,12 +468,11 @@ fn validate_snapshot(snapshot: &DiagnosticSnapshot) -> Result<()> {
     Ok(())
 }
 
-fn validate_snapshot_with_poll_limit(
+fn validate_snapshot_with_poll_budget_yield(
     snapshot: &DiagnosticSnapshot,
-    expected_poll_limit: u32,
+    expected_poll_budget_yield: u32,
 ) -> Result<()> {
-    let fatal_flags =
-        MODEM_FLAG_RX_OVERFLOW | MODEM_FLAG_TX_OVERFLOW | MODEM_FLAG_TIMEOUT;
+    let fatal_flags = MODEM_FLAG_RX_OVERFLOW | MODEM_FLAG_TX_OVERFLOW | MODEM_FLAG_TIMEOUT;
     ensure!(snapshot.last_error == 0, "SFC last_error is non-zero");
     ensure!(
         snapshot.flags & fatal_flags == 0,
@@ -485,14 +483,14 @@ fn validate_snapshot_with_poll_limit(
     ensure!(snapshot.tx_overflow == 0, "SFC TX overflowed");
     ensure!(snapshot.timeout == 0, "SFC transaction timed out");
     ensure!(
-        snapshot.poll_limit == expected_poll_limit,
-        "SFC poll limit count is {}, expected {} after stress burst",
-        snapshot.poll_limit,
-        expected_poll_limit
+        snapshot.poll_budget_yield == expected_poll_budget_yield,
+        "SFC poll budget yield count is {}, expected {} after stress burst",
+        snapshot.poll_budget_yield,
+        expected_poll_budget_yield
     );
     ensure!(
-        snapshot.flags & MODEM_FLAG_POLL_LIMIT != 0,
-        "SFC poll limit flag was not set by stress burst"
+        snapshot.flags & MODEM_FLAG_POLL_BUDGET_YIELD != 0,
+        "SFC poll budget yield flag was not set by stress burst"
     );
     Ok(())
 }
@@ -530,6 +528,6 @@ mod tests {
         assert_eq!(data.len(), 255);
         assert_eq!(data.first(), Some(&0x00));
         assert_eq!(data.last(), Some(&0xfe));
-        assert_eq!(STRESS_EXPECTED_POLL_LIMITS, 7);
+        assert_eq!(STRESS_EXPECTED_POLL_BUDGET_YIELDS, 7);
     }
 }

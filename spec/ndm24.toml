@@ -211,11 +211,11 @@ type = "u32"
 description = "TX ring overflow count"
 
 [[diagnostic.fields]]
-name = "poll_limit"
+name = "poll_budget_yield"
 offset = 52
 size = 4
 type = "u32"
-description = "Poll budget exhaustion count"
+description = "Poll budget yield count"
 
 [[diagnostic.fields]]
 name = "timeout"
@@ -382,7 +382,7 @@ connected = 7
 disconnecting = 8
 
 [flags]
-poll_limit = 0x01
+poll_budget_yield = 0x01
 rx_overflow = 0x02
 tx_overflow = 0x04
 timeout = 0x08

@@ -30,7 +30,7 @@ nmitimenShadow: .res $1
 .export modemLastDataReport, modemLastStatusReport, modemTraceNextSequence
 .export modemReceiveAcceptedCount, modemReceiveDiscardedCount
 .export modemTransmitByteCount, modemReceiveOverflowCount
-.export modemTransmitOverflowCount, modemPollLimitCount, modemTimeoutCount
+.export modemTransmitOverflowCount, modemPollBudgetYieldCount, modemTimeoutCount
 .export modemReinitializeCount, modemTraceOverwrittenCount, modemResetStartFrame
 .export modemTerminalDroppedCount
 .export modemAtStatus, modemAtExpectedResult
@@ -61,7 +61,7 @@ modemReceiveDiscardedCount: .res $4
 modemTransmitByteCount: .res $4
 modemReceiveOverflowCount: .res $4
 modemTransmitOverflowCount: .res $4
-modemPollLimitCount: .res $4
+modemPollBudgetYieldCount: .res $4
 modemTimeoutCount: .res $4
 modemReinitializeCount: .res $4
 modemTraceOverwrittenCount: .res $4
@@ -99,7 +99,7 @@ modemStateEnd:
 .assert modemTransmitByteCount - modemState = MODEM_DIAG_TX_BYTES, error, "TX bytes offset"
 .assert modemReceiveOverflowCount - modemState = MODEM_DIAG_RX_OVERFLOW, error, "RX overflow offset"
 .assert modemTransmitOverflowCount - modemState = MODEM_DIAG_TX_OVERFLOW, error, "TX overflow offset"
-.assert modemPollLimitCount - modemState = MODEM_DIAG_POLL_LIMIT, error, "poll limit offset"
+.assert modemPollBudgetYieldCount - modemState = MODEM_DIAG_POLL_BUDGET_YIELD, error, "poll budget yield offset"
 .assert modemTimeoutCount - modemState = MODEM_DIAG_TIMEOUT, error, "timeout offset"
 .assert modemReinitializeCount - modemState = MODEM_DIAG_REINITIALIZE, error, "reinitialize offset"
 .assert modemTraceOverwrittenCount - modemState = MODEM_DIAG_TRACE_OVERWRITTEN, error, "trace overwritten offset"

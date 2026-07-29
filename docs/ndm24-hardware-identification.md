@@ -43,9 +43,9 @@ NDM24自身がATコマンドで返す識別情報をhardware revision別に保�
 | `AT+GSN` | `ERROR` | なし |
 | `AT+GCAP` | `ERROR` | なし |
 
-`ATI3`、`ATI4`、`ATI5` のraw responseはそれぞれ55、42、59byteあり、各コマンドで32byteのpoll budget exhaustionが1回発生しました。いずれも次のメインループで受信を継続し、RX discard、overflow、trace overwriteなしで完全な応答を取得しています。poll budget exhaustionはデータ損失ではなく、1回の `modemPoll` を有限時間で戻す設計が働いた記録です。
+`ATI3`、`ATI4`、`ATI5` のraw responseはそれぞれ55、42、59byteあり、各コマンドで `poll_budget_yield` が1回発生しました。いずれも次のメインループで受信を継続し、RX discard、overflow、trace overwriteなしで完全な応答を取得しています。`poll_budget_yield` はデータ損失ではなく、1回の `modemPoll` を32回の9-bit transferで区切り、メインループへ処理を返す設計が働いた記録です。
 
-取得終了時のドライバは `READY`、RX ring indexは104/104、TX ring indexは110/110でした。`last_error`、timeout、RX/TX overflow、RX discard、terminal drop、trace overwriteはいずれも0です。poll budget exhaustionは上記3件だけで、コマンド別の前後カウンタも原記録に保存しています。
+取得終了時のドライバは `READY`、RX ring indexは104/104、TX ring indexは110/110でした。`last_error`、timeout、RX/TX overflow、RX discard、terminal drop、trace overwriteはいずれも0です。`poll_budget_yield` は上記3件だけで、コマンド別の前後カウンタも原記録に保存しています。原記録は旧schemaのため、同じ値のフィールド名は `poll_limit` です。
 
 ## revision B
 
@@ -77,7 +77,7 @@ NDM24自身がATコマンドで返す識別情報をhardware revision別に保�
 
 `ATI2` の完全な応答は `ATI2 CR CR LF OK CR LF CR LF OK CR LF` です。最初の `OK` は情報行、最後の `OK` はATコマンドの最終結果です。最終結果の検出後に到着した6byteもRX ringから回収しており、欠落ではありません。
 
-取得終了時のドライバは `READY`、RX ring indexは65/65、TX ring indexは110/110でした。`last_error`、timeout、RX/TX overflow、poll limit、RX discard、terminal drop、trace overwriteはいずれも0です。raw byte列、コマンド別trace、照会前後のカウンタは原記録に保存しています。
+取得終了時のドライバは `READY`、RX ring indexは65/65、TX ring indexは110/110でした。`last_error`、timeout、RX/TX overflow、`poll_budget_yield`、RX discard、terminal drop、trace overwriteはいずれも0です。raw byte列、コマンド別trace、照会前後のカウンタは原記録に保存しています。原記録は旧schemaのため、同じ値のフィールド名は `poll_limit` です。
 
 予備取得では `AT+GCAP` が一度だけ10秒以内に応答終端へ到達せずタイムアウトしました。ROMを再起動して同じ16コマンドを再取得した上記の正式記録では、`AT+GCAP` は `ERROR` を返して正常に完了しています。revision B固有の確定事項とはせず、revision A取得時とrevision B再試験時の再現性確認項目にします。
 

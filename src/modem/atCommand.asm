@@ -3,6 +3,7 @@
 .export at
 .export atz
 .export at_f
+.export atm0
 .export ats7_60
 .export ats8_3
 .export att
@@ -31,6 +32,9 @@ atz:
 
 at_f:
 .byte "AT&F", $0d, $0a, $00
+
+atm0:
+.byte "ATM0", $0d, $0a, $00
 
 ats7_60:
 .byte "ATS7=60", $0d, $0a, $00

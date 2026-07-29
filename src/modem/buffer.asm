@@ -12,7 +12,7 @@
 .import modemLastDataReport, modemLastStatusReport, modemTraceNextSequence
 .import modemReceiveAcceptedCount, modemReceiveDiscardedCount
 .import modemTransmitByteCount, modemReceiveOverflowCount
-.import modemTransmitOverflowCount, modemPollLimitCount
+.import modemTransmitOverflowCount, modemPollBudgetYieldCount
 .import modemAtStatus, modemAtExpectedResult
 .import modemSessionLastResult, modemSessionLineLength, modemAtStartFrame
 .import modemReceiveBuffer, modemTransmitBuffer
@@ -25,7 +25,7 @@
 .export modemStoreReceivedByte, modemRecordDiscard
 .export modemReadByte, modemQueueByte
 .export modemPeekTransmitByte, modemConsumeTransmitByte
-.export modemRecordPollLimit
+.export modemRecordPollBudgetYield
 
 .proc modemInitializeDiagnostics
   .a8
@@ -294,11 +294,11 @@ done:
   rts
 .endproc
 
-.proc modemRecordPollLimit
+.proc modemRecordPollBudgetYield
   .a8
   lda modemFlags
-  ora #MODEM_FLAG_POLL_LIMIT
+  ora #MODEM_FLAG_POLL_BUDGET_YIELD
   sta modemFlags
-  modemIncrement32 modemPollLimitCount
+  modemIncrement32 modemPollBudgetYieldCount
   rts
 .endproc

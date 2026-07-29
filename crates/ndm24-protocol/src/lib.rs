@@ -69,7 +69,8 @@ pub struct DiagnosticSnapshot {
     pub tx_bytes: u32,
     pub rx_overflow: u32,
     pub tx_overflow: u32,
-    pub poll_limit: u32,
+    #[serde(alias = "poll_limit")]
+    pub poll_budget_yield: u32,
     pub timeout: u32,
     pub reinitialize: u32,
     pub trace_overwritten: u32,
@@ -128,7 +129,7 @@ impl DiagnosticSnapshot {
             tx_bytes: read_u32(data, MODEM_DIAG_TX_BYTES)?,
             rx_overflow: read_u32(data, MODEM_DIAG_RX_OVERFLOW)?,
             tx_overflow: read_u32(data, MODEM_DIAG_TX_OVERFLOW)?,
-            poll_limit: read_u32(data, MODEM_DIAG_POLL_LIMIT)?,
+            poll_budget_yield: read_u32(data, MODEM_DIAG_POLL_BUDGET_YIELD)?,
             timeout: read_u32(data, MODEM_DIAG_TIMEOUT)?,
             reinitialize: read_u32(data, MODEM_DIAG_REINITIALIZE)?,
             trace_overwritten: read_u32(data, MODEM_DIAG_TRACE_OVERWRITTEN)?,
@@ -288,5 +289,26 @@ mod tests {
 
         let snapshot = DiagnosticSnapshot::decode(&data).unwrap();
         assert_eq!(snapshot.terminal_dropped, 0x1234_5678);
+    }
+
+    #[test]
+    fn diagnostic_serialized_name_accepts_legacy_poll_limit_alias() {
+        let mut data = vec![0; MODEM_DIAGNOSTIC_SIZE];
+        data[MODEM_DIAG_MAGIC..MODEM_DIAG_MAGIC + 4].copy_from_slice(&MODEM_DIAGNOSTIC_MAGIC);
+        data[MODEM_DIAG_VERSION..MODEM_DIAG_VERSION + 2]
+            .copy_from_slice(&MODEM_DIAGNOSTIC_VERSION.to_le_bytes());
+        data[MODEM_DIAG_SIZE..MODEM_DIAG_SIZE + 2]
+            .copy_from_slice(&(MODEM_DIAGNOSTIC_SIZE as u16).to_le_bytes());
+        data[MODEM_DIAG_POLL_BUDGET_YIELD..MODEM_DIAG_POLL_BUDGET_YIELD + 4]
+            .copy_from_slice(&7_u32.to_le_bytes());
+
+        let snapshot = DiagnosticSnapshot::decode(&data).unwrap();
+        let current = toml::to_string(&snapshot).unwrap();
+        assert!(current.contains("poll_budget_yield = 7"));
+        assert!(!current.contains("poll_limit"));
+
+        let legacy = current.replace("poll_budget_yield = 7", "poll_limit = 7");
+        let decoded: DiagnosticSnapshot = toml::from_str(&legacy).unwrap();
+        assert_eq!(decoded.poll_budget_yield, 7);
     }
 }

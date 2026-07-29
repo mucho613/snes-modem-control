@@ -56,7 +56,7 @@ cargo run -p ndm24-tools -- monitor
 # メールボックス経由の AT クイックテスト
 cargo run -p ndm24-tools -- test
 
-# 任意の AT コマンドを1回送り、OKまで確認
+# 任意の AT コマンドを1回送り、OKまで確認（ATM0は通常の初期化で自動送信）
 cargo run -p ndm24-tools -- at ATM0
 
 # 有効な循環トレースを時系列 JSON で出力
@@ -98,7 +98,7 @@ cargo run -p ndm24-tools -- peer --port COM5 --baud 115200
 cargo run -p ndm24-tools -- connect-test --revision B --port COM5
 ```
 
-このコマンドはDFM-56UをV.22bis 2400bpsの自動応答に設定し、SFCへ `AT&F`、`AT%B2400`、`ATS7=60`、`ATX3`、`ATDT0` を順次要求します。両側の `CONNECT` 後に10秒保持し、DFM-56UのDTRを落としてNDM24側の `NO CARRIER` まで確認します。結果は `build/hardware-tests/<test-id>/connect-test.json` に保存し、終了時にDFM-56Uへ `ATZ` を送ります。
+このコマンドはDFM-56UをV.22bis 2400bpsの自動応答に設定し、SFCへ `AT&F`、`ATM0`、`AT%B2400`、`ATS7=60`、`ATX3`、`ATDT0` を順次要求します。`AT&F` で既定値へ戻ったスピーカー設定を直後の `ATM0` で再適用します。両側の `CONNECT` 後に10秒保持し、DFM-56UのDTRを落としてNDM24側の `NO CARRIER` まで確認します。結果は `build/hardware-tests/<test-id>/connect-test.json` に保存し、終了時にDFM-56Uへ `ATZ` を送ります。
 
 接続後の8bit透過性を確認するには、同じ配線で次を実行します。
 

@@ -234,6 +234,8 @@ queueProbe:
   .a8
   .i8
 
+  ; ATM0 doubles as the liveness probe and reapplies speaker-off after every
+  ; power-on or explicit raw-R reinitialization.
   lda #$50
   sta modemSessionStage
   lda #'A'
@@ -246,14 +248,24 @@ queueProbe:
   lda #$52
   sta modemSessionStage
   bcs queueFailed
-  lda #$0d
+  lda #'M'
   jsr modemQueueByte
   lda #$53
   sta modemSessionStage
   bcs queueFailed
-  lda #$0a
+  lda #'0'
   jsr modemQueueByte
   lda #$54
+  sta modemSessionStage
+  bcs queueFailed
+  lda #$0d
+  jsr modemQueueByte
+  lda #$55
+  sta modemSessionStage
+  bcs queueFailed
+  lda #$0a
+  jsr modemQueueByte
+  lda #$56
   sta modemSessionStage
 queueFailed:
   rts

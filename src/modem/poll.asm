@@ -13,7 +13,7 @@
 .import modemLastDataReport, modemLastStatusReport, modemLastDiscardReason
 .import modemTransmitReadIndex, modemTransmitWriteIndex
 .import modemSnapshotBegin, modemSnapshotEnd
-.import modemStoreReceivedByte, modemRecordPollLimit
+.import modemStoreReceivedByte, modemRecordPollBudgetYield
 .import modemTransfer9, modemRecordTrace, modemSetState
 
 .export modemPoll
@@ -182,7 +182,7 @@
 @budgetReached:
   lda #$01
   sta modemBurstPending
-  jsr modemRecordPollLimit
+  jsr modemRecordPollBudgetYield
 
 @pollEnd:
   lda #$25

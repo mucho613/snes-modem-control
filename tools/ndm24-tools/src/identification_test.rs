@@ -62,8 +62,8 @@ struct IdentificationRecord {
     information_lines: Vec<String>,
     rx_discarded_before: u32,
     rx_discarded_after: u32,
-    poll_limit_before: u32,
-    poll_limit_after: u32,
+    poll_budget_yield_before: u32,
+    poll_budget_yield_after: u32,
     trace_overwritten: u32,
     pending_rx_after_quiet: Vec<u8>,
     trace: Vec<TraceEvent>,
@@ -131,7 +131,7 @@ pub async fn run(
         };
     }
     let report = IdentificationReport {
-        schema_version: 2,
+        schema_version: 3,
         test_id,
         started_unix_seconds,
         hardware_revision: hardware_revision.to_owned(),
@@ -235,8 +235,8 @@ async fn transact(
         information_lines,
         rx_discarded_before: before.rx_discarded,
         rx_discarded_after: snapshot.rx_discarded,
-        poll_limit_before: before.poll_limit,
-        poll_limit_after: snapshot.poll_limit,
+        poll_budget_yield_before: before.poll_budget_yield,
+        poll_budget_yield_after: snapshot.poll_budget_yield,
         trace_overwritten: snapshot.trace_overwritten,
         pending_rx_after_quiet,
         trace,

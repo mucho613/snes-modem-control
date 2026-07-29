@@ -30,7 +30,7 @@ ABI version: `2`. Block size: `128` bytes.
 | `0x28` | 4 | `u32` | `tx_bytes` | Bytes clocked to the NDM24 interface |
 | `0x2C` | 4 | `u32` | `rx_overflow` | RX ring overflow count |
 | `0x30` | 4 | `u32` | `tx_overflow` | TX ring overflow count |
-| `0x34` | 4 | `u32` | `poll_limit` | Poll budget exhaustion count |
+| `0x34` | 4 | `u32` | `poll_budget_yield` | Poll budget yield count |
 | `0x38` | 4 | `u32` | `timeout` | Timeout count |
 | `0x3C` | 4 | `u32` | `reinitialize` | Initialization request count |
 | `0x40` | 4 | `u32` | `trace_overwritten` | Trace events written after the first full ring |

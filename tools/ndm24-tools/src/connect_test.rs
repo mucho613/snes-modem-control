@@ -5,11 +5,11 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, ensure};
 use ndm24_protocol::{
-    DiagnosticSnapshot, MODEM_FLAG_POLL_LIMIT, MODEM_FLAG_RX_OVERFLOW, MODEM_FLAG_TIMEOUT,
-    MODEM_FLAG_TX_OVERFLOW, MODEM_MAILBOX_COMMAND_AT_TRANSACTION,
-    MODEM_MAILBOX_COMMAND_CLEAR_TRACE, MODEM_MAILBOX_COMMAND_FREEZE_TRACE,
-    MODEM_MAILBOX_COMMAND_RESUME_TRACE, MODEM_SESSION_RESULT_CONNECT,
-    MODEM_SESSION_RESULT_NO_CARRIER, MODEM_SESSION_RESULT_OK, TraceEvent,
+    DiagnosticSnapshot, MODEM_FLAG_RX_OVERFLOW, MODEM_FLAG_TIMEOUT, MODEM_FLAG_TX_OVERFLOW,
+    MODEM_MAILBOX_COMMAND_AT_TRANSACTION, MODEM_MAILBOX_COMMAND_CLEAR_TRACE,
+    MODEM_MAILBOX_COMMAND_FREEZE_TRACE, MODEM_MAILBOX_COMMAND_RESUME_TRACE,
+    MODEM_SESSION_RESULT_CONNECT, MODEM_SESSION_RESULT_NO_CARRIER, MODEM_SESSION_RESULT_OK,
+    TraceEvent,
 };
 use serde::Serialize;
 
@@ -20,6 +20,7 @@ const DTE_BAUD: u32 = 115_200;
 const SETUP_TIMEOUT_FRAMES: u16 = 300;
 const DIAL_TIMEOUT_FRAMES: u16 = 3_900;
 const DISCONNECT_TIMEOUT_FRAMES: u16 = 900;
+pub(crate) const NDM24_SETUP_COMMANDS: [&str; 5] = ["AT&F", "ATM0", "AT%B2400", "ATS7=60", "ATX3"];
 
 #[derive(Debug, Serialize)]
 struct TransactionRecord {
@@ -81,7 +82,7 @@ pub async fn run(
         .with_context(|| format!("create test output {}", output_dir.display()))?;
 
     let mut report = ConnectTestReport {
-        schema_version: 3,
+        schema_version: 4,
         test_id,
         started_unix_seconds,
         hardware_revision: revision_label,
@@ -162,7 +163,7 @@ async fn run_connected(
     );
     report.initial_snapshot = Some(initial);
 
-    for command in ["AT&F", "AT%B2400", "ATS7=60", "ATX3"] {
+    for command in NDM24_SETUP_COMMANDS {
         let record = transact(
             websocket,
             labels,
@@ -219,10 +220,7 @@ async fn run_connected(
     report.transactions.push(disconnect);
 
     let final_snapshot = qusb2snes::read_snapshot(websocket, labels).await?;
-    let fatal_flags = MODEM_FLAG_POLL_LIMIT
-        | MODEM_FLAG_RX_OVERFLOW
-        | MODEM_FLAG_TX_OVERFLOW
-        | MODEM_FLAG_TIMEOUT;
+    let fatal_flags = MODEM_FLAG_RX_OVERFLOW | MODEM_FLAG_TX_OVERFLOW | MODEM_FLAG_TIMEOUT;
     ensure!(final_snapshot.last_error == 0, "SFC last_error is non-zero");
     ensure!(
         final_snapshot.flags & fatal_flags == 0,
@@ -385,6 +383,11 @@ mod tests {
             arguments,
             vec![MODEM_SESSION_RESULT_NO_CARRIER, 0x84, 0x03, 0]
         );
+    }
+
+    #[test]
+    fn reapplies_speaker_off_immediately_after_factory_defaults() {
+        assert_eq!(&NDM24_SETUP_COMMANDS[..2], &["AT&F", "ATM0"]);
     }
 
     #[test]
