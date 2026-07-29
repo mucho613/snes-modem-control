@@ -4,7 +4,7 @@
 
 最初のPPPマイルストーンは、NDM24から受け取る任意位置で分割されたbyte列を、FCS検証済みのPPPフレームへ復元する層です。`crates/ndm24-ppp` を仕様の参照実装とし、同じ状態遷移と試験ベクトルを65816へ移植しています。
 
-現時点で実装済みなのはRFC 1662の非同期HDLC-like framingです。Rust参照実装に加えて、65816版の受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escape、NDM24のRX/TXリングへの上限付き接続を実装しています。LCP、認証、IPCP、IPv4、UDP、TCP、NTPはまだSFC上で動作しません。
+現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP packet parser、Configure交渉コア、peer option方針まで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。LCPのmain-loop接続、認証、IPCP、IPv4、UDP、TCP、NTPはまだSFC上で動作しません。
 
 PPP接続は次の順序で進みます。
 
@@ -64,6 +64,9 @@ Rust参照実装は全入力分割位置、破損FCSからの再同期、Flag直
 - `src/ppp/framing.asm`: byte単位の受信状態機械
 - `src/ppp/receive.asm`: NDM24 RX ringの所有権と上限付きdrain
 - `src/ppp/transmit.asm`: backpressure対応の送信encoderとTX ring充填
+- `src/ppp/lcp.asm`: LCP packet parser
+- `src/ppp/lcpNegotiation.asm`: Configure交渉状態機械
+- `src/ppp/lcpOptions.asm`: peer option評価とNak/Reject生成
 - `src/ppp/selfTest.asm`: 固定fixtureによる常設セルフテスト
 
 `pppDecoderPush` はraw byteを1byteずつ受け取り、次のeventを返します。
@@ -190,7 +193,7 @@ cargo run -p ndm24-tools -- ppp-monitor
 | PFC / ACFC | 65816 framingが未対応のためReject |
 | Quality-Protocol / unknown / duplicate | Reject |
 
-Configure-Rejectが必要なoptionとConfigure-Nak候補が同じRequestに含まれる場合は、RFCの優先関係に従ってReject対象だけを順序・内容を変えず返します。受理したMRU、ACCM、PAP要求、peer Magic-Numberは双方のConfigure-Ackが成立した `ThisLayerUp` と同時に上位層へ渡します。
+Configure-Rejectが必要なoptionとConfigure-Nak候補が同じRequestに含まれる場合は、RFCの優先関係に従ってReject対象だけを順序・内容を変えず返します。受理したMRU、ACCM、PAP要求、peer Magic-Numberは、peer Request全体をConfigure-Ackできると確定した時点でまとめて公開します。Nak/Reject対象を含むRequestの値は途中状態として公開しません。
 
 固定transcript試験では、Ackの到着順が前後する2経路、Opened到達、timeout再送と回数超過、Nakによるlocal option置換、Rejectによる除去、Opened中の再交渉を検査します。状態機械が返すpacketはLCPの `Code` から始まるInformation部分であり、Address `$FF`、Control `$03`、Protocol `$C021` とRFC 1662 framingの付加は下位層の責務です。
 
@@ -204,12 +207,12 @@ parserの最終Code、Identifier、Length、error、呼出回数はPPP診断ABI 
 
 `src/ppp/lcpNegotiation.asm` は、Rust参照実装から `Request-Sent`、`Ack-Received`、`Ack-Sent`、`Opened` の基本遷移を移植しています。local Configure-Requestは既定MRU 1500と既定ACCM `$FFFFFFFF` を維持する空optionです。Identifierは有効なNak/Rejectまたは重複Ack後の新しいRequestで更新し、Identifierやoption列が一致しない応答は状態を変えません。
 
-交渉コアは共有送信encoderを直接上書きせず、`pppLcpPendingAction` にConfigure-Request/Ack/Rejectを保持します。`pppLcpBuildPending` はencoderがidleのときだけ `pppTransmitBuffer` を構築し、Ackでは受信packetのIdentifierとoption列をLength境界までそのまま複製します。
+交渉コアは共有送信encoderを直接上書きせず、`pppLcpPendingAction` にConfigure-Request/Ack/Nak/Rejectを保持します。`pppLcpBuildPending` はencoderがidleのときだけ `pppTransmitBuffer` を構築します。Ackは受信packetのIdentifierとoption列をLength境界までそのまま複製し、Nakは置換が必要なoptionだけを元の順序で返し、Rejectは対象optionのbyte列だけを変更せず返します。
 
-この段階のpeer option方針は意図的に限定されています。空optionのConfigure-RequestだけをAckし、optionを含むRequestは全optionを順序・内容を変えずConfigure-Rejectします。MRU、ACCM、PAP、Magic-Numberを選別して受理する方針は、main-loop接続前に続けて移植します。
+`src/ppp/lcpOptions.asm` はMRU、ACCM、PAP、Magic-Numberを選別して受理します。CHAPなどPAP以外の認証方式はPAPへNakし、PFC、ACFC、Quality-Protocol、未知option、重複した全optionはRejectします。同じRequestにReject対象とNak対象があればRejectを優先します。
 
-常設セルフテストのstep `$30`～`$3A` は、Ack到着順が逆の2経路、Opened到達、不正Identifier、Nak後のIdentifier更新、共有encoderへのRequest/Ack/Reject構築を固定transcriptで検査します。
+常設セルフテストのstep `$30`～`$3A` は、Ack到着順が逆の2経路、Opened到達、不正Identifier、Nak後のIdentifier更新、共有encoderへのRequest/Ack構築を固定transcriptで検査します。step `$40`～`$43` は、全対応optionの受理と値の公開、MRU・CHAPのNak置換、RejectのNakに対する優先、重複optionを両方Rejectするbyte列を検査します。
 
 ## 次の実装
 
-次はMRU、ACCM、PAP、Magic-Numberのpeer option方針とConfigure-Nakを65816へ移植します。その後、3秒のrestart timerとMax-Configure、受信frame解放を含むmain-loop pollへ接続します。ここまでは対向PPPサーバーを必要としません。実際のpeerとのLCP交渉を始める段階で対向PPPサーバーを用意します。
+次は3秒のrestart timer、Max-Configure、lower-layer down処理を65816へ移植します。その後、受信frameの所有権と解放を含むmain-loop pollへ接続します。ここまでは対向PPPサーバーを必要としません。実際のpeerとのLCP交渉を始める段階で対向PPPサーバーを用意します。

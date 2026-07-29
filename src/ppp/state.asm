@@ -123,6 +123,9 @@ pppDiagnosticStateEnd:
 .export pppReceiveDrainRemaining
 .export pppTransmitLogicalByte, pppTransmitFillRemaining
 .export pppLcpPacketEnd, pppLcpOptionLength
+.export pppLcpOptionSeen, pppLcpOptionDuplicate
+.export pppLcpOptionOffset, pppLcpOutputCursor
+.export pppLcpHasReject, pppLcpHasNak, pppLcpPeerMagic
 pppLastEvent: .res $1
 pppLastInvalidReason: .res $1
 pppDecoderScratchByte: .res $1
@@ -131,6 +134,13 @@ pppTransmitLogicalByte: .res $1
 pppTransmitFillRemaining: .res $1
 pppLcpPacketEnd: .res $2
 pppLcpOptionLength: .res $2
+pppLcpOptionOffset: .res $2
+pppLcpOutputCursor: .res $2
+pppLcpHasReject: .res $1
+pppLcpHasNak: .res $1
+pppLcpPeerMagic: .res $4
+pppLcpOptionSeen: .res $100
+pppLcpOptionDuplicate: .res $100
 
 ; A nesting count lets the permanent self-test wrap lower-level routines that
 ; also publish state without ever exposing an even sequence mid-operation.

@@ -5,6 +5,7 @@
 
 .import pppSnapshotBegin, pppSnapshotEnd
 .import pppLcpParseFrame, pppLcpInitialize
+.import pppLcpEvaluatePeerRequest, pppLcpBuildPeerResponse
 .import pppLcpState, pppLcpLastIdentifier, pppLcpLastError
 .import pppLcpRequestIdentifier, pppLcpRestartRemaining
 .import pppLcpPendingAction, pppLcpPacketLength
@@ -91,18 +92,10 @@
 
 @configureRequest:
   .a8
-  ; Empty peer options are accepted. Until the option policy is moved from
-  ; the Rust reference, every non-empty option list is rejected verbatim.
-  rep #$20
-  .a16
-  lda pppLcpPacketLength
-  cmp #PPP_LCP_HEADER_LENGTH
-  beq @acceptableRequest
-
-  sep #$20
-  .a8
-  lda #PPP_LCP_ACTION_CONFIGURE_REJECT
+  jsr pppLcpEvaluatePeerRequest
   sta pppLcpPendingAction
+  cmp #PPP_LCP_ACTION_CONFIGURE_ACK
+  beq @acceptableRequest
   lda pppLcpState
   cmp #PPP_LCP_STATE_ACK_RECEIVED
   bne :+
@@ -113,11 +106,7 @@
   jmp @returnSuccess
 
 @acceptableRequest:
-  .a16
-  sep #$20
   .a8
-  lda #PPP_LCP_ACTION_CONFIGURE_ACK
-  sta pppLcpPendingAction
   lda pppLcpState
   cmp #PPP_LCP_STATE_ACK_RECEIVED
   beq @requestCompletesOpen
@@ -285,8 +274,10 @@
   beq @buildRequest
   cmp #PPP_LCP_ACTION_CONFIGURE_ACK
   beq @copyResponse
+  cmp #PPP_LCP_ACTION_CONFIGURE_NAK
+  beq @buildSelectiveResponse
   cmp #PPP_LCP_ACTION_CONFIGURE_REJECT
-  beq @copyResponse
+  beq @buildSelectiveResponse
   bra @busy
 
 @buildRequest:
@@ -325,15 +316,7 @@
   .a16
   sep #$20
   .a8
-  lda pppLcpPendingAction
-  cmp #PPP_LCP_ACTION_CONFIGURE_ACK
-  beq @responseAck
-  lda #PPP_LCP_CODE_CONFIGURE_REJECT
-  bra @storeResponseCode
-@responseAck:
-  .a8
   lda #PPP_LCP_CODE_CONFIGURE_ACK
-@storeResponseCode:
   .a8
   sta pppTransmitBuffer + PPP_LCP_FRAME_OFFSET
   rep #$20
@@ -341,6 +324,11 @@
   lda pppLcpPacketLength
   clc
   adc #PPP_UNCOMPRESSED_HEADER_LENGTH
+  bra @begin
+
+@buildSelectiveResponse:
+  .a8
+  jsr pppLcpBuildPeerResponse
 
 @begin:
   .a16
@@ -537,8 +525,7 @@
   cmp #PPP_LCP_ACTION_CONFIGURE_REQUEST
   bne @fail38
 
-  ; Until peer option policy is ported, a non-empty request is rejected
-  ; verbatim while the local request remains in Request-Sent.
+  ; A supported non-empty request is Acked without changing its option bytes.
   jsr pppLcpBuildPending
   bcs @fail39
   jsr pppTransmitInitialize
@@ -548,12 +535,12 @@
   jsr pppLcpReceiveFrame
   bcs @fail39
   lda pppLcpPendingAction
-  cmp #PPP_LCP_ACTION_CONFIGURE_REJECT
+  cmp #PPP_LCP_ACTION_CONFIGURE_ACK
   bne @fail39
   jsr pppLcpBuildPending
   bcs @fail3a
   lda pppTransmitBuffer + 4
-  cmp #PPP_LCP_CODE_CONFIGURE_REJECT
+  cmp #PPP_LCP_CODE_CONFIGURE_ACK
   bne @fail3a
   lda pppTransmitBuffer + 5
   cmp #$0a
