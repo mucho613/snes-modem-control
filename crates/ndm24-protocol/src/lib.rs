@@ -198,6 +198,8 @@ pub struct PppDiagnosticSnapshot {
     pub lcp_deferred_request: bool,
     pub lcp_restart_deadline: u16,
     pub lcp_peer_magic: u32,
+    pub carrier_loss_count: u32,
+    pub carrier_tail_byte_count: u32,
 }
 
 impl PppDiagnosticSnapshot {
@@ -275,6 +277,8 @@ impl PppDiagnosticSnapshot {
             lcp_deferred_request: data[PPP_DIAG_LCP_DEFERRED_REQUEST] != 0,
             lcp_restart_deadline: read_u16(data, PPP_DIAG_LCP_RESTART_DEADLINE)?,
             lcp_peer_magic: read_u32(data, PPP_DIAG_LCP_PEER_MAGIC)?,
+            carrier_loss_count: read_u32(data, PPP_DIAG_CARRIER_LOSS_COUNT)?,
+            carrier_tail_byte_count: read_u32(data, PPP_DIAG_CARRIER_TAIL_BYTE_COUNT)?,
         })
     }
 }
@@ -474,6 +478,10 @@ mod tests {
             .copy_from_slice(&0xff80_u16.to_le_bytes());
         data[PPP_DIAG_LCP_PEER_MAGIC..PPP_DIAG_LCP_PEER_MAGIC + 4]
             .copy_from_slice(&0x1234_5678_u32.to_le_bytes());
+        data[PPP_DIAG_CARRIER_LOSS_COUNT..PPP_DIAG_CARRIER_LOSS_COUNT + 4]
+            .copy_from_slice(&3_u32.to_le_bytes());
+        data[PPP_DIAG_CARRIER_TAIL_BYTE_COUNT..PPP_DIAG_CARRIER_TAIL_BYTE_COUNT + 4]
+            .copy_from_slice(&12_u32.to_le_bytes());
 
         let snapshot = PppDiagnosticSnapshot::decode(&data).unwrap();
         assert_eq!(snapshot.snapshot_sequence, 8);
@@ -493,6 +501,8 @@ mod tests {
         assert!(snapshot.lcp_deferred_request);
         assert_eq!(snapshot.lcp_restart_deadline, 0xff80);
         assert_eq!(snapshot.lcp_peer_magic, 0x1234_5678);
+        assert_eq!(snapshot.carrier_loss_count, 3);
+        assert_eq!(snapshot.carrier_tail_byte_count, 12);
     }
 
     #[test]

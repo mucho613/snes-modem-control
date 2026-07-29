@@ -44,7 +44,7 @@ ABI version: `2`. Block size: `128` bytes.
 
 ## PPP Diagnostic ABI
 
-ABI version: `3`. Block size: `104` bytes.
+ABI version: `4`. Block size: `112` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|
@@ -95,6 +95,8 @@ ABI version: `3`. Block size: `104` bytes.
 | `0x61` | 1 | `u8` | `lcp_deferred_request` | Non-zero while Opened renegotiation owes a local Configure-Request |
 | `0x62` | 2 | `u16` | `lcp_restart_deadline` | Low 16-bit VBlank frame deadline for LCP restart |
 | `0x64` | 4 | `u32` | `lcp_peer_magic` | Accepted peer Magic-Number |
+| `0x68` | 4 | `u32` | `carrier_loss_count` | Raw NDM24 NO CARRIER result lines detected while PPP owned RX |
+| `0x6C` | 4 | `u32` | `carrier_tail_byte_count` | Bytes discarded from the current RX burst after NO CARRIER |
 
 ## Mailbox ABI
 

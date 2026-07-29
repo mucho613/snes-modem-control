@@ -289,8 +289,8 @@ description = "Frame at which the current generic AT transaction started"
 
 [ppp_diagnostic]
 magic = [0x50, 0x50, 0x50, 0x31]
-version = 3
-size = 104
+version = 4
+size = 112
 
 [[ppp_diagnostic.fields]]
 name = "magic"
@@ -620,6 +620,20 @@ offset = 100
 size = 4
 type = "u32"
 description = "Accepted peer Magic-Number"
+
+[[ppp_diagnostic.fields]]
+name = "carrier_loss_count"
+offset = 104
+size = 4
+type = "u32"
+description = "Raw NDM24 NO CARRIER result lines detected while PPP owned RX"
+
+[[ppp_diagnostic.fields]]
+name = "carrier_tail_byte_count"
+offset = 108
+size = 4
+type = "u32"
+description = "Bytes discarded from the current RX burst after NO CARRIER"
 
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]

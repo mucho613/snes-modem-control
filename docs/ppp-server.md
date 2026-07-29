@@ -178,8 +178,24 @@ revision AのNDM24とDFM-56UをV.22bis 2400 bit/sで接続し、最初の実回�
 しました。PPP decoderがRXを所有したままNDM24の`NO CARRIER`を消費したため、
 後から開始したAT result待ちはtimeoutし、明示的な再初期化が必要でした。
 切断境界でFCS errorも1回記録されています。この問題はLCP確立中の欠損では
-ありませんが、正常切断の合格条件は未達です。以後の切断試験時間を確保する
-ためPAP待ちを120秒へ延長しています。
+ありませんが、この時点の正常切断の合格条件は未達です。その後、PPP所有中
+にもraw `NO CARRIER` result lineを識別し、自動で`Ready`とLCP `Closed`へ
+戻す処理を追加しました。同じ切断で連続した2行目も次のAT transactionへ
+残さないよう、同じRX burstの末尾を消費して診断counterへ記録します。以後の
+再試験時間を確保するためPAP待ちも120秒へ延長しています。
+
+同日の修正版再試験では、再び双方のConfigure-Request/AckとSFC側`Opened`を
+確認した後、PPP受信所有権を維持したまま`pppd`を停止しました。結果は次の
+とおりで、正常切断の合格条件も満たしました。
+
+- peerの2回のTerminate-RequestをFCS error 0で受信した。
+- 最初のraw `NO CARRIER\r\n`で`carrier_loss_count`が1になった。
+- 同じRX burstに続いた2行目の12byteを`carrier_tail_byte_count`へ記録した。
+- Modemは`Ready`、LCPは`Closed`となり、timer、peer option、pending送信は
+  すべて初期化された。
+- RX read/write indexは239/239で一致し、`pending-rx`の結果は空配列だった。
+- 切断直後の新しい`AT` transactionも`OK`で完了し、timeout、overflow、
+  discardは0だった。
 
 試験終了時は必ず停止します。
 

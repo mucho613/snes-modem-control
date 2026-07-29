@@ -69,6 +69,9 @@ cargo run -p ndm24-tools -- at ATM0
 cargo run -p ndm24-tools -- at ATDT0 --expect connect --timeout-frames 3900 --timeout-seconds 75
 cargo run -p ndm24-tools -- at "" --expect no-carrier --timeout-frames 900 --timeout-seconds 20
 
+# 次のtransactionへ持ち越される未処理RX byteをJSON配列で確認
+cargo run -p ndm24-tools -- pending-rx
+
 # 有効な循環トレースを時系列 JSON で出力
 cargo run -p ndm24-tools -- trace-live
 

@@ -98,6 +98,12 @@ enum Command {
         #[arg(long)]
         once: bool,
     },
+    PendingRx {
+        #[arg(long, default_value = "ws://localhost:23074")]
+        websocket: String,
+        #[arg(long, default_value = "build/smoke/modem-control.lbl")]
+        labels: PathBuf,
+    },
     Peer {
         #[arg(long)]
         port: String,
@@ -293,6 +299,11 @@ async fn main() -> Result<()> {
                 once,
             )
             .await
+        }
+        Command::PendingRx { websocket, labels } => {
+            let bytes = qusb2snes::read_pending_rx(&websocket, &labels).await?;
+            println!("{}", serde_json::to_string(&bytes)?);
+            Ok(())
         }
         Command::Peer {
             port,

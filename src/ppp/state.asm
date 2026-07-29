@@ -26,6 +26,7 @@
 .export pppLcpPeerMru, pppLcpPeerAccm, pppLcpReceiveCount
 .export pppLcpTimerActive, pppLcpDeferredRequest
 .export pppLcpRestartDeadline, pppLcpPeerMagic
+.export pppCarrierLossCount, pppCarrierTailByteCount
 
 pppDiagnosticState:
 pppDiagnosticMagic: .res $4
@@ -75,6 +76,8 @@ pppLcpTimerActive: .res $1
 pppLcpDeferredRequest: .res $1
 pppLcpRestartDeadline: .res $2
 pppLcpPeerMagic: .res $4
+pppCarrierLossCount: .res $4
+pppCarrierTailByteCount: .res $4
 .res PPP_DIAGNOSTIC_SIZE - (* - pppDiagnosticState)
 pppDiagnosticStateEnd:
 
@@ -125,6 +128,8 @@ pppDiagnosticStateEnd:
 .assert pppLcpDeferredRequest - pppDiagnosticState = PPP_DIAG_LCP_DEFERRED_REQUEST, error, "PPP LCP deferred request offset"
 .assert pppLcpRestartDeadline - pppDiagnosticState = PPP_DIAG_LCP_RESTART_DEADLINE, error, "PPP LCP restart deadline offset"
 .assert pppLcpPeerMagic - pppDiagnosticState = PPP_DIAG_LCP_PEER_MAGIC, error, "PPP LCP peer magic offset"
+.assert pppCarrierLossCount - pppDiagnosticState = PPP_DIAG_CARRIER_LOSS_COUNT, error, "PPP carrier loss count offset"
+.assert pppCarrierTailByteCount - pppDiagnosticState = PPP_DIAG_CARRIER_TAIL_BYTE_COUNT, error, "PPP carrier tail byte count offset"
 .assert pppDiagnosticStateEnd - pppDiagnosticState = PPP_DIAGNOSTIC_SIZE, error, "PPP diagnostic ABI size"
 
 ; Decoder and pump scratch fields are private and intentionally excluded from
@@ -138,6 +143,9 @@ pppDiagnosticStateEnd:
 .export pppLcpHasReject, pppLcpHasNak
 .export pppLcpPollAction
 .export pppLcpPollSavedModemState
+.export pppCarrierLineIndex, pppCarrierScratchByte
+.export pppCarrierTestSavedModemState, pppCarrierTestSavedSessionResult
+.export pppCarrierTestSavedLineLength
 pppLastEvent: .res $1
 pppLastInvalidReason: .res $1
 pppDecoderScratchByte: .res $1
@@ -152,6 +160,11 @@ pppLcpHasReject: .res $1
 pppLcpHasNak: .res $1
 pppLcpPollAction: .res $1
 pppLcpPollSavedModemState: .res $1
+pppCarrierLineIndex: .res $1
+pppCarrierScratchByte: .res $1
+pppCarrierTestSavedModemState: .res $1
+pppCarrierTestSavedSessionResult: .res $1
+pppCarrierTestSavedLineLength: .res $1
 pppLcpOptionSeen: .res $100
 pppLcpOptionDuplicate: .res $100
 

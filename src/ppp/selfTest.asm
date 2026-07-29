@@ -19,6 +19,7 @@
 .import pppLcpOptionsRunSelfTest
 .import pppLcpTimerRunSelfTest
 .import pppLcpPollRunSelfTest
+.import pppCarrierLossRunSelfTest
 
 .export pppRunSelfTest
 
@@ -406,6 +407,10 @@
   jmp @fail
 :
   jsr pppLcpPollRunSelfTest
+  bcc :+
+  jmp @fail
+:
+  jsr pppCarrierLossRunSelfTest
   bcc :+
   jmp @fail
 :

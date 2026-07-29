@@ -7,7 +7,7 @@
 .import pppLastEvent, pppLastInvalidReason, pppLastFrameLength
 .import pppLastProtocol, pppFrameBuffer, pppDecoderScratchByte
 
-.export pppDecoderReset, pppDecoderPush
+.export pppDecoderReset, pppDecoderPush, pppDecoderDiscardPartial
 
 ; Reset the stream decoder. The first Flag Sequence after reset establishes
 ; synchronization and does not report an empty frame.
@@ -27,6 +27,19 @@
   stz pppLastProtocol + 1
   jsr pppPrepareNextFrame
 
+  plb
+  rts
+.endproc
+
+; Discard an incomplete frame at a confirmed modem result-line boundary while
+; preserving the most recent completed frame diagnostics.
+.proc pppDecoderDiscardPartial
+  .a8
+  .i16
+
+  phb
+  setDBR $7e
+  jsr pppPrepareNextFrame
   plb
   rts
 .endproc

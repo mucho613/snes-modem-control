@@ -132,7 +132,7 @@ Address 1 + Control 1 + Protocol 2 + Information 1500 + FCS 2
 
 ## 常設PPP診断
 
-`pppDiagnosticState` はmagic `PPP1`、ABI version 3、104byteの公開診断blockです。レイアウトの正本は `spec/ndm24.toml` で、AssemblyとRustのoffset定数および[生成済みABI表](generated/diagnostic-abi.md)を同時に生成します。
+`pppDiagnosticState` はmagic `PPP1`、ABI version 4、112byteの公開診断blockです。レイアウトの正本は `spec/ndm24.toml` で、AssemblyとRustのoffset定数および[生成済みABI表](generated/diagnostic-abi.md)を同時に生成します。
 
 PC側では次のコマンドでJSON Linesとして読み取れます。
 
@@ -153,6 +153,8 @@ cargo run -p ndm24-tools -- ppp-monitor
 - decoderのflags、長さ、FCS
 - encoderのstage、長さ、位置、FCS
 - 送受信byte数、TX ring backpressure数、carrier喪失によるabort数
+- PPP受信所有中にNDM24のraw `NO CARRIER`を検出した回数
+- 検出後、同じRX burstに残った切断後byteを破棄した数
 - LCP state、最後のCode・Identifier・error、local Request Identifier
 - restart残数、timer有効状態と期限、pending/deferred送信
 - 受理したpeer MRU、ACCM、Magic-Number、option flags
@@ -236,9 +238,21 @@ Opened中にpeer Configure-Requestを受けた場合は応答packetと新しいl
 
 回線を発信しないgate試験では `ppp-receive-start` 後もNDM24がCONNECTEDでなければ `receive_active=false`、`lcp_state=Closed`、`transmit_active=false` のままであることを確認します。
 
+PPP受信所有中もraw byte列を`NO CARRIER\r\n`と並行照合します。SFC側が
+Configure-RequestでACCMを省略している間、receive ACCMは規定値
+`$FFFFFFFF`であり、正規PPP frame内のCR/LFはescapeされます。このため、
+生のCR/LFで完結したresult lineをPPP payloadと誤認しません。検出時は未完の
+decoder frameだけを破棄し、PPP所有権を解除してModemを`Ready`へ戻します。
+同じ切断でNDM24が`NO CARRIER`を2行連続して返す場合があるため、検出時点で
+RX ringに残っている同じburstのbyteも切断後データとして消費します。その数は
+`carrier_tail_byte_count`へ残し、次のAT transactionへ持ち込みません。
+続く同じmain-loopのLCP pollがlower-downを実行するため、timer、peer option、
+pending送信を次の接続へ持ち越しません。常設セルフテストのstep
+`$66`～`$69`が、部分一致からの再同期、検出event、状態復帰、常設counterを
+検査します。
+
 ## 次の実装
 
 オフラインで確定できるLCP処理と、実対向での`Opened`到達まで完了しました。
-次は、PPP decoderがRXを所有している間に回線が切れた場合にも、NDM24の
-`NO CARRIER`をAT sessionへ引き渡して`Ready`へ戻す切断境界を整理します。
-その後、PAP Authenticate-Requestの送信と認証結果処理へ進みます。
+raw `NO CARRIER`による自動lower-downも実対向で合格しました。次はPAP
+Authenticate-Requestの送信と認証結果処理へ進みます。
