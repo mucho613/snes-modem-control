@@ -289,7 +289,7 @@ description = "Frame at which the current generic AT transaction started"
 
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]
-version = 4
+version = 5
 size = 96
 argument_size = 32
 
@@ -416,6 +416,7 @@ at_transaction = 6
 binary_transmit = 7
 binary_receive = 8
 binary_stress_transmit = 9
+ppp_self_test = 10
 
 [mailbox_status]
 idle = 0

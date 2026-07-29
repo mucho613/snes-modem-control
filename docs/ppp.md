@@ -2,9 +2,9 @@
 
 ## 現在の範囲
 
-最初のPPPマイルストーンは、NDM24から受け取る任意位置で分割されたbyte列を、FCS検証済みのPPPフレームへ復元する層です。`crates/ndm24-ppp` を仕様の参照実装とし、同じ状態遷移と試験ベクトルを65816へ移植します。
+最初のPPPマイルストーンは、NDM24から受け取る任意位置で分割されたbyte列を、FCS検証済みのPPPフレームへ復元する層です。`crates/ndm24-ppp` を仕様の参照実装とし、同じ状態遷移と試験ベクトルを65816へ移植しています。
 
-現時点で実装済みなのはRFC 1662の非同期HDLC-like framingだけです。LCP、認証、IPCP、IPv4、UDP、TCP、NTPはまだSFC上で動作しません。
+現時点で実装済みなのはRFC 1662の非同期HDLC-like受信framingです。Rust参照実装に加えて、65816版のFCS計算、unescape、Flag境界、最大長判定、再同期を実装しています。NDM24受信リングとの接続、送信encoder、LCP、認証、IPCP、IPv4、UDP、TCP、NTPはまだSFC上で動作しません。
 
 PPP接続は次の順序で進みます。
 
@@ -55,7 +55,36 @@ default ACCM, Flags included:
 
 Rust参照実装は全入力分割位置、破損FCSからの再同期、Flag直前のescape、receive ACCMによる注入control文字の除去、最大長超過、default MRU 1500byteを試験します。
 
-## SFC への移植境界
+## 65816受信decoder
+
+65816実装は次のファイルに分離しています。
+
+- `src/ppp/constants.inc`: RFC 1662の定数、event、invalid理由
+- `src/ppp/state.asm`: decoder状態とframe buffer
+- `src/ppp/framing.asm`: byte単位の受信状態機械
+- `src/ppp/selfTest.asm`: 固定fixtureによる常設セルフテスト
+
+`pppDecoderPush` はraw byteを1byteずつ受け取り、次のeventを返します。
+
+| event | 意味 |
+|---|---|
+| `PPP_EVENT_NONE` | frameは未完成 |
+| `PPP_EVENT_FRAME` | FCS検証済みframeが完成 |
+| `PPP_EVENT_FCS_ERROR` | Flagまで受信したがFCS不一致 |
+| `PPP_EVENT_INVALID` | 短すぎるframe、またはFlag直前のescape |
+| `PPP_EVENT_OVERFLOW` | 1506byteを超え、次のFlagまで破棄 |
+
+現在のreceive ACCMはLCP交渉前の `$FFFFFFFF` 固定です。LCPでACCMを交渉する段階で可変化します。
+
+セルフテストはモデムや電話回線を必要とせず、FXPAK PROで起動したsmoke ROMに対して実行できます。
+
+```powershell
+cargo run -p ndm24-tools -- mailbox ppp-self-test
+```
+
+正常frameとProtocol `$C021` の復元、破損FCS、Flag直前のescape、receive ACCMによるXON除去をSFC上で検査します。失敗時のmailbox resultは、`src/ppp/selfTest.asm` 内の失敗step番号です。
+
+## SFC のメモリと接続境界
 
 default MRUは1500byteです。非圧縮時にFlag間で必要な最大unescaped長は次の1506byteです。
 
@@ -80,4 +109,4 @@ Address 1 + Control 1 + Protocol 2 + Information 1500 + FCS 2
 
 ## 次の実装
 
-次はRust参照実装と同じbitwise FCS更新、unescape、Flag境界、最大長判定を65816へ移植します。実回線へ発信する前に、固定fixtureをSFC上で投入し、Rustと同じframeまたは同じdiscard理由になることをQUsb2Snesから検証します。
+次はNDM24 RX ringをbyte単位で65816 decoderへdrainし、完成frameを上位層へ引き渡す境界を実装します。その後、TX ringの空きに応じて中断・再開できる送信encoderを追加します。LCPの実装と実回線試験は送受信framingの完成後に行います。

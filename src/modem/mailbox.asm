@@ -14,6 +14,7 @@
 .import modemAtBegin
 .import modemQueueByte, modemReadByte
 .import modemClearTrace, modemFreezeTrace, modemResumeTrace
+.import pppRunSelfTest
 
 .export modemMailboxPoll
 .proc modemMailboxPoll
@@ -134,10 +135,16 @@
   cmp #MODEM_MAILBOX_COMMAND_BINARY_TRANSMIT
   beq @binaryTransmit
   cmp #MODEM_MAILBOX_COMMAND_BINARY_RECEIVE
-  beq @binaryReceive
+  bne :+
+  jmp @binaryReceive
+:
   cmp #MODEM_MAILBOX_COMMAND_BINARY_STRESS_TRANSMIT
   bne :+
   jmp @binaryStressTransmit
+:
+  cmp #MODEM_MAILBOX_COMMAND_PPP_SELF_TEST
+  bne :+
+  jmp @pppSelfTest
 :
   lda #MODEM_MAILBOX_STATUS_FAILED
   sta modemMailboxStatus
@@ -182,14 +189,22 @@
 @binaryTransmit:
   lda modemDriverState
   cmp #MODEM_STATE_CONNECTED
-  bne @binaryInvalid
+  beq :+
+  jmp @binaryInvalid
+:
   lda modemTransmitReadIndex
   cmp modemTransmitWriteIndex
-  bne @binaryInvalid
+  beq :+
+  jmp @binaryInvalid
+:
   lda modemMailboxArguments + MODEM_BINARY_ARGUMENT_LENGTH
-  beq @binaryInvalid
+  bne :+
+  jmp @binaryInvalid
+:
   cmp #(MODEM_BINARY_CHUNK_MAX_LENGTH + 1)
-  bcs @binaryInvalid
+  bcc :+
+  jmp @binaryInvalid
+:
   tay
   ldx #$00
 @binaryTransmitLoop:
@@ -202,7 +217,7 @@
   stx modemMailboxResult
   lda #MODEM_MAILBOX_STATUS_PASSED
   sta modemMailboxStatus
-  bra @commitCommand
+  jmp @commitCommand
 
 @binaryReceive:
   lda modemDriverState
@@ -246,6 +261,19 @@
   bne @binaryStressTransmitLoop
   stx modemMailboxResult
   lda #MODEM_MAILBOX_STATUS_PASSED
+  sta modemMailboxStatus
+  bra @commitCommand
+
+@pppSelfTest:
+  jsr pppRunSelfTest
+  bcs @pppSelfTestFailed
+  lda #MODEM_MAILBOX_STATUS_PASSED
+  sta modemMailboxStatus
+  bra @commitCommand
+
+@pppSelfTestFailed:
+  sta modemMailboxResult
+  lda #MODEM_MAILBOX_STATUS_FAILED
   sta modemMailboxStatus
   bra @commitCommand
 
