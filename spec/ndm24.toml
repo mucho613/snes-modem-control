@@ -289,8 +289,8 @@ description = "Frame at which the current generic AT transaction started"
 
 [ppp_diagnostic]
 magic = [0x50, 0x50, 0x50, 0x31]
-version = 2
-size = 96
+version = 3
+size = 104
 
 [[ppp_diagnostic.fields]]
 name = "magic"
@@ -592,6 +592,34 @@ offset = 92
 size = 4
 type = "u32"
 description = "LCP packets presented to the packet parser"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_timer_active"
+offset = 96
+size = 1
+type = "u8"
+description = "Non-zero while the LCP restart timer is armed"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_deferred_request"
+offset = 97
+size = 1
+type = "u8"
+description = "Non-zero while Opened renegotiation owes a local Configure-Request"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_restart_deadline"
+offset = 98
+size = 2
+type = "u16"
+description = "Low 16-bit VBlank frame deadline for LCP restart"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_peer_magic"
+offset = 100
+size = 4
+type = "u32"
+description = "Accepted peer Magic-Number"
 
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]

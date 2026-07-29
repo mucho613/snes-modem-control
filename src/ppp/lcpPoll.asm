@@ -1,0 +1,402 @@
+.include "../macro/utility.asm"
+.include "../modem/generated.inc"
+.include "constants.inc"
+
+.code
+
+.import modemDriverState
+.import pppReceiveEnabled, pppFrameReady, pppReleaseFrame
+.import pppReceiveInitialize
+.import pppTransmitActive, pppTransmitBuffer
+.import pppTransmitInitialize, pppTransmitAbort
+.import pppLcpState, pppLcpPendingAction, pppLcpTimerActive
+.import pppLcpDeferredRequest, pppLcpPollAction
+.import pppLcpPollSavedModemState
+.import pppLcpInitialize, pppLcpOpen, pppLcpReceiveFrame
+.import pppLcpBuildPending, pppLcpPollTimeout, pppLcpLowerDown
+.import pppLastProtocol, pppLastFrameLength, pppFrameBuffer
+
+.export pppLcpPoll, pppLcpPollRunSelfTest
+
+; Own completed LCP frames and serialize them through the shared encoder.
+; This runs after pppReceivePoll and before pppTransmitPoll.
+.proc pppLcpPoll
+  .a16
+  .i16
+
+  pha
+  phb
+  phx
+  phy
+  setDBR $7e
+  sep #$20
+  .a8
+
+  lda pppReceiveEnabled
+  beq @lowerUnavailable
+  lda modemDriverState
+  cmp #MODEM_STATE_CONNECTED
+  bne @lowerUnavailable
+
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_CLOSED
+  beq @open
+  cmp #PPP_LCP_STATE_STOPPED
+  beq @stopped
+
+@serviceExistingPending:
+  .a8
+  jsr @servicePending
+  bcs @done
+  lda pppFrameReady
+  beq @timer
+  rep #$20
+  .a16
+  lda pppLastProtocol
+  cmp #PPP_PROTOCOL_LCP
+  beq @receiveLcp
+  sep #$20
+  .a8
+  jsr pppReleaseFrame
+  bra @timer
+
+@open:
+  .a8
+  jsr pppLcpOpen
+  bra @serviceExistingPending
+
+@stopped:
+  .a8
+  lda pppFrameReady
+  beq @done
+  jsr pppReleaseFrame
+  bra @done
+
+@receiveLcp:
+  .a16
+  sep #$20
+  .a8
+  jsr pppLcpReceiveFrame
+  bcs @releaseThenTimer
+
+  lda pppLcpPendingAction
+  cmp #PPP_LCP_ACTION_CONFIGURE_ACK
+  beq @responsePending
+  cmp #PPP_LCP_ACTION_CONFIGURE_NAK
+  beq @responsePending
+  cmp #PPP_LCP_ACTION_CONFIGURE_REJECT
+  beq @responsePending
+
+@releaseThenTimer:
+  .a8
+  jsr pppReleaseFrame
+  jsr @servicePending
+  bra @timer
+
+@responsePending:
+  .a8
+  ; A busy encoder keeps both the response action and receive-frame ownership.
+  jsr @servicePending
+  bcs @done
+
+@timer:
+  .a8
+  jsr pppLcpPollTimeout
+  .a8
+  jsr @servicePending
+  bra @done
+
+@lowerUnavailable:
+  .a8
+  lda pppFrameReady
+  beq :+
+  jsr pppReleaseFrame
+:
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_CLOSED
+  beq :+
+  jsr pppLcpLowerDown
+:
+  jsr pppTransmitAbort
+
+@done:
+  .a8
+  rep #$30
+  .a16
+  .i16
+  ply
+  plx
+  plb
+  pla
+  rts
+
+; Try to transfer one pending action to the encoder.
+;
+; Carry set means encoder backpressure. A response retains frame ownership
+; until success. After a response succeeds, an Opened renegotiation request is
+; promoted from the one-byte deferred slot.
+@servicePending:
+  .a8
+  lda pppLcpPendingAction
+  beq @serviceReady
+  sta pppLcpPollAction
+  jsr pppLcpBuildPending
+  bcs @serviceBusy
+
+  lda pppLcpPollAction
+  cmp #PPP_LCP_ACTION_CONFIGURE_ACK
+  beq @responseSent
+  cmp #PPP_LCP_ACTION_CONFIGURE_NAK
+  beq @responseSent
+  cmp #PPP_LCP_ACTION_CONFIGURE_REJECT
+  bne @serviceReady
+
+@responseSent:
+  .a8
+  lda pppFrameReady
+  beq :+
+  jsr pppReleaseFrame
+:
+  lda pppLcpDeferredRequest
+  beq @serviceReady
+  stz pppLcpDeferredRequest
+  lda #PPP_LCP_ACTION_CONFIGURE_REQUEST
+  sta pppLcpPendingAction
+
+@serviceReady:
+  .a8
+  clc
+  rts
+@serviceBusy:
+  .a8
+  sec
+  rts
+.endproc
+
+.macro pppLcpPollRequireEqual failure
+  beq :+
+  jmp failure
+:
+.endmacro
+
+.macro pppLcpPollRequireNonzero failure
+  bne :+
+  jmp failure
+:
+.endmacro
+
+; Simulated main-loop transcript including encoder backpressure and Opened
+; renegotiation. It never reads or writes the NDM24 controller port.
+;
+; Output:
+;   Carry clear, A=$00: passed
+;   Carry set, A=$60-$65: failed step
+.proc pppLcpPollRunSelfTest
+  .a8
+  .i16
+
+  phb
+  phx
+  phy
+  setDBR $7e
+  lda modemDriverState
+  sta pppLcpPollSavedModemState
+  jsr pppReceiveInitialize
+  jsr pppTransmitInitialize
+  jsr pppLcpInitialize
+  lda #MODEM_STATE_CONNECTED
+  sta modemDriverState
+  lda #$01
+  sta pppReceiveEnabled
+
+  ; Closed + enabled + CONNECTED sends the initial local request.
+  rep #$20
+  .a16
+  jsr pppLcpPoll
+  sep #$20
+  .a8
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_REQUEST_SENT
+  pppLcpPollRequireEqual @fail60
+  lda pppLcpPendingAction
+  pppLcpPollRequireEqual @fail60
+  lda pppTransmitActive
+  pppLcpPollRequireNonzero @fail60
+  lda pppLcpTimerActive
+  pppLcpPollRequireNonzero @fail60
+
+  ; A peer request arriving while TX is busy remains owned with its Ack.
+  lda #PPP_LCP_CODE_CONFIGURE_REQUEST
+  ldx #$0007
+  jsr @writeEmptyPacket
+  rep #$20
+  .a16
+  jsr pppLcpPoll
+  sep #$20
+  .a8
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_ACK_SENT
+  pppLcpPollRequireEqual @fail61
+  lda pppLcpPendingAction
+  cmp #PPP_LCP_ACTION_CONFIGURE_ACK
+  pppLcpPollRequireEqual @fail61
+  lda pppFrameReady
+  pppLcpPollRequireNonzero @fail61
+
+  ; Once the encoder is idle, Ack is built and the frame is released.
+  jsr pppTransmitInitialize
+  rep #$20
+  .a16
+  jsr pppLcpPoll
+  sep #$20
+  .a8
+  lda pppFrameReady
+  pppLcpPollRequireEqual @fail62
+  lda pppLcpPendingAction
+  pppLcpPollRequireEqual @fail62
+  lda pppTransmitBuffer + 4
+  cmp #PPP_LCP_CODE_CONFIGURE_ACK
+  pppLcpPollRequireEqual @fail62
+  lda pppTransmitBuffer + 5
+  cmp #$07
+  pppLcpPollRequireEqual @fail62
+
+  ; Peer Ack of the local empty request completes Opened.
+  jsr pppTransmitInitialize
+  lda #PPP_LCP_CODE_CONFIGURE_ACK
+  ldx #$0000
+  jsr @writeEmptyPacket
+  rep #$20
+  .a16
+  jsr pppLcpPoll
+  sep #$20
+  .a8
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_OPENED
+  pppLcpPollRequireEqual @fail63
+  lda pppFrameReady
+  ora pppLcpPendingAction
+  ora pppLcpTimerActive
+  pppLcpPollRequireEqual @fail63
+
+  ; A peer request in Opened serializes its Ack before a fresh local request.
+  jsr pppTransmitInitialize
+  lda #PPP_LCP_CODE_CONFIGURE_REQUEST
+  ldx #$0008
+  jsr @writeEmptyPacket
+  rep #$20
+  .a16
+  jsr pppLcpPoll
+  sep #$20
+  .a8
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_ACK_SENT
+  pppLcpPollRequireEqual @fail64
+  lda pppTransmitBuffer + 4
+  cmp #PPP_LCP_CODE_CONFIGURE_ACK
+  pppLcpPollRequireEqual @fail64
+  lda pppLcpPendingAction
+  cmp #PPP_LCP_ACTION_CONFIGURE_REQUEST
+  pppLcpPollRequireEqual @fail64
+  lda pppLcpDeferredRequest
+  pppLcpPollRequireEqual @fail64
+
+  jsr pppTransmitInitialize
+  rep #$20
+  .a16
+  jsr pppLcpPoll
+  sep #$20
+  .a8
+  lda pppTransmitBuffer + 4
+  cmp #PPP_LCP_CODE_CONFIGURE_REQUEST
+  pppLcpPollRequireEqual @fail64
+  lda pppTransmitBuffer + 5
+  cmp #$01
+  pppLcpPollRequireEqual @fail64
+  lda pppLcpPendingAction
+  pppLcpPollRequireEqual @fail64
+
+  ; Disabling ownership releases any retained frame, cancels TX, and lowers LCP.
+  lda #$01
+  sta pppFrameReady
+  stz pppReceiveEnabled
+  rep #$20
+  .a16
+  jsr pppLcpPoll
+  sep #$20
+  .a8
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_CLOSED
+  pppLcpPollRequireEqual @fail65
+  lda pppFrameReady
+  ora pppTransmitActive
+  ora pppLcpPendingAction
+  ora pppLcpTimerActive
+  ora pppLcpDeferredRequest
+  pppLcpPollRequireEqual @fail65
+
+  jsr @cleanup
+  lda #$00
+  clc
+  bra @return
+
+@fail60:
+  lda #$60
+  bra @fail
+@fail61:
+  lda #$61
+  bra @fail
+@fail62:
+  lda #$62
+  bra @fail
+@fail63:
+  lda #$63
+  bra @fail
+@fail64:
+  lda #$64
+  bra @fail
+@fail65:
+  lda #$65
+
+@fail:
+  pha
+  jsr @cleanup
+  pla
+  sec
+
+@return:
+  ply
+  plx
+  plb
+  rts
+
+@cleanup:
+  .a8
+  lda pppLcpPollSavedModemState
+  sta modemDriverState
+  jsr pppReceiveInitialize
+  jsr pppTransmitInitialize
+  jsr pppLcpInitialize
+  rts
+
+; Input A=Code, X low byte=Identifier.
+@writeEmptyPacket:
+  .a8
+  sta pppFrameBuffer + 4
+  txa
+  sta pppFrameBuffer + 5
+  stz pppFrameBuffer + 6
+  lda #PPP_LCP_HEADER_LENGTH
+  sta pppFrameBuffer + 7
+  rep #$20
+  .a16
+  lda #PPP_PROTOCOL_LCP
+  sta pppLastProtocol
+  lda #PPP_LCP_MINIMUM_FRAME_LENGTH
+  sta pppLastFrameLength
+  sep #$20
+  .a8
+  lda #$01
+  sta pppFrameReady
+  rts
+.endproc

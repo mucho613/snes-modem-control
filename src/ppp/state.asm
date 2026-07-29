@@ -24,6 +24,8 @@
 .export pppLcpLastError, pppLcpRequestIdentifier, pppLcpRestartRemaining
 .export pppLcpPeerFlags, pppLcpPendingAction, pppLcpPacketLength
 .export pppLcpPeerMru, pppLcpPeerAccm, pppLcpReceiveCount
+.export pppLcpTimerActive, pppLcpDeferredRequest
+.export pppLcpRestartDeadline, pppLcpPeerMagic
 
 pppDiagnosticState:
 pppDiagnosticMagic: .res $4
@@ -69,6 +71,10 @@ pppLcpPacketLength: .res $2
 pppLcpPeerMru: .res $2
 pppLcpPeerAccm: .res $4
 pppLcpReceiveCount: .res $4
+pppLcpTimerActive: .res $1
+pppLcpDeferredRequest: .res $1
+pppLcpRestartDeadline: .res $2
+pppLcpPeerMagic: .res $4
 .res PPP_DIAGNOSTIC_SIZE - (* - pppDiagnosticState)
 pppDiagnosticStateEnd:
 
@@ -115,6 +121,10 @@ pppDiagnosticStateEnd:
 .assert pppLcpPeerMru - pppDiagnosticState = PPP_DIAG_LCP_PEER_MRU, error, "PPP LCP peer MRU offset"
 .assert pppLcpPeerAccm - pppDiagnosticState = PPP_DIAG_LCP_PEER_ACCM, error, "PPP LCP peer ACCM offset"
 .assert pppLcpReceiveCount - pppDiagnosticState = PPP_DIAG_LCP_RECEIVE_COUNT, error, "PPP LCP receive count offset"
+.assert pppLcpTimerActive - pppDiagnosticState = PPP_DIAG_LCP_TIMER_ACTIVE, error, "PPP LCP timer active offset"
+.assert pppLcpDeferredRequest - pppDiagnosticState = PPP_DIAG_LCP_DEFERRED_REQUEST, error, "PPP LCP deferred request offset"
+.assert pppLcpRestartDeadline - pppDiagnosticState = PPP_DIAG_LCP_RESTART_DEADLINE, error, "PPP LCP restart deadline offset"
+.assert pppLcpPeerMagic - pppDiagnosticState = PPP_DIAG_LCP_PEER_MAGIC, error, "PPP LCP peer magic offset"
 .assert pppDiagnosticStateEnd - pppDiagnosticState = PPP_DIAGNOSTIC_SIZE, error, "PPP diagnostic ABI size"
 
 ; Decoder and pump scratch fields are private and intentionally excluded from
@@ -125,8 +135,9 @@ pppDiagnosticStateEnd:
 .export pppLcpPacketEnd, pppLcpOptionLength
 .export pppLcpOptionSeen, pppLcpOptionDuplicate
 .export pppLcpOptionOffset, pppLcpOutputCursor
-.export pppLcpHasReject, pppLcpHasNak, pppLcpPeerMagic
-.export pppLcpRestartDeadline, pppLcpTimerActive
+.export pppLcpHasReject, pppLcpHasNak
+.export pppLcpPollAction
+.export pppLcpPollSavedModemState
 pppLastEvent: .res $1
 pppLastInvalidReason: .res $1
 pppDecoderScratchByte: .res $1
@@ -139,9 +150,8 @@ pppLcpOptionOffset: .res $2
 pppLcpOutputCursor: .res $2
 pppLcpHasReject: .res $1
 pppLcpHasNak: .res $1
-pppLcpPeerMagic: .res $4
-pppLcpRestartDeadline: .res $2
-pppLcpTimerActive: .res $1
+pppLcpPollAction: .res $1
+pppLcpPollSavedModemState: .res $1
 pppLcpOptionSeen: .res $100
 pppLcpOptionDuplicate: .res $100
 

@@ -16,6 +16,7 @@
 .import pppTransmitBuffer
 
 .export pppTransmitInitialize, pppTransmitBegin, pppTransmitPoll
+.export pppTransmitAbort
 .export pppTransmitPeek, pppTransmitAdvance
 
 .proc pppTransmitInitialize
@@ -108,6 +109,28 @@ busy:
 invalid:
   plb
   sec
+  rts
+.endproc
+
+; Cancel an owned frame without resetting lifetime diagnostics.
+.proc pppTransmitAbort
+  .a8
+  .i16
+
+  phb
+  setDBR $7e
+  lda pppTransmitActive
+  beq abortDone
+  jsr pppSnapshotBegin
+  stz pppTransmitActive
+  stz pppTransmitEscapeSecond
+  lda #PPP_TRANSMIT_STAGE_IDLE
+  sta pppTransmitStage
+  pppIncrement32 pppTransmitAbortCount
+  jsr pppSnapshotEnd
+abortDone:
+  .a8
+  plb
   rts
 .endproc
 

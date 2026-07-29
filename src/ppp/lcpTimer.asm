@@ -11,6 +11,7 @@
 .import pppLcpRestartRemaining, pppLcpPendingAction
 .import pppLcpPeerFlags, pppLcpPeerMru, pppLcpPeerAccm
 .import pppLcpPeerMagic, pppLcpRestartDeadline, pppLcpTimerActive
+.import pppLcpDeferredRequest
 
 .export pppLcpArmRestartTimer, pppLcpPollTimeout, pppLcpLowerDown
 .export pppLcpTimerRunSelfTest
@@ -125,6 +126,7 @@
   cmp #PPP_LCP_STATE_ACK_SENT
   beq @configuring
   stz pppLcpTimerActive
+  stz pppLcpDeferredRequest
   plb
   clc
   rts
@@ -144,6 +146,7 @@
   lda #PPP_LCP_ACTION_CONFIGURE_REQUEST
   sta pppLcpPendingAction
   stz pppLcpTimerActive
+  stz pppLcpDeferredRequest
   jsr pppSnapshotEnd
   plb
   sec
@@ -156,6 +159,7 @@
   stz pppLcpRestartRemaining
   stz pppLcpPendingAction
   stz pppLcpTimerActive
+  stz pppLcpDeferredRequest
   jsr pppSnapshotEnd
   plb
   sec
@@ -183,6 +187,7 @@
   stz pppLcpRestartRemaining
   stz pppLcpPendingAction
   stz pppLcpTimerActive
+  stz pppLcpDeferredRequest
   stz pppLcpPeerFlags
   rep #$20
   .a16

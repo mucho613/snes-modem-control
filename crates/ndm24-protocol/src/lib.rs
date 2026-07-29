@@ -194,6 +194,10 @@ pub struct PppDiagnosticSnapshot {
     pub lcp_peer_mru: u16,
     pub lcp_peer_accm: u32,
     pub lcp_receive_count: u32,
+    pub lcp_timer_active: bool,
+    pub lcp_deferred_request: bool,
+    pub lcp_restart_deadline: u16,
+    pub lcp_peer_magic: u32,
 }
 
 impl PppDiagnosticSnapshot {
@@ -267,6 +271,10 @@ impl PppDiagnosticSnapshot {
             lcp_peer_mru: read_u16(data, PPP_DIAG_LCP_PEER_MRU)?,
             lcp_peer_accm: read_u32(data, PPP_DIAG_LCP_PEER_ACCM)?,
             lcp_receive_count: read_u32(data, PPP_DIAG_LCP_RECEIVE_COUNT)?,
+            lcp_timer_active: data[PPP_DIAG_LCP_TIMER_ACTIVE] != 0,
+            lcp_deferred_request: data[PPP_DIAG_LCP_DEFERRED_REQUEST] != 0,
+            lcp_restart_deadline: read_u16(data, PPP_DIAG_LCP_RESTART_DEADLINE)?,
+            lcp_peer_magic: read_u32(data, PPP_DIAG_LCP_PEER_MAGIC)?,
         })
     }
 }
@@ -460,6 +468,12 @@ mod tests {
             .copy_from_slice(&u32::MAX.to_le_bytes());
         data[PPP_DIAG_LCP_RECEIVE_COUNT..PPP_DIAG_LCP_RECEIVE_COUNT + 4]
             .copy_from_slice(&6_u32.to_le_bytes());
+        data[PPP_DIAG_LCP_TIMER_ACTIVE] = 1;
+        data[PPP_DIAG_LCP_DEFERRED_REQUEST] = 1;
+        data[PPP_DIAG_LCP_RESTART_DEADLINE..PPP_DIAG_LCP_RESTART_DEADLINE + 2]
+            .copy_from_slice(&0xff80_u16.to_le_bytes());
+        data[PPP_DIAG_LCP_PEER_MAGIC..PPP_DIAG_LCP_PEER_MAGIC + 4]
+            .copy_from_slice(&0x1234_5678_u32.to_le_bytes());
 
         let snapshot = PppDiagnosticSnapshot::decode(&data).unwrap();
         assert_eq!(snapshot.snapshot_sequence, 8);
@@ -475,6 +489,10 @@ mod tests {
         assert_eq!(snapshot.lcp_peer_mru, 1500);
         assert_eq!(snapshot.lcp_peer_accm, u32::MAX);
         assert_eq!(snapshot.lcp_receive_count, 6);
+        assert!(snapshot.lcp_timer_active);
+        assert!(snapshot.lcp_deferred_request);
+        assert_eq!(snapshot.lcp_restart_deadline, 0xff80);
+        assert_eq!(snapshot.lcp_peer_magic, 0x1234_5678);
     }
 
     #[test]

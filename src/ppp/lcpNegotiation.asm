@@ -9,7 +9,7 @@
 .import pppLcpState, pppLcpLastIdentifier, pppLcpLastError
 .import pppLcpRequestIdentifier, pppLcpRestartRemaining
 .import pppLcpPendingAction, pppLcpPacketLength
-.import pppLcpTimerActive
+.import pppLcpTimerActive, pppLcpDeferredRequest
 .import pppFrameBuffer, pppTransmitBuffer, pppTransmitActive
 .import pppTransmitBegin, pppTransmitInitialize
 .import pppLcpArmRestartTimer
@@ -35,6 +35,7 @@
   stz pppLcpRequestIdentifier
   lda #(PPP_LCP_DEFAULT_MAX_CONFIGURE - 1)
   sta pppLcpRestartRemaining
+  stz pppLcpDeferredRequest
   lda #PPP_LCP_ACTION_CONFIGURE_REQUEST
   sta pppLcpPendingAction
   stz pppLcpLastError
@@ -77,7 +78,9 @@
   cmp #PPP_LCP_CODE_CONFIGURE_REQUEST
   beq @configureRequest
   cmp #PPP_LCP_CODE_CONFIGURE_ACK
-  beq @configureAck
+  bne :+
+  jmp @configureAck
+:
   cmp #PPP_LCP_CODE_CONFIGURE_NAK
   bne :+
   jmp @configureNegative
@@ -101,6 +104,10 @@
   .a8
   jsr pppLcpEvaluatePeerRequest
   sta pppLcpPendingAction
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_OPENED
+  beq @openedPeerRequest
+  lda pppLcpPendingAction
   cmp #PPP_LCP_ACTION_CONFIGURE_ACK
   beq @acceptableRequest
   lda pppLcpState
@@ -109,6 +116,25 @@
   jmp @returnSuccess
 :
   lda #PPP_LCP_STATE_REQUEST_SENT
+  sta pppLcpState
+  jmp @returnSuccess
+
+@openedPeerRequest:
+  .a8
+  inc pppLcpRequestIdentifier
+  lda #(PPP_LCP_DEFAULT_MAX_CONFIGURE - 1)
+  sta pppLcpRestartRemaining
+  stz pppLcpTimerActive
+  lda #$01
+  sta pppLcpDeferredRequest
+  lda pppLcpPendingAction
+  cmp #PPP_LCP_ACTION_CONFIGURE_ACK
+  beq :+
+  lda #PPP_LCP_STATE_REQUEST_SENT
+  sta pppLcpState
+  jmp @returnSuccess
+:
+  lda #PPP_LCP_STATE_ACK_SENT
   sta pppLcpState
   jmp @returnSuccess
 
@@ -243,6 +269,7 @@
   lda #(PPP_LCP_DEFAULT_MAX_CONFIGURE - 1)
   sta pppLcpRestartRemaining
   stz pppLcpTimerActive
+  stz pppLcpDeferredRequest
   lda #PPP_LCP_ACTION_CONFIGURE_REQUEST
   sta pppLcpPendingAction
   rts

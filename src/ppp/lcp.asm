@@ -11,6 +11,7 @@
 .import pppLcpPeerMru, pppLcpPeerAccm, pppLcpReceiveCount
 .import pppLcpPacketEnd, pppLcpOptionLength
 .import pppLcpPeerMagic, pppLcpRestartDeadline, pppLcpTimerActive
+.import pppLcpDeferredRequest, pppLcpPollAction
 
 .export pppLcpInitialize, pppLcpParseFrame, pppLcpRunSelfTest
 
@@ -36,6 +37,8 @@
   stz pppLcpRestartDeadline
   stz pppLcpRestartDeadline + 1
   stz pppLcpTimerActive
+  stz pppLcpDeferredRequest
+  stz pppLcpPollAction
   rep #$20
   .a16
   lda #PPP_DEFAULT_MRU

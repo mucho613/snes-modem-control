@@ -44,7 +44,7 @@ ABI version: `2`. Block size: `128` bytes.
 
 ## PPP Diagnostic ABI
 
-ABI version: `2`. Block size: `96` bytes.
+ABI version: `3`. Block size: `104` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|
@@ -91,6 +91,10 @@ ABI version: `2`. Block size: `96` bytes.
 | `0x56` | 2 | `u16` | `lcp_peer_mru` | Peer MRU accepted for local transmission |
 | `0x58` | 4 | `u32` | `lcp_peer_accm` | Peer ACCM accepted for local transmission |
 | `0x5C` | 4 | `u32` | `lcp_receive_count` | LCP packets presented to the packet parser |
+| `0x60` | 1 | `u8` | `lcp_timer_active` | Non-zero while the LCP restart timer is armed |
+| `0x61` | 1 | `u8` | `lcp_deferred_request` | Non-zero while Opened renegotiation owes a local Configure-Request |
+| `0x62` | 2 | `u16` | `lcp_restart_deadline` | Low 16-bit VBlank frame deadline for LCP restart |
+| `0x64` | 4 | `u32` | `lcp_peer_magic` | Accepted peer Magic-Number |
 
 ## Mailbox ABI
 

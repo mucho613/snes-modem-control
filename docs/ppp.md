@@ -4,7 +4,7 @@
 
 最初のPPPマイルストーンは、NDM24から受け取る任意位置で分割されたbyte列を、FCS検証済みのPPPフレームへ復元する層です。`crates/ndm24-ppp` を仕様の参照実装とし、同じ状態遷移と試験ベクトルを65816へ移植しています。
 
-現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP packet parser、Configure交渉コア、peer option方針まで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。LCPのmain-loop接続、認証、IPCP、IPv4、UDP、TCP、NTPはまだSFC上で動作しません。
+現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP packet parser、Configure交渉、peer option方針、restart timer、main-loop pollまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。実対向とのLCP試験、認証、IPCP、IPv4、UDP、TCP、NTPはまだSFC上で動作しません。
 
 PPP接続は次の順序で進みます。
 
@@ -68,6 +68,7 @@ Rust参照実装は全入力分割位置、破損FCSからの再同期、Flag直
 - `src/ppp/lcpNegotiation.asm`: Configure交渉状態機械
 - `src/ppp/lcpOptions.asm`: peer option評価とNak/Reject生成
 - `src/ppp/lcpTimer.asm`: restart timer、Max-Configure、lower-down
+- `src/ppp/lcpPoll.asm`: main-loop、frame所有権、送信直列化
 - `src/ppp/selfTest.asm`: 固定fixtureによる常設セルフテスト
 
 `pppDecoderPush` はraw byteを1byteずつ受け取り、次のeventを返します。
@@ -131,7 +132,7 @@ Address 1 + Control 1 + Protocol 2 + Information 1500 + FCS 2
 
 ## 常設PPP診断
 
-`pppDiagnosticState` はmagic `PPP1`、ABI version 2、96byteの公開診断blockです。レイアウトの正本は `spec/ndm24.toml` で、AssemblyとRustのoffset定数および[生成済みABI表](generated/diagnostic-abi.md)を同時に生成します。
+`pppDiagnosticState` はmagic `PPP1`、ABI version 3、104byteの公開診断blockです。レイアウトの正本は `spec/ndm24.toml` で、AssemblyとRustのoffset定数および[生成済みABI表](generated/diagnostic-abi.md)を同時に生成します。
 
 PC側では次のコマンドでJSON Linesとして読み取れます。
 
@@ -152,6 +153,9 @@ cargo run -p ndm24-tools -- ppp-monitor
 - decoderのflags、長さ、FCS
 - encoderのstage、長さ、位置、FCS
 - 送受信byte数、TX ring backpressure数、carrier喪失によるabort数
+- LCP state、最後のCode・Identifier・error、local Request Identifier
+- restart残数、timer有効状態と期限、pending/deferred送信
+- 受理したpeer MRU、ACCM、Magic-Number、option flags
 
 認証frameには利用者IDやpasswordが含まれ得るため、常設traceへpayload全体は保存しません。protocol、code、identifier、length、エラー理由までを診断対象とし、credential byte列は記録対象外とします。
 
@@ -222,6 +226,16 @@ Max-Configureは初回送信を含む10回です。初回Requestの後に9回ま
 
 16bit counterの比較は期限までの差が半周未満であることを利用した減算で行うため、`$FFFF` から `$0000` をまたぐ場合も同じです。常設セルフテストのstep `$50`～`$55` は、共有encoder受理時のtimer開始、wrap-around直前、期限ちょうど、同一Identifier再送、回数超過、`Ack-Received` fallback、lower-downによる初期化を実時間待ちなしで検査します。
 
+## 65816 LCP main-loop接続
+
+`src/ppp/lcpPoll.asm` は `pppReceivePoll` の後、`pppTransmitPoll` の前に毎main-loop呼び出されます。PPP受信所有権が有効でNDM24が `CONNECTED` のときだけ、ClosedからLCPを開始します。未接続時や所有権無効時はLCPをlower-downし、保持frameと送信中frameを破棄するため、AT sessionやraw binary試験へ状態を持ち越しません。
+
+完成したLCP frameにAck/Nak/Rejectが必要な場合、その応答が共有encoderへ受理されるまで `pppFrameReady` を保持します。encoderがbusyでも受信bufferを上書きせず、受理後にだけ `pppReleaseFrame` します。受信AckやNak後の新しいlocal Requestは受信frameのbyte列に依存しないため、frameを解放してからpending送信として待機できます。
+
+Opened中にpeer Configure-Requestを受けた場合は応答packetと新しいlocal Configure-Requestの2packetが必要です。1frame分の応答を先にencoderへ渡し、`lcp_deferred_request` でlocal Requestを保持して直列化します。常設セルフテストのstep `$60`～`$65` は、初回Request、TX busy中のframe保持、Ack後の解放、Opened到達、Opened中の再交渉、所有権解除時のlower-downを模擬transcriptで検査します。
+
+回線を発信しないgate試験では `ppp-receive-start` 後もNDM24がCONNECTEDでなければ `receive_active=false`、`lcp_state=Closed`、`transmit_active=false` のままであることを確認します。
+
 ## 次の実装
 
-次は受信frameの所有権と解放を含むLCP main-loop pollへ接続します。ここまでは対向PPPサーバーを必要としません。実際のpeerとのLCP交渉を始める段階で対向PPPサーバーを用意します。
+オフラインで確定できるLCP処理はmain-loop接続まで完了しました。次は疑似PSTNの対向PPPサーバーを用意し、実際のV.22bis回線上でConfigure-Request/Ack、PAP要求option、timer、診断snapshotを照合する接続試験です。ここから先は対向PPPサーバーが必要です。

@@ -13,6 +13,7 @@
 .import pppReceiveInitialize, pppReceivePoll
 .import pppTransmitInitialize, pppTransmitPoll
 .import pppLcpInitialize
+.import pppLcpPoll
 .import nmitimenShadow
 
 .include "./registers.inc"
@@ -114,6 +115,7 @@
     jsr modemPoll
     jsr modemSessionPoll
     jsr pppReceivePoll
+    jsr pppLcpPoll
     jsr pppTransmitPoll
   .endif
   bra @mainLoop
