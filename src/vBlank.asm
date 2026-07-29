@@ -5,14 +5,9 @@
 
 .code
 
-.import terminalScrollLineNumber
-.import bg1YScrollPos
-.import updateLine23TileMap
 .import frameCounter
-.import setBg1TileHdma
-.import setBgEnableHdma
-.import scrollPositionTable
 .import controllerPollTick, modemPollTick
+.import terminalRenderVBlank
 
 .export VBlank
 .proc VBlank
@@ -27,34 +22,19 @@
   phy
   php
 
-  rep #$20
+  ; An NMI can interrupt main-loop code while X/Y are 8-bit. Normalize both
+  ; widths after saving P so every VBlank callee gets its declared ABI.
+  rep #$30
   .a16
+  .i16
   inc32 frameCounter
 
+  ; PPU work remains in VBlank. At most 32 queued terminal bytes are written;
+  ; controller and NDM24 serial I/O stay in the main loop.
   sep #$20
   .a8
-  jsr updateLine23TileMap
+  jsr terminalRenderVBlank
 
-  lda terminalScrollLineNumber
-  asl
-  tax
-  lda scrollPositionTable, x
-  sta bg1YScrollPos
-  lda scrollPositionTable + 1, x
-  sta bg1YScrollPos + 1
-
-  lda bg1YScrollPos
-  sta BG1VOFS
-  lda bg1YScrollPos + 1
-  sta BG1VOFS
-
-  jsr setBg1TileHdma
-  jsr setBgEnableHdma
-  lda #%00000011
-  sta HDMAEN
-
-  ; Interrupt work ends here. Controller and NDM24 serial I/O are performed
-  ; only by the main loop, so this interrupt cannot split a transfer.
   lda #$01
   sta controllerPollTick
   sta modemPollTick

@@ -5,6 +5,14 @@ use serde::{Deserialize, Serialize};
 
 pub use generated::*;
 
+pub const MODEM_SESSION_RESULT_NONE: u8 = 0;
+pub const MODEM_SESSION_RESULT_OK: u8 = 1;
+pub const MODEM_SESSION_RESULT_ERROR: u8 = 2;
+pub const MODEM_SESSION_RESULT_CONNECT: u8 = 3;
+pub const MODEM_SESSION_RESULT_NO_CARRIER: u8 = 4;
+pub const MODEM_SESSION_RESULT_BUSY: u8 = 5;
+pub const MODEM_SESSION_RESULT_NO_DIALTONE: u8 = 6;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum DriverState {
@@ -13,6 +21,10 @@ pub enum DriverState {
     Probing = MODEM_STATE_PROBING,
     Ready = MODEM_STATE_READY,
     Error = MODEM_STATE_ERROR,
+    AtCommand = MODEM_STATE_AT_COMMAND,
+    Dialing = MODEM_STATE_DIALING,
+    Connected = MODEM_STATE_CONNECTED,
+    Disconnecting = MODEM_STATE_DISCONNECTING,
 }
 
 impl TryFrom<u8> for DriverState {
@@ -25,6 +37,10 @@ impl TryFrom<u8> for DriverState {
             MODEM_STATE_PROBING => Ok(Self::Probing),
             MODEM_STATE_READY => Ok(Self::Ready),
             MODEM_STATE_ERROR => Ok(Self::Error),
+            MODEM_STATE_AT_COMMAND => Ok(Self::AtCommand),
+            MODEM_STATE_DIALING => Ok(Self::Dialing),
+            MODEM_STATE_CONNECTED => Ok(Self::Connected),
+            MODEM_STATE_DISCONNECTING => Ok(Self::Disconnecting),
             _ => bail!("unknown modem state {value}"),
         }
     }
@@ -58,6 +74,12 @@ pub struct DiagnosticSnapshot {
     pub reinitialize: u32,
     pub trace_overwritten: u32,
     pub reset_start_frame: u32,
+    pub terminal_dropped: u32,
+    pub at_status: u8,
+    pub at_expected_result: u8,
+    pub session_last_result: u8,
+    pub session_line_length: u8,
+    pub at_start_frame: u32,
 }
 
 impl DiagnosticSnapshot {
@@ -111,6 +133,12 @@ impl DiagnosticSnapshot {
             reinitialize: read_u32(data, MODEM_DIAG_REINITIALIZE)?,
             trace_overwritten: read_u32(data, MODEM_DIAG_TRACE_OVERWRITTEN)?,
             reset_start_frame: read_u32(data, MODEM_DIAG_RESET_START_FRAME)?,
+            terminal_dropped: read_u32(data, MODEM_DIAG_TERMINAL_DROPPED)?,
+            at_status: data[MODEM_DIAG_AT_STATUS],
+            at_expected_result: data[MODEM_DIAG_AT_EXPECTED_RESULT],
+            session_last_result: data[MODEM_DIAG_SESSION_LAST_RESULT],
+            session_line_length: data[MODEM_DIAG_SESSION_LINE_LENGTH],
+            at_start_frame: read_u32(data, MODEM_DIAG_AT_START_FRAME)?,
         })
     }
 
@@ -161,21 +189,31 @@ pub enum PollKind {
     Transfer9,
 }
 
-pub fn receive_decision(kind: PollKind, data_report: u16, status_report: u16) -> u8 {
-    if kind == PollKind::Full16 {
-        return MODEM_DISCARD_FULL_REPORT;
-    }
-    if status_report.to_le_bytes()[1] & MODEM_STATUS_READY_MASK as u8 == 0 {
-        return MODEM_DISCARD_STATUS_NOT_READY;
-    }
-    if data_report.to_le_bytes()[0] & MODEM_RX_PRESENT_MASK as u8 == 0 {
-        return MODEM_DISCARD_NO_DATA;
+pub fn receive_decision(kind: PollKind, data_report: u16, _status_report: u16) -> u8 {
+    let receive_present = data_report.to_le_bytes()[0] & MODEM_RX_PRESENT_MASK as u8
+        == MODEM_RX_PRESENT_ASSERTED as u8;
+    if !receive_present {
+        return if kind == PollKind::Full16 {
+            MODEM_DISCARD_FULL_REPORT
+        } else {
+            MODEM_DISCARD_NO_DATA
+        };
     }
     MODEM_DISCARD_NONE
 }
 
 pub fn receive_is_accepted(kind: PollKind, data_report: u16, status_report: u16) -> bool {
     receive_decision(kind, data_report, status_report) == MODEM_DISCARD_NONE
+}
+
+pub fn transfer_requested(
+    previous_receive_decision: u8,
+    status_report: u16,
+    transmit_pending: bool,
+) -> bool {
+    previous_receive_decision == MODEM_DISCARD_NONE
+        || status_report.to_le_bytes()[1] & MODEM_STATUS_TRANSFER_HINT_MASK as u8 != 0
+        || transmit_pending
 }
 
 fn read_u16(data: &[u8], offset: usize) -> Result<u16> {
@@ -201,23 +239,54 @@ mod tests {
     use super::*;
 
     #[test]
-    fn full_report_never_delivers_a_byte() {
+    fn full_report_uses_present_bit_and_not_data2_status() {
+        assert!(receive_is_accepted(PollKind::Full16, 0x4183, 0x4000));
+        assert!(receive_is_accepted(PollKind::Full16, 0x4183, 0x0000));
+    }
+
+    #[test]
+    fn full_report_rejects_absent_byte() {
         assert_eq!(
-            receive_decision(PollKind::Full16, 0x0d80, 0x4000),
+            receive_decision(PollKind::Full16, 0x4103, 0x4000),
             MODEM_DISCARD_FULL_REPORT
         );
     }
 
     #[test]
-    fn nine_bit_report_requires_status_and_present_bits() {
-        assert_eq!(
-            receive_decision(PollKind::Transfer9, 0x0d80, 0x0000),
-            MODEM_DISCARD_STATUS_NOT_READY
-        );
+    fn nine_bit_report_uses_present_bit_and_not_data2_status() {
+        assert_eq!(MODEM_RX_PRESENT_ASSERTED, MODEM_RX_PRESENT_MASK);
         assert_eq!(
             receive_decision(PollKind::Transfer9, 0x0d00, 0x4000),
             MODEM_DISCARD_NO_DATA
         );
         assert!(receive_is_accepted(PollKind::Transfer9, 0x0d80, 0x4000));
+        assert!(receive_is_accepted(PollKind::Transfer9, 0x0d80, 0x0000));
+    }
+
+    #[test]
+    fn accepted_receive_keeps_draining_after_data2_hint_falls() {
+        assert!(transfer_requested(MODEM_DISCARD_NONE, 0x0000, false));
+        assert!(transfer_requested(
+            MODEM_DISCARD_NO_DATA,
+            (MODEM_STATUS_TRANSFER_HINT_MASK as u16) << 8,
+            false
+        ));
+        assert!(transfer_requested(MODEM_DISCARD_NO_DATA, 0x0000, true));
+        assert!(!transfer_requested(MODEM_DISCARD_NO_DATA, 0x0000, false));
+    }
+
+    #[test]
+    fn diagnostic_decodes_terminal_drop_counter() {
+        let mut data = vec![0; MODEM_DIAGNOSTIC_SIZE];
+        data[MODEM_DIAG_MAGIC..MODEM_DIAG_MAGIC + 4].copy_from_slice(&MODEM_DIAGNOSTIC_MAGIC);
+        data[MODEM_DIAG_VERSION..MODEM_DIAG_VERSION + 2]
+            .copy_from_slice(&MODEM_DIAGNOSTIC_VERSION.to_le_bytes());
+        data[MODEM_DIAG_SIZE..MODEM_DIAG_SIZE + 2]
+            .copy_from_slice(&(MODEM_DIAGNOSTIC_SIZE as u16).to_le_bytes());
+        data[MODEM_DIAG_TERMINAL_DROPPED..MODEM_DIAG_TERMINAL_DROPPED + 4]
+            .copy_from_slice(&0x1234_5678_u32.to_le_bytes());
+
+        let snapshot = DiagnosticSnapshot::decode(&data).unwrap();
+        assert_eq!(snapshot.terminal_dropped, 0x1234_5678);
     }
 }

@@ -1,18 +1,83 @@
 .include "../registers.inc"
 .include "../macro/utility.asm"
 .include "constants.inc"
-.include "nop.inc"
 
 .code
 
 .import frameCounter
-.import modemLastDataReport, modemLastStatusReport, modemLastDiscardReason
 .import modemResetStartFrame, modemReinitializeCount
 .import modemSessionProbeSent, modemSessionRetryCount, modemSessionLineLength
 .import modemResetQueues, modemSnapshotBegin, modemSnapshotEnd
-.import modemRecordTrace, modemSetState
+.import modemSetState
 
 .export modemInitialize
+
+; Send the NDM24-specific raw "R" initialization transaction. The waveform is
+; intentionally kept instruction-for-instruction compatible with the original
+; implementation that was verified by observing the NDM24 power lamp.
+.proc modemSendRawInitialize
+  .a16
+  .i16
+
+  phb
+  pea $8000
+  plb
+  plb
+
+  sep #$30
+  .a8
+  .i8
+
+  lda #$01
+  stz JOYOUT
+  sta JOYOUT
+  stz JOYOUT
+
+  ldx #$10
+@readReport:
+  lda JOYSER1
+  dex
+  bne @readReport
+
+  lda #$01
+  stz JOYOUT
+  sta JOYOUT
+  stz JOYOUT
+
+  lda #$80
+  sta WRIO
+  lda JOYSER1
+
+  lda #$52
+  pha
+  ldx #$08
+@writeR:
+  pla
+  rol
+  pha
+  lda #$00
+  ror
+  sta WRIO
+  lda JOYSER1
+  dex
+  bne @writeR
+  pla
+
+  lda #$80
+  sta WRIO
+
+  lda #$01
+  stz JOYOUT
+  sta JOYOUT
+  stz JOYOUT
+
+  rep #$30
+  .a16
+  .i16
+  plb
+  rts
+.endproc
+
 .proc modemInitialize
   .a16
   .i16
@@ -38,77 +103,14 @@
   stz modemSessionRetryCount
   stz modemSessionLineLength
 
-  ; JRA PAT drives controller-port-2 I/O low and then releases it at power-up.
-  stz .lobyte(WRIO)
-  lda #MODEM_TX_RELEASE
-  sta .lobyte(WRIO)
-
-  ; Capture one complete 16-bit report. Its data byte is deliberately not
-  ; delivered to the RX ring; this read establishes status and identity only.
-  stz modemLastDataReport
-  stz modemLastDataReport + 1
-  stz modemLastStatusReport
-  stz modemLastStatusReport + 1
-
-  stz .lobyte(JOYOUT)
-  lda #MODEM_LATCH_ASSERT
-  sta .lobyte(JOYOUT)
-  stz .lobyte(JOYOUT)
-
-  nop8Times
-  nop8Times
-  nop8Times
-
-  ldx #$10
-@readFullReport:
-  lda .lobyte(JOYSER1)
-  lsr
-  rol modemLastDataReport
-  rol modemLastDataReport + 1
-  lsr
-  rol modemLastStatusReport
-  rol modemLastStatusReport + 1
-  dex
-  bne @readFullReport
-
-  lda #MODEM_DISCARD_FULL_REPORT
-  sta modemLastDiscardReason
-  lda #MODEM_TRACE_POLL16
-  jsr modemRecordTrace
-
-  ; NDM24-specific R command. This is not an AT command and is kept in the
-  ; transport initialization sequence until its exact semantics are known.
-  stz .lobyte(JOYOUT)
-  lda #MODEM_LATCH_ASSERT
-  sta .lobyte(JOYOUT)
-  stz .lobyte(JOYOUT)
-
-  lda #MODEM_TX_RELEASE
-  sta .lobyte(WRIO)
-  lda .lobyte(JOYSER1)
-
-  lda #MODEM_RESET_COMMAND
-  ldy #$08
-@writeResetCommand:
-  asl
-  xba
-  lda #MODEM_TX_RELEASE
-  bcs @writeResetBit
-  lda #MODEM_TX_ASSERT
-@writeResetBit:
-  sta .lobyte(WRIO)
-  nop8Times
-  lda .lobyte(JOYSER1)
-  xba
-  dey
-  bne @writeResetCommand
-
-  lda #MODEM_TX_RELEASE
-  sta .lobyte(WRIO)
-  stz .lobyte(JOYOUT)
-  lda #MODEM_LATCH_ASSERT
-  sta .lobyte(JOYOUT)
-  stz .lobyte(JOYOUT)
+  ; Use the hardware-verified raw "R" waveform verbatim.
+  rep #$30
+  .a16
+  .i16
+  jsr modemSendRawInitialize
+  sep #$30
+  .a8
+  .i8
 
   rep #$20
   .a16

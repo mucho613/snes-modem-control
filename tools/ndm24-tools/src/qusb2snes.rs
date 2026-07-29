@@ -10,7 +10,7 @@ use ndm24_protocol::{
     MODEM_MAILBOX_OFFSET_HOST_SEQUENCE, MODEM_MAILBOX_OFFSET_PROCESSED_SEQUENCE,
     MODEM_MAILBOX_OFFSET_RESULT, MODEM_MAILBOX_OFFSET_STATUS, MODEM_MAILBOX_SIZE,
     MODEM_MAILBOX_STATUS_FAILED, MODEM_MAILBOX_STATUS_PASSED, MODEM_MAILBOX_VERSION,
-    MODEM_TRACE_EVENT_SIZE, MODEM_TRACE_SIZE, TraceEvent,
+    MODEM_RING_STORAGE_SIZE, MODEM_TRACE_EVENT_SIZE, MODEM_TRACE_SIZE, TraceEvent,
 };
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
@@ -42,13 +42,25 @@ struct Client {
     device: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct MailboxOutcome {
+    pub sequence: u32,
+    pub result: u16,
+    pub output: Vec<u8>,
+}
+
 impl Client {
     async fn connect(websocket: &str) -> Result<Self> {
         let (mut socket, _) = connect_async(websocket)
             .await
             .with_context(|| format!("connect to QUsb2Snes at {websocket}"))?;
         send_request(&mut socket, "Name", vec!["snes-modem-control".to_owned()]).await?;
-        let devices = request_response(&mut socket, "DeviceList", vec![]).await?;
+        let devices = tokio::time::timeout(
+            Duration::from_secs(10),
+            request_response(&mut socket, "DeviceList", vec![]),
+        )
+        .await
+        .context("timed out waiting for QUsb2Snes device list")??;
         let device = devices
             .iter()
             .find(|name| {
@@ -59,21 +71,31 @@ impl Client {
             .context("QUsb2Snes reported no devices")?
             .clone();
         send_request(&mut socket, "Attach", vec![device.clone()]).await?;
-        let info = request_response(&mut socket, "Info", vec![])
-            .await
-            .context("verify QUsb2Snes attachment")?;
-        ensure!(!info.is_empty(), "attached device returned no information");
         Ok(Self { socket, device })
     }
 
     async fn read_address(&mut self, offset: usize, size: usize) -> Result<Vec<u8>> {
-        read_address(&mut self.socket, offset, size).await
+        tokio::time::timeout(
+            Duration::from_secs(10),
+            read_address(&mut self.socket, offset, size),
+        )
+        .await
+        .context("timed out reading FXPAK PRO address")?
     }
 
-    async fn write_address(&mut self, offset: usize, data: &[u8]) -> Result<()> {
-        write_binary_request(&mut self.socket, "PutAddress", offset, data).await
+    async fn execute_address(&mut self, offset: usize, data: &[u8]) -> Result<()> {
+        write_binary_request_with_flags(
+            &mut self.socket,
+            "PutAddress",
+            offset,
+            data,
+            Some(vec!["SETX".to_owned()]),
+        )
+        .await
     }
 }
+
+const FXPAK_EXECUTION_SCRATCH: usize = 0x3f_0000;
 
 pub async fn monitor(
     websocket: &str,
@@ -101,6 +123,13 @@ pub async fn monitor(
 }
 
 pub async fn dump_trace(websocket: &str, label_path: &Path) -> Result<()> {
+    for event in read_trace_events(websocket, label_path).await? {
+        println!("{}", serde_json::to_string(&event)?);
+    }
+    Ok(())
+}
+
+pub async fn read_trace_events(websocket: &str, label_path: &Path) -> Result<Vec<TraceEvent>> {
     let labels = read_labels(label_path)?;
     let state = labels
         .get("modemState")
@@ -137,10 +166,7 @@ pub async fn dump_trace(websocket: &str, label_path: &Path) -> Result<()> {
         distance >= 1 && distance <= available
     });
     events.sort_by_key(|event| event.sequence);
-    for event in events {
-        println!("{}", serde_json::to_string(&event)?);
-    }
-    Ok(())
+    Ok(events)
 }
 
 pub async fn mailbox_command(
@@ -149,6 +175,26 @@ pub async fn mailbox_command(
     command: u8,
     timeout: Duration,
 ) -> Result<()> {
+    let outcome =
+        mailbox_command_with_arguments(websocket, label_path, command, &[], timeout).await?;
+    println!(
+        "mailbox command {command} passed (sequence {})",
+        outcome.sequence
+    );
+    Ok(())
+}
+
+pub async fn mailbox_command_with_arguments(
+    websocket: &str,
+    label_path: &Path,
+    command: u8,
+    arguments: &[u8],
+    timeout: Duration,
+) -> Result<MailboxOutcome> {
+    ensure!(
+        arguments.len() <= ndm24_protocol::MODEM_MAILBOX_ARGUMENT_SIZE,
+        "mailbox arguments are too long"
+    );
     let labels = read_labels(label_path)?;
     let mailbox = labels
         .get("modemMailbox")
@@ -160,20 +206,40 @@ pub async fn mailbox_command(
 
     let initial = client.read_address(offset, MODEM_MAILBOX_SIZE).await?;
     validate_mailbox(&initial)?;
-    let current = read_u32(&initial, MODEM_MAILBOX_OFFSET_HOST_SEQUENCE)?;
+    let current = read_u32(&initial, MODEM_MAILBOX_OFFSET_PROCESSED_SEQUENCE)?;
     let sequence = current.wrapping_add(1);
 
+    let mut writes = arguments
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(index, byte)| {
+            (
+                mailbox + ndm24_protocol::MODEM_MAILBOX_OFFSET_ARGUMENTS as u32 + index as u32,
+                byte,
+            )
+        })
+        .collect::<Vec<_>>();
+    writes.push((mailbox + MODEM_MAILBOX_OFFSET_COMMAND as u32, command));
+    writes.extend(
+        sequence
+            .to_le_bytes()
+            .into_iter()
+            .enumerate()
+            .map(|(index, byte)| {
+                (
+                    mailbox + MODEM_MAILBOX_OFFSET_HOST_SEQUENCE as u32 + index as u32,
+                    byte,
+                )
+            }),
+    );
+    let payload = build_wram_write_payload(&writes)?;
     client
-        .write_address(offset + MODEM_MAILBOX_OFFSET_COMMAND, &[command])
-        .await?;
-    client
-        .write_address(
-            offset + MODEM_MAILBOX_OFFSET_HOST_SEQUENCE,
-            &sequence.to_le_bytes(),
-        )
+        .execute_address(FXPAK_EXECUTION_SCRATCH, &payload)
         .await?;
 
     let started = Instant::now();
+    let mut completion_candidate: Option<Vec<u8>> = None;
     loop {
         let mailbox = client.read_address(offset, MODEM_MAILBOX_SIZE).await?;
         validate_mailbox(&mailbox)?;
@@ -182,19 +248,105 @@ pub async fn mailbox_command(
         if processed == sequence
             && (status == MODEM_MAILBOX_STATUS_PASSED || status == MODEM_MAILBOX_STATUS_FAILED)
         {
+            if completion_candidate.as_ref() != Some(&mailbox) {
+                completion_candidate = Some(mailbox);
+                ensure!(
+                    started.elapsed() < timeout,
+                    "timed out stabilizing mailbox command {command}"
+                );
+                tokio::time::sleep(Duration::from_millis(10)).await;
+                continue;
+            }
             let result = read_u16(&mailbox, MODEM_MAILBOX_OFFSET_RESULT)?;
             ensure!(
                 status == MODEM_MAILBOX_STATUS_PASSED,
                 "SFC mailbox command failed with result 0x{result:04x}"
             );
-            println!("mailbox command {command} passed (sequence {sequence})");
-            return Ok(());
+            let output = read_stable_mailbox_output(websocket, offset).await?;
+            return Ok(MailboxOutcome {
+                sequence,
+                result,
+                output,
+            });
         }
+        completion_candidate = None;
         ensure!(
             started.elapsed() < timeout,
             "timed out waiting for mailbox command {command}"
         );
         tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+}
+
+async fn read_stable_mailbox_output(websocket: &str, mailbox_offset: usize) -> Result<Vec<u8>> {
+    let output_offset = mailbox_offset + ndm24_protocol::MODEM_MAILBOX_OFFSET_OUTPUT;
+    let mut client = Client::connect(websocket).await?;
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        let first = client
+            .read_address(output_offset, ndm24_protocol::MODEM_MAILBOX_ARGUMENT_SIZE)
+            .await?;
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        let second = client
+            .read_address(output_offset, ndm24_protocol::MODEM_MAILBOX_ARGUMENT_SIZE)
+            .await?;
+        if first == second {
+            return Ok(second);
+        }
+        ensure!(
+            Instant::now() < deadline,
+            "mailbox output did not stabilize"
+        );
+    }
+}
+
+pub async fn read_snapshot(websocket: &str, label_path: &Path) -> Result<DiagnosticSnapshot> {
+    let labels = read_labels(label_path)?;
+    let state = labels
+        .get("modemState")
+        .copied()
+        .context("label file does not contain modemState")?;
+    let offset = wram_to_usb2snes(state)?;
+    let mut client = Client::connect(websocket).await?;
+    read_stable_snapshot(&mut client, offset).await
+}
+
+pub async fn read_pending_rx(websocket: &str, label_path: &Path) -> Result<Vec<u8>> {
+    let labels = read_labels(label_path)?;
+    let state = labels
+        .get("modemState")
+        .copied()
+        .context("label file does not contain modemState")?;
+    let receive_buffer = labels
+        .get("modemReceiveBuffer")
+        .copied()
+        .context("label file does not contain modemReceiveBuffer")?;
+    let state_offset = wram_to_usb2snes(state)?;
+    let buffer_offset = wram_to_usb2snes(receive_buffer)?;
+    let mut client = Client::connect(websocket).await?;
+    eprintln!("attached to {}", client.device);
+    let deadline = Instant::now() + Duration::from_secs(2);
+
+    loop {
+        let before = read_stable_snapshot(&mut client, state_offset).await?;
+        let ring = client
+            .read_address(buffer_offset, MODEM_RING_STORAGE_SIZE)
+            .await?;
+        let after = read_stable_snapshot(&mut client, state_offset).await?;
+        if before.rx_read_index == after.rx_read_index
+            && before.rx_write_index == after.rx_write_index
+            && before.rx_accepted == after.rx_accepted
+        {
+            return Ok(pending_ring_bytes(
+                &ring,
+                after.rx_read_index,
+                after.rx_write_index,
+            ));
+        }
+        ensure!(
+            Instant::now() < deadline,
+            "RX ring kept changing while it was read"
+        );
     }
 }
 
@@ -211,9 +363,28 @@ pub async fn upload_and_boot(websocket: &str, rom_path: &Path, remote_path: &str
     .await?;
     send_binary_chunks(&mut client.socket, &data).await?;
     send_request(&mut client.socket, "Boot", vec![remote_path.to_owned()]).await?;
+    let info = tokio::time::timeout(
+        Duration::from_secs(15),
+        request_response(&mut client.socket, "Info", vec![]),
+    )
+    .await
+    .context("timed out waiting for FXPAK PRO to boot the uploaded ROM")??;
+    verify_running_rom(&info, remote_path)?;
     println!(
-        "uploaded {} bytes to {remote_path} and requested boot",
+        "uploaded {} bytes to {remote_path} and confirmed boot",
         data.len()
+    );
+    Ok(())
+}
+
+fn verify_running_rom(info: &[String], expected_path: &str) -> Result<()> {
+    let running_path = info
+        .get(2)
+        .context("QUsb2Snes Info response does not contain the running ROM path")?
+        .trim_end_matches('\0');
+    ensure!(
+        running_path.eq_ignore_ascii_case(expected_path),
+        "FXPAK PRO is running {running_path:?}, expected {expected_path:?}"
     );
     Ok(())
 }
@@ -239,7 +410,12 @@ fn validate_mailbox(data: &[u8]) -> Result<()> {
 }
 
 async fn read_stable_snapshot(client: &mut Client, offset: usize) -> Result<DiagnosticSnapshot> {
+    let deadline = Instant::now() + Duration::from_secs(2);
     loop {
+        ensure!(
+            Instant::now() < deadline,
+            "diagnostic snapshot did not stabilize; confirm that the running ROM matches the label file"
+        );
         let first = client.read_address(offset, MODEM_DIAGNOSTIC_SIZE).await?;
         let first_sequence = read_u32(&first, MODEM_DIAG_SNAPSHOT_SEQUENCE)?;
         if first_sequence & 1 != 0 {
@@ -257,10 +433,19 @@ async fn read_stable_snapshot(client: &mut Client, offset: usize) -> Result<Diag
 }
 
 async fn send_request(socket: &mut Socket, opcode: &str, operands: Vec<String>) -> Result<()> {
+    send_request_with_flags(socket, opcode, operands, None).await
+}
+
+async fn send_request_with_flags(
+    socket: &mut Socket,
+    opcode: &str,
+    operands: Vec<String>,
+    flags: Option<Vec<String>>,
+) -> Result<()> {
     let request = Request {
         opcode,
         space: "SNES",
-        flags: None,
+        flags,
         operands,
     };
     socket
@@ -311,19 +496,41 @@ async fn read_address(socket: &mut Socket, offset: usize, size: usize) -> Result
     Ok(output)
 }
 
-async fn write_binary_request(
+async fn write_binary_request_with_flags(
     socket: &mut Socket,
     opcode: &str,
     offset: usize,
     data: &[u8],
+    flags: Option<Vec<String>>,
 ) -> Result<()> {
-    send_request(
+    send_request_with_flags(
         socket,
         opcode,
         vec![format!("{offset:x}"), format!("{:x}", data.len())],
+        flags,
     )
     .await?;
     send_binary_chunks(socket, data).await
+}
+
+fn build_wram_write_payload(writes: &[(u32, u8)]) -> Result<Vec<u8>> {
+    ensure!(!writes.is_empty(), "WRAM execution payload has no writes");
+    let mut payload = Vec::with_capacity(6 * writes.len() + 6);
+    payload.extend_from_slice(&[0x08, 0xe2, 0x20, 0x48]); // PHP; SEP #$20; PHA
+    for &(address, value) in writes {
+        ensure!(
+            (0x7e_0000..=0x7f_ffff).contains(&address),
+            "execution payload target 0x{address:06x} is outside SNES WRAM"
+        );
+        payload.extend_from_slice(&[0xa9, value, 0x8f]); // LDA #value; STA long
+        payload.extend_from_slice(&address.to_le_bytes()[..3]);
+    }
+    payload.extend_from_slice(&[0x68, 0x28]); // PLA; PLP
+    ensure!(
+        payload.len() <= 0x100,
+        "WRAM execution payload exceeds the FXPAK PRO 256-byte execution area"
+    );
+    Ok(payload)
 }
 
 async fn send_binary_chunks(socket: &mut Socket, data: &[u8]) -> Result<()> {
@@ -349,4 +556,71 @@ fn read_u32(data: &[u8], offset: usize) -> Result<u32> {
         .try_into()
         .expect("slice length was checked");
     Ok(u32::from_le_bytes(bytes))
+}
+
+fn pending_ring_bytes(ring: &[u8], read_index: u8, write_index: u8) -> Vec<u8> {
+    let mut output = Vec::with_capacity(write_index.wrapping_sub(read_index) as usize);
+    let mut index = read_index;
+    while index != write_index {
+        output.push(ring[index as usize]);
+        index = index.wrapping_add(1);
+    }
+    output
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        MODEM_RING_STORAGE_SIZE, build_wram_write_payload, pending_ring_bytes, verify_running_rom,
+    };
+
+    #[test]
+    fn running_rom_accepts_fxpak_nul_padding() {
+        let info = vec![
+            "1.11.0".to_owned(),
+            "SD2SNES".to_owned(),
+            "/snes-modem-control.sfc\0\0".to_owned(),
+        ];
+
+        verify_running_rom(&info, "/snes-modem-control.sfc").unwrap();
+    }
+
+    #[test]
+    fn running_rom_rejects_the_fxpak_menu() {
+        let info = vec![
+            "1.11.0".to_owned(),
+            "SD2SNES".to_owned(),
+            "/sd2snes/m3nu.bin\0".to_owned(),
+        ];
+
+        let error = verify_running_rom(&info, "/snes-modem-control.sfc").unwrap_err();
+        assert!(error.to_string().contains("/sd2snes/m3nu.bin"));
+    }
+
+    #[test]
+    fn builds_register_preserving_wram_write_payload() {
+        let payload = build_wram_write_payload(&[(0x7e_1234, 0x56)]).unwrap();
+        assert_eq!(
+            payload,
+            [
+                0x08, 0xe2, 0x20, 0x48, // PHP; SEP #$20; PHA
+                0xa9, 0x56, 0x8f, 0x34, 0x12, 0x7e, // LDA #$56; STA $7E1234
+                0x68, 0x28, // PLA; PLP
+            ]
+        );
+    }
+
+    #[test]
+    fn rejects_execution_payload_outside_wram() {
+        assert!(build_wram_write_payload(&[(0x00_1234, 0x56)]).is_err());
+    }
+
+    #[test]
+    fn pending_rx_reconstructs_wrapped_ring() {
+        let mut ring = vec![0; MODEM_RING_STORAGE_SIZE];
+        ring[254] = b'A';
+        ring[255] = b'B';
+        ring[0] = b'C';
+        assert_eq!(pending_ring_bytes(&ring, 254, 1), b"ABC");
+    }
 }

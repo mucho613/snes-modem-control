@@ -5,12 +5,16 @@
 
 .import frameCounter
 .import modemDriverState, modemFlags, modemLastError, modemTimeoutCount
+.import modemSessionStage
 .import modemSessionProbeSent, modemSessionRetryCount, modemSessionLastResult
 .import modemSessionLineLength, modemSessionLine, modemSessionProbeStartFrame
+.import modemAtStatus, modemAtExpectedResult, modemAtStartFrame, modemAtTimeoutFrames
+.import modemMailboxArguments
+.import modemTransmitReadIndex, modemTransmitWriteIndex
 .import modemQueueByte, modemReadByte
 .import modemSetState, modemRecordTrace
 
-.export modemSessionPoll
+.export modemSessionPoll, modemAtBegin
 .proc modemSessionPoll
   .a16
   .i16
@@ -24,17 +28,36 @@
   sep #$30
   .a8
   .i8
+  lda #$10
+  sta modemSessionStage
 
+  lda modemAtStatus
+  cmp #MODEM_AT_STATUS_RUNNING
+  bne @checkProbe
+  jmp atReadResponse
+
+@checkProbe:
   lda modemDriverState
   cmp #MODEM_STATE_PROBING
-  bne done
+  beq @probing
+  jmp done
+@probing:
 
   lda modemSessionProbeSent
   bne readResponse
+  lda #$20
+  sta modemSessionStage
   jsr queueProbe
-  bcs done
+  lda #$21
+  sta modemSessionStage
+  bcc probeQueued
+  jmp done
+probeQueued:
   lda #$01
   sta modemSessionProbeSent
+  stz modemSessionLastResult
+  lda #$22
+  sta modemSessionStage
   rep #$20
   .a16
   lda frameCounter
@@ -45,15 +68,49 @@
   .a8
 
 readResponse:
+  lda #$30
+  sta modemSessionStage
   jsr modemReadByte
+  ; Preserve the returned byte while publishing the diagnostic stage.
+  pha
+  lda #$31
+  sta modemSessionStage
+  pla
   bcs checkTimeout
   jsr feedByte
-  lda modemDriverState
-  cmp #MODEM_STATE_PROBING
+  lda modemSessionLastResult
   beq readResponse
-  bra done
+  cmp #MODEM_SESSION_RESULT_OK
+  beq probePassed
+  jmp probeRejected
+
+probePassed:
+  lda #MODEM_STATE_READY
+  jsr modemSetState
+  jmp done
+
+probeRejected:
+  lda #MODEM_ERROR_PROBE_REJECTED
+  sta modemLastError
+  inc modemSessionRetryCount
+  lda modemSessionRetryCount
+  cmp #MODEM_PROBE_RETRY_LIMIT
+  bcs probeRejectedFinal
+  stz modemSessionProbeSent
+  stz modemSessionLineLength
+  stz modemSessionLastResult
+  jmp done
+
+probeRejectedFinal:
+  lda #MODEM_STATE_ERROR
+  jsr modemSetState
+  lda #MODEM_TRACE_ERROR
+  jsr modemRecordTrace
+  jmp done
 
 checkTimeout:
+  lda #$40
+  sta modemSessionStage
   rep #$20
   .a16
   lda frameCounter
@@ -62,8 +119,10 @@ checkTimeout:
   cmp #MODEM_PROBE_TIMEOUT_FRAMES
   sep #$20
   .a8
-  bcc done
+  bcs @probeTimeoutExpired
+  jmp done
 
+@probeTimeoutExpired:
   modemIncrement32 modemTimeoutCount
   inc modemSessionRetryCount
   lda modemSessionRetryCount
@@ -71,7 +130,7 @@ checkTimeout:
   bcs probeFailed
   stz modemSessionProbeSent
   stz modemSessionLineLength
-  bra done
+  jmp done
 
 probeFailed:
   lda modemFlags
@@ -83,8 +142,85 @@ probeFailed:
   jsr modemSetState
   lda #MODEM_TRACE_ERROR
   jsr modemRecordTrace
+  jmp done
+
+atReadResponse:
+  lda #$60
+  sta modemSessionStage
+  jsr modemReadByte
+  bcs atCheckTimeout
+  jsr feedByte
+  lda modemSessionLastResult
+  beq atReadResponse
+  lda modemAtExpectedResult
+  beq atPassed
+  lda modemSessionLastResult
+  cmp modemAtExpectedResult
+  beq atPassed
+  jmp atRejected
+
+atPassed:
+  lda #MODEM_AT_STATUS_PASSED
+  sta modemAtStatus
+  lda modemAtExpectedResult
+  cmp #MODEM_SESSION_RESULT_CONNECT
+  beq atConnected
+  cmp #MODEM_SESSION_RESULT_NO_CARRIER
+  beq atReturnedReady
+  lda #MODEM_STATE_READY
+  jsr modemSetState
+  bra done
+
+atConnected:
+  lda #MODEM_STATE_CONNECTED
+  jsr modemSetState
+  jmp done
+
+atReturnedReady:
+  lda #MODEM_STATE_READY
+  jsr modemSetState
+  jmp done
+
+atRejected:
+  lda #MODEM_ERROR_AT_REJECTED
+  sta modemLastError
+  lda #MODEM_AT_STATUS_FAILED
+  sta modemAtStatus
+  lda #MODEM_STATE_ERROR
+  jsr modemSetState
+  lda #MODEM_TRACE_ERROR
+  jsr modemRecordTrace
+  jmp done
+
+atCheckTimeout:
+  rep #$20
+  .a16
+  lda frameCounter
+  sec
+  sbc modemAtStartFrame
+  cmp modemAtTimeoutFrames
+  sep #$20
+  .a8
+  bcs @atTimeoutExpired
+  jmp done
+
+@atTimeoutExpired:
+  modemIncrement32 modemTimeoutCount
+  lda modemFlags
+  ora #MODEM_FLAG_TIMEOUT
+  sta modemFlags
+  lda #MODEM_ERROR_AT_TIMEOUT
+  sta modemLastError
+  lda #MODEM_AT_STATUS_FAILED
+  sta modemAtStatus
+  lda #MODEM_STATE_ERROR
+  jsr modemSetState
+  lda #MODEM_TRACE_ERROR
+  jsr modemRecordTrace
 
 done:
+  lda #$90
+  sta modemSessionStage
   rep #$30
   .a16
   .i16
@@ -95,25 +231,44 @@ done:
   rts
 
 queueProbe:
+  .a8
+  .i8
+
+  lda #$50
+  sta modemSessionStage
   lda #'A'
   jsr modemQueueByte
+  lda #$51
+  sta modemSessionStage
   bcs queueFailed
   lda #'T'
   jsr modemQueueByte
+  lda #$52
+  sta modemSessionStage
   bcs queueFailed
   lda #$0d
   jsr modemQueueByte
+  lda #$53
+  sta modemSessionStage
   bcs queueFailed
   lda #$0a
   jsr modemQueueByte
+  lda #$54
+  sta modemSessionStage
 queueFailed:
   rts
 
 ; Input A is one raw modem byte. Parsing is deliberately active only in
 ; PROBING, so bytes received after readiness remain owned by the next layer.
 feedByte:
+  .a8
+  .i8
+
+  ; NDM24 terminates AT result lines with CR LF. Keep the text accumulated
+  ; across CR and commit it on LF so READY is not published before the final
+  ; LF has been consumed from the RX ring.
   cmp #$0d
-  beq finishLine
+  beq ignoreCarriageReturn
   cmp #$0a
   beq finishLine
 
@@ -123,6 +278,9 @@ feedByte:
   sta modemSessionLine, y
   iny
   sty modemSessionLineLength
+  rts
+
+ignoreCarriageReturn:
   rts
 
 lineTooLong:
@@ -152,10 +310,9 @@ checkOk:
   lda modemSessionLine + 1
   cmp #'K'
   bne checkError
+
   lda #MODEM_SESSION_RESULT_OK
   sta modemSessionLastResult
-  lda #MODEM_STATE_READY
-  jsr modemSetState
   jmp lineDone
 
 checkError:
@@ -178,20 +335,6 @@ checkError:
   bne checkBusy
   lda #MODEM_SESSION_RESULT_ERROR
   sta modemSessionLastResult
-  lda #MODEM_ERROR_PROBE_REJECTED
-  sta modemLastError
-  inc modemSessionRetryCount
-  lda modemSessionRetryCount
-  cmp #MODEM_PROBE_RETRY_LIMIT
-  bcc retryRejectedProbe
-  lda #MODEM_STATE_ERROR
-  jsr modemSetState
-  lda #MODEM_TRACE_ERROR
-  jsr modemRecordTrace
-  jmp lineDone
-
-retryRejectedProbe:
-  stz modemSessionProbeSent
   jmp lineDone
 
 checkBusy:
@@ -319,5 +462,139 @@ checkNoDialtone:
 
 lineDone:
   stz modemSessionLineLength
+  rts
+.endproc
+
+; Begin one host-supplied AT transaction.
+; Mailbox arguments:
+;   +0 expected MODEM_SESSION_RESULT_*
+;   +1 timeout frames, little endian u16
+;   +3 command byte count
+;   +4 command bytes (may be empty when waiting for NO CARRIER)
+; Carry clear means accepted; carry set means invalid or queue full.
+.proc modemAtBegin
+  .a8
+  .i8
+
+  phb
+  phx
+  phy
+  setDBR $7e
+
+  lda modemMailboxArguments + MODEM_AT_ARGUMENT_EXPECTED_RESULT
+  cmp #MODEM_SESSION_RESULT_NONE
+  beq @validateReadyState
+  cmp #MODEM_SESSION_RESULT_OK
+  beq @validateReadyState
+  cmp #MODEM_SESSION_RESULT_CONNECT
+  beq @validateReadyState
+  cmp #MODEM_SESSION_RESULT_NO_CARRIER
+  beq @validateConnectedState
+  jmp @invalid
+
+@validateReadyState:
+  lda modemDriverState
+  cmp #MODEM_STATE_READY
+  beq @validateTimeout
+  jmp @invalid
+
+@validateConnectedState:
+  lda modemDriverState
+  cmp #MODEM_STATE_CONNECTED
+  beq @validateTimeout
+  jmp @invalid
+
+@validateTimeout:
+  lda modemTransmitReadIndex
+  cmp modemTransmitWriteIndex
+  beq @validateTimeoutValue
+  jmp @invalid
+
+@validateTimeoutValue:
+  lda modemMailboxArguments + MODEM_AT_ARGUMENT_TIMEOUT_FRAMES
+  ora modemMailboxArguments + MODEM_AT_ARGUMENT_TIMEOUT_FRAMES + 1
+  bne @validateLength
+  jmp @invalid
+
+@validateLength:
+  lda modemMailboxArguments + MODEM_AT_ARGUMENT_COMMAND_LENGTH
+  cmp #(MODEM_AT_COMMAND_MAX_LENGTH + 1)
+  bcc @lengthValid
+  jmp @invalid
+@lengthValid:
+  tay
+  bne @queueCommand
+  lda modemMailboxArguments + MODEM_AT_ARGUMENT_EXPECTED_RESULT
+  cmp #MODEM_SESSION_RESULT_NO_CARRIER
+  beq @start
+  jmp @invalid
+
+@queueCommand:
+  ldx #$00
+@queueByte:
+  lda modemMailboxArguments + MODEM_AT_ARGUMENT_COMMAND, x
+  jsr modemQueueByte
+  bcc @queuedByte
+  jmp @invalid
+@queuedByte:
+  inx
+  dey
+  bne @queueByte
+
+@start:
+  lda modemMailboxArguments + MODEM_AT_ARGUMENT_EXPECTED_RESULT
+  sta modemAtExpectedResult
+  lda modemMailboxArguments + MODEM_AT_ARGUMENT_TIMEOUT_FRAMES
+  sta modemAtTimeoutFrames
+  lda modemMailboxArguments + MODEM_AT_ARGUMENT_TIMEOUT_FRAMES + 1
+  sta modemAtTimeoutFrames + 1
+  stz modemSessionLastResult
+  stz modemSessionLineLength
+
+  rep #$20
+  .a16
+  lda frameCounter
+  sta modemAtStartFrame
+  lda frameCounter + 2
+  sta modemAtStartFrame + 2
+  sep #$20
+  .a8
+
+  lda #MODEM_AT_STATUS_RUNNING
+  sta modemAtStatus
+  lda modemAtExpectedResult
+  cmp #MODEM_SESSION_RESULT_CONNECT
+  beq @setDialing
+  cmp #MODEM_SESSION_RESULT_NO_CARRIER
+  beq @setDisconnecting
+  lda #MODEM_STATE_AT_COMMAND
+  jsr modemSetState
+  bra @accepted
+
+@setDialing:
+  lda #MODEM_STATE_DIALING
+  jsr modemSetState
+  bra @accepted
+
+@setDisconnecting:
+  lda #MODEM_STATE_DISCONNECTING
+  jsr modemSetState
+
+@accepted:
+  ply
+  plx
+  plb
+  clc
+  rts
+
+@invalid:
+  lda #MODEM_ERROR_AT_INVALID
+  sta modemLastError
+  lda #MODEM_AT_STATUS_FAILED
+  sta modemAtStatus
+  ply
+  plx
+  plb
+  sec
   rts
 .endproc

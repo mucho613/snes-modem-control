@@ -7,20 +7,36 @@ latch_assert = 0x01
 tx_assert = 0x00
 tx_release = 0x80
 rx_present_mask = 0x80
-status_ready_mask = 0x40
+rx_present_asserted = 0x80
+status_transfer_hint_mask = 0x40
 reset_command = 0x52
 
 [driver]
 poll_budget = 32
 ring_storage_size = 256
 ring_capacity = 255
-reset_guard_frames = 120
+reset_guard_frames = 600
 probe_timeout_frames = 300
 probe_retry_limit = 3
 
+[terminal]
+columns = 32
+rows = 64
+queue_storage_size = 256
+queue_capacity = 255
+render_budget = 32
+tilemap_base = 0x4000
+tilemap_mask = 0x07ff
+scroll_anchor = 0x00d9
+bg1sc = 0x42
+palette_background = 0x0000
+palette_foreground = 0x6f7b
+palette_unused_2 = 0x0000
+palette_unused_3 = 0x0000
+
 [diagnostic]
 magic = [0x4e, 0x44, 0x4d, 0x32]
-version = 1
+version = 2
 size = 128
 trace_event_size = 16
 trace_capacity = 256
@@ -229,10 +245,52 @@ size = 4
 type = "u32"
 description = "Frame at which the R command was sent"
 
+[[diagnostic.fields]]
+name = "terminal_dropped"
+offset = 72
+size = 4
+type = "u32"
+description = "Oldest display-mirror bytes discarded to retain newer output"
+
+[[diagnostic.fields]]
+name = "at_status"
+offset = 76
+size = 1
+type = "u8"
+description = "Current generic AT transaction status"
+
+[[diagnostic.fields]]
+name = "at_expected_result"
+offset = 77
+size = 1
+type = "u8"
+description = "Result code expected by the generic AT transaction"
+
+[[diagnostic.fields]]
+name = "session_last_result"
+offset = 78
+size = 1
+type = "u8"
+description = "Most recent parsed AT result code"
+
+[[diagnostic.fields]]
+name = "session_line_length"
+offset = 79
+size = 1
+type = "u8"
+description = "Bytes currently accumulated by the AT line parser"
+
+[[diagnostic.fields]]
+name = "at_start_frame"
+offset = 80
+size = 4
+type = "u32"
+description = "Frame at which the current generic AT transaction started"
+
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]
-version = 1
-size = 64
+version = 3
+size = 96
 argument_size = 32
 
 [[mailbox.fields]]
@@ -299,8 +357,15 @@ type = "bytes"
 description = "Command arguments"
 
 [[mailbox.fields]]
-name = "reserved"
+name = "output"
 offset = 52
+size = 32
+type = "bytes"
+description = "Command output; written only by the SFC"
+
+[[mailbox.fields]]
+name = "reserved"
+offset = 84
 size = 12
 type = "bytes"
 description = "Reserved; must be zero"
@@ -311,6 +376,10 @@ resetting = 1
 probing = 2
 ready = 3
 error = 4
+at_command = 5
+dialing = 6
+connected = 7
+disconnecting = 8
 
 [flags]
 poll_limit = 0x01
@@ -343,6 +412,9 @@ quick_test = 2
 clear_trace = 3
 freeze_trace = 4
 resume_trace = 5
+at_transaction = 6
+binary_transmit = 7
+binary_receive = 8
 
 [mailbox_status]
 idle = 0

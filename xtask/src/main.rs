@@ -26,10 +26,14 @@ enum Task {
     Rom {
         #[arg(long)]
         smoke: bool,
+        #[arg(long, conflicts_with = "smoke")]
+        font_test: bool,
     },
     Deploy {
         #[arg(long)]
         smoke: bool,
+        #[arg(long, conflicts_with = "smoke")]
+        font_test: bool,
         #[arg(long, default_value = "ws://localhost:23074")]
         websocket: String,
         #[arg(long, default_value = "/snes-modem-control.sfc")]
@@ -44,6 +48,7 @@ struct SpecFile {
     spec: SpecInfo,
     protocol: BTreeMap<String, toml::Value>,
     driver: BTreeMap<String, toml::Value>,
+    terminal: BTreeMap<String, toml::Value>,
     diagnostic: Diagnostic,
     mailbox: Mailbox,
     states: BTreeMap<String, u8>,
@@ -91,6 +96,54 @@ struct Field {
 }
 
 #[derive(Debug, Deserialize)]
+struct FontSource {
+    source_url: String,
+    source_file: String,
+    readme_file: String,
+    commit: String,
+    sha256_lf: String,
+    readme_sha256_canonical_lf: String,
+    author: String,
+    license: String,
+    provenance: String,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum RomProfile {
+    Normal,
+    Smoke,
+    FontTest,
+}
+
+impl RomProfile {
+    fn from_flags(smoke: bool, font_test: bool) -> Self {
+        if smoke {
+            Self::Smoke
+        } else if font_test {
+            Self::FontTest
+        } else {
+            Self::Normal
+        }
+    }
+
+    fn output_directory(self) -> &'static str {
+        match self {
+            Self::Normal => "build/normal",
+            Self::Smoke => "build/smoke",
+            Self::FontTest => "build/font-test",
+        }
+    }
+
+    fn assembler_define(self) -> Option<&'static str> {
+        match self {
+            Self::Normal => None,
+            Self::Smoke => Some("MODEM_SMOKE_TEST"),
+            Self::FontTest => Some("MODEM_FONT_TEST"),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
 struct ToolchainFile {
     cc65: Cc65Platforms,
 }
@@ -111,15 +164,19 @@ fn main() -> Result<()> {
     let root = workspace_root()?;
     match Cli::parse().command {
         Task::Generate { check } => generate(&root, check),
-        Task::Rom { smoke } => build_rom(&root, smoke),
+        Task::Rom { smoke, font_test } => {
+            build_rom(&root, RomProfile::from_flags(smoke, font_test))
+        }
         Task::Deploy {
             smoke,
+            font_test,
             websocket,
             remote_path,
         } => {
-            build_rom(&root, smoke)?;
+            let profile = RomProfile::from_flags(smoke, font_test);
+            build_rom(&root, profile)?;
             let rom = root
-                .join(if smoke { "build/smoke" } else { "build/normal" })
+                .join(profile.output_directory())
                 .join("modem-control.sfc");
             run(Command::new("cargo")
                 .current_dir(&root)
@@ -132,8 +189,9 @@ fn main() -> Result<()> {
             run(Command::new("cargo")
                 .args(["test", "--workspace"])
                 .current_dir(&root))?;
-            build_rom(&root, false)?;
-            build_rom(&root, true)
+            build_rom(&root, RomProfile::Normal)?;
+            build_rom(&root, RomProfile::Smoke)?;
+            build_rom(&root, RomProfile::FontTest)
         }
         Task::Bootstrap => bootstrap(&root),
     }
@@ -171,7 +229,63 @@ fn validate_spec(spec: &SpecFile) -> Result<()> {
             == spec.diagnostic.trace_size,
         "trace size does not match event size times capacity"
     );
+    validate_terminal(&spec.terminal)?;
     Ok(())
+}
+
+fn validate_terminal(terminal: &BTreeMap<String, toml::Value>) -> Result<()> {
+    let columns = scalar_value(terminal, "columns", "terminal")?;
+    let rows = scalar_value(terminal, "rows", "terminal")?;
+    let queue_storage_size = scalar_value(terminal, "queue_storage_size", "terminal")?;
+    let queue_capacity = scalar_value(terminal, "queue_capacity", "terminal")?;
+    let render_budget = scalar_value(terminal, "render_budget", "terminal")?;
+    let tilemap_mask = scalar_value(terminal, "tilemap_mask", "terminal")?;
+    let palette_background = scalar_value(terminal, "palette_background", "terminal")?;
+    let palette_foreground = scalar_value(terminal, "palette_foreground", "terminal")?;
+    let palette_unused_2 = scalar_value(terminal, "palette_unused_2", "terminal")?;
+    let palette_unused_3 = scalar_value(terminal, "palette_unused_3", "terminal")?;
+
+    ensure!(
+        columns.is_power_of_two(),
+        "terminal columns must be a power of two"
+    );
+    ensure!(
+        queue_storage_size == 256,
+        "terminal queue storage must be 256 bytes for 8-bit indices"
+    );
+    ensure!(
+        queue_capacity.checked_add(1) == Some(queue_storage_size),
+        "terminal queue capacity must reserve one byte to distinguish full from empty"
+    );
+    ensure!(
+        render_budget > 0 && render_budget <= queue_capacity,
+        "terminal render budget must be between 1 and queue capacity"
+    );
+    ensure!(
+        columns.checked_mul(rows) == tilemap_mask.checked_add(1),
+        "terminal tilemap mask must cover exactly columns times rows entries"
+    );
+    ensure!(
+        [
+            palette_background,
+            palette_foreground,
+            palette_unused_2,
+            palette_unused_3
+        ]
+        .into_iter()
+        .all(|color| color <= 0x7fff),
+        "terminal palette colors must be 15-bit BGR values"
+    );
+    Ok(())
+}
+
+fn scalar_value(values: &BTreeMap<String, toml::Value>, name: &str, group: &str) -> Result<usize> {
+    let value = values
+        .get(name)
+        .with_context(|| format!("{group}.{name} is missing"))?
+        .as_integer()
+        .with_context(|| format!("{group}.{name} must be an integer"))?;
+    usize::try_from(value).with_context(|| format!("{group}.{name} must be non-negative"))
 }
 
 fn validate_fields(fields: &[Field], size: usize, block_name: &str) -> Result<()> {
@@ -194,6 +308,7 @@ fn validate_fields(fields: &[Field], size: usize, block_name: &str) -> Result<()
 
 fn generate(root: &Path, check: bool) -> Result<()> {
     let spec = read_spec(root)?;
+    let (font_source, font) = load_font8x8(root)?;
     let outputs = [
         (
             root.join("src/modem/generated.inc"),
@@ -206,6 +321,10 @@ fn generate(root: &Path, check: bool) -> Result<()> {
         (
             root.join("docs/generated/diagnostic-abi.md"),
             render_markdown(&spec),
+        ),
+        (
+            root.join("src/terminal/generated-font.inc"),
+            render_font_assembly(&font_source),
         ),
     ];
 
@@ -227,6 +346,300 @@ fn generate(root: &Path, check: bool) -> Result<()> {
             println!("generated {}", path.strip_prefix(root)?.display());
         }
     }
+    let sfc_font = generate_sfc_font(&font);
+    let palette = generate_palette(&spec)?;
+    let preview = generate_font_preview(&sfc_font, &palette)?;
+    let binary_outputs = [
+        (root.join("assets/font.bin"), sfc_font),
+        (root.join("assets/palette.bin"), palette),
+        (root.join("docs/generated/font-preview.png"), preview),
+    ];
+    for (path, content) in binary_outputs {
+        sync_generated_bytes(root, &path, &content, check)?;
+    }
+    Ok(())
+}
+
+const FONT_TEST_LINES: &[&[u8]] = &[
+    b" !\"#$%&'()*+,-./",
+    b"0123456789:;<=>?",
+    b"@ABCDEFGHIJKLMNO",
+    b"PQRSTUVWXYZ[\\]^_",
+    b"`abcdefghijklmno",
+    b"pqrstuvwxyz{|}~",
+    b"",
+    b"0O 1Il| 2Z 5S 6G 8B 9g",
+    b"AT%B2400 ATS10=14",
+    b"192.168.100.255",
+    b"!@#$%^&*()[]{}\\|;:'\",.<>/?",
+    b"font8x8 / Public Domain",
+];
+
+fn load_font8x8(root: &Path) -> Result<(FontSource, [[u8; 8]; 128])> {
+    let directory = root.join("third_party/font8x8");
+    let metadata = fs::read_to_string(directory.join("SOURCE.toml"))
+        .context("read third_party/font8x8/SOURCE.toml")?;
+    let metadata: FontSource = toml::from_str(&metadata).context("parse font8x8 SOURCE.toml")?;
+    ensure!(
+        metadata.license == "Public Domain",
+        "font8x8 license metadata changed unexpectedly"
+    );
+    ensure!(
+        metadata.provenance.contains("Marcel Sondaar")
+            && metadata
+                .provenance
+                .contains("International Business Machines"),
+        "font8x8 provenance metadata is incomplete"
+    );
+
+    let source_path = directory.join(&metadata.source_file);
+    let source = canonical_text(
+        &fs::read_to_string(&source_path)
+            .with_context(|| format!("read {}", source_path.display()))?,
+    );
+    let actual_hash = format!("{:x}", Sha256::digest(source.as_bytes()));
+    ensure!(
+        actual_hash == metadata.sha256_lf,
+        "font8x8 source hash mismatch: expected {}, got {actual_hash}",
+        metadata.sha256_lf
+    );
+    ensure!(
+        source.contains("License: Public Domain"),
+        "font8x8 source is missing its Public Domain declaration"
+    );
+    let readme_path = directory.join(&metadata.readme_file);
+    let readme = canonical_text(
+        &fs::read_to_string(&readme_path)
+            .with_context(|| format!("read {}", readme_path.display()))?,
+    );
+    let readme_hash = format!("{:x}", Sha256::digest(readme.as_bytes()));
+    ensure!(
+        readme_hash == metadata.readme_sha256_canonical_lf,
+        "font8x8 README hash mismatch: expected {}, got {readme_hash}",
+        metadata.readme_sha256_canonical_lf
+    );
+    ensure!(
+        readme.contains("Author: Daniel Hepper")
+            && readme.contains("License: Public Domain")
+            && readme.contains("Marcel Sondaar")
+            && readme.contains("International Business Machines"),
+        "font8x8 README is missing its author, license, or provenance"
+    );
+    Ok((metadata, parse_font8x8_basic(&source)?))
+}
+
+fn canonical_text(source: &str) -> String {
+    let normalized = source.replace("\r\n", "\n");
+    format!("{}\n", normalized.trim_end_matches('\n'))
+}
+
+fn parse_font8x8_basic(source: &str) -> Result<[[u8; 8]; 128]> {
+    let mut glyphs = [[0_u8; 8]; 128];
+    let mut seen = [false; 128];
+
+    for line in source.lines() {
+        let Some(marker) = line.find("// U+") else {
+            continue;
+        };
+        let codepoint_text = line
+            .get(marker + 5..marker + 9)
+            .context("font8x8 source has a truncated Unicode marker")?;
+        let codepoint = usize::from_str_radix(codepoint_text, 16)
+            .with_context(|| format!("invalid font8x8 codepoint {codepoint_text}"))?;
+        ensure!(codepoint < 128, "font8x8 basic codepoint is out of range");
+        ensure!(
+            !seen[codepoint],
+            "duplicate font8x8 codepoint U+{codepoint:04X}"
+        );
+
+        let start = line.find('{').context("font8x8 glyph row is missing `{`")?;
+        let end = line[start + 1..]
+            .find('}')
+            .map(|offset| start + 1 + offset)
+            .context("font8x8 glyph row is missing `}`")?;
+        let values = line[start + 1..end]
+            .split(',')
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| {
+                let hexadecimal = value
+                    .strip_prefix("0x")
+                    .or_else(|| value.strip_prefix("0X"))
+                    .with_context(|| format!("font8x8 value is not hexadecimal: {value}"))?;
+                u8::from_str_radix(hexadecimal, 16)
+                    .with_context(|| format!("invalid font8x8 byte: {value}"))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        ensure!(
+            values.len() == 8,
+            "font8x8 U+{codepoint:04X} must contain exactly eight rows"
+        );
+        glyphs[codepoint].copy_from_slice(&values);
+        seen[codepoint] = true;
+    }
+
+    ensure!(
+        seen.into_iter().all(|present| present),
+        "font8x8 basic source does not define all 128 codepoints"
+    );
+    Ok(glyphs)
+}
+
+fn generate_sfc_font(glyphs: &[[u8; 8]; 128]) -> Vec<u8> {
+    let mut output = vec![0_u8; 256 * 16];
+    for (codepoint, glyph) in glyphs.iter().enumerate().take(0x7f).skip(0x20) {
+        let destination = codepoint * 16;
+        for row in 0..8 {
+            // font8x8 stores the leftmost pixel in bit 0. SNES bitplanes store
+            // it in bit 7, so every row is reversed into plane 0.
+            output[destination + row * 2] = glyph[row].reverse_bits();
+            output[destination + row * 2 + 1] = 0;
+        }
+    }
+    output
+}
+
+fn generate_palette(spec: &SpecFile) -> Result<Vec<u8>> {
+    let mut output = vec![0_u8; 512];
+    for (index, name) in [
+        "palette_background",
+        "palette_foreground",
+        "palette_unused_2",
+        "palette_unused_3",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let color = u16::try_from(scalar_value(&spec.terminal, name, "terminal")?)?;
+        output[index * 2..index * 2 + 2].copy_from_slice(&color.to_le_bytes());
+    }
+    Ok(output)
+}
+
+fn generate_font_preview(font: &[u8], palette: &[u8]) -> Result<Vec<u8>> {
+    const SCALE: usize = 4;
+    const COLUMNS: usize = 32;
+    ensure!(
+        font.len() == 4096,
+        "font preview requires 4096-byte SFC font data"
+    );
+    ensure!(
+        palette.len() == 512,
+        "font preview requires 512-byte CGRAM data"
+    );
+    let background = decode_bgr555(u16::from_le_bytes([palette[0], palette[1]]));
+    let foreground = decode_bgr555(u16::from_le_bytes([palette[2], palette[3]]));
+    let width = COLUMNS * 8;
+    let height = FONT_TEST_LINES.len() * 8;
+    let mut pixels = vec![0_u8; width * height * 3];
+    for pixel in pixels.chunks_exact_mut(3) {
+        pixel.copy_from_slice(&background);
+    }
+
+    for (row, line) in FONT_TEST_LINES.iter().enumerate() {
+        for (column, &codepoint) in line.iter().enumerate() {
+            ensure!(column < COLUMNS, "font preview line exceeds 32 columns");
+            let tile = usize::from(codepoint) * 16;
+            for glyph_y in 0..8 {
+                let plane = font[tile + glyph_y * 2];
+                for glyph_x in 0..8 {
+                    if plane & (0x80 >> glyph_x) == 0 {
+                        continue;
+                    }
+                    let pixel = ((row * 8 + glyph_y) * width + column * 8 + glyph_x) * 3;
+                    pixels[pixel..pixel + 3].copy_from_slice(&foreground);
+                }
+            }
+        }
+    }
+
+    let scaled_width = width * SCALE;
+    let scaled_height = height * SCALE;
+    let mut scaled = vec![0_u8; scaled_width * scaled_height * 3];
+    for y in 0..scaled_height {
+        for x in 0..scaled_width {
+            let source = ((y / SCALE) * width + x / SCALE) * 3;
+            let destination = (y * scaled_width + x) * 3;
+            scaled[destination..destination + 3].copy_from_slice(&pixels[source..source + 3]);
+        }
+    }
+
+    let mut output = Vec::new();
+    {
+        let mut encoder = png::Encoder::new(
+            &mut output,
+            u32::try_from(scaled_width)?,
+            u32::try_from(scaled_height)?,
+        );
+        encoder.set_color(png::ColorType::Rgb);
+        encoder.set_depth(png::BitDepth::Eight);
+        let mut writer = encoder
+            .write_header()
+            .context("write font preview PNG header")?;
+        writer
+            .write_image_data(&scaled)
+            .context("write font preview PNG pixels")?;
+    }
+    Ok(output)
+}
+
+fn decode_bgr555(color: u16) -> [u8; 3] {
+    let expand = |component: u16| u8::try_from((component * 255 + 15) / 31).unwrap();
+    [
+        expand(color & 0x1f),
+        expand((color >> 5) & 0x1f),
+        expand((color >> 10) & 0x1f),
+    ]
+}
+
+fn render_font_assembly(source: &FontSource) -> String {
+    let mut output = generated_banner(";");
+    output.push_str(".export fontTestScreen, fontAttribution\n\n");
+    output.push_str("fontTestScreen:\n");
+    for line in FONT_TEST_LINES {
+        write_assembly_bytes(&mut output, line);
+        output.push_str(".byte $0A\n");
+    }
+    output.push_str(".byte $00\n\nfontAttribution:\n");
+    let attribution = format!(
+        "font8x8 by {}; {}; derived from Marcel Sondaar and IBM public-domain VGA fonts; commit {}; {}",
+        source.author, source.license, source.commit, source.source_url
+    );
+    write_assembly_bytes(&mut output, attribution.as_bytes());
+    output.push_str(".byte $00\n");
+    output
+}
+
+fn write_assembly_bytes(output: &mut String, bytes: &[u8]) {
+    for chunk in bytes.chunks(16) {
+        output.push_str(".byte ");
+        for (index, byte) in chunk.iter().enumerate() {
+            if index != 0 {
+                output.push(',');
+            }
+            output.push_str(&format!("${byte:02X}"));
+        }
+        output.push('\n');
+    }
+}
+
+fn sync_generated_bytes(root: &Path, path: &Path, content: &[u8], check: bool) -> Result<()> {
+    if check {
+        let current = fs::read(path)
+            .with_context(|| format!("generated file is missing: {}", path.display()))?;
+        ensure!(
+            current == content,
+            "{} is out of date; run `cargo xtask generate`",
+            path.display()
+        );
+    } else {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(path, content)
+            .with_context(|| format!("write generated file {}", path.display()))?;
+        println!("generated {}", path.strip_prefix(root)?.display());
+    }
     Ok(())
 }
 
@@ -234,6 +647,7 @@ fn render_assembly(spec: &SpecFile) -> Result<String> {
     let mut out = generated_banner(";");
     scalar_maps_asm(&mut out, "MODEM", &spec.protocol)?;
     scalar_maps_asm(&mut out, "MODEM", &spec.driver)?;
+    scalar_maps_asm(&mut out, "TERMINAL", &spec.terminal)?;
     writeln(
         &mut out,
         &format!("MODEM_SPEC_VERSION = ${:04X}", spec.spec.version),
@@ -317,6 +731,7 @@ fn render_rust(spec: &SpecFile) -> Result<String> {
     let mut out = generated_banner("//");
     scalar_maps_rust(&mut out, "MODEM", &spec.protocol)?;
     scalar_maps_rust(&mut out, "MODEM", &spec.driver)?;
+    scalar_maps_rust(&mut out, "TERMINAL", &spec.terminal)?;
     writeln(
         &mut out,
         &format!("pub const MODEM_SPEC_VERSION: u16 = {};", spec.spec.version),
@@ -517,9 +932,9 @@ fn writeln(out: &mut String, line: &str) {
     out.push('\n');
 }
 
-fn build_rom(root: &Path, smoke: bool) -> Result<()> {
+fn build_rom(root: &Path, profile: RomProfile) -> Result<()> {
     let tools = find_cc65(root)?;
-    let out = root.join(if smoke { "build/smoke" } else { "build/normal" });
+    let out = root.join(profile.output_directory());
     if out.exists() {
         fs::remove_dir_all(&out)?;
     }
@@ -536,8 +951,8 @@ fn build_rom(root: &Path, smoke: bool) -> Result<()> {
         fs::create_dir_all(object.parent().expect("object has a parent"))?;
         let mut command = Command::new(&tools.ca65);
         command.current_dir(root).args(["--cpu", "65816", "-g"]);
-        if smoke {
-            command.args(["-D", "MODEM_SMOKE_TEST"]);
+        if let Some(define) = profile.assembler_define() {
+            command.args(["-D", define]);
         }
         command.arg("-o").arg(&object).arg(&source);
         configure_cc65_command(&mut command, &tools)?;
@@ -565,6 +980,13 @@ fn build_rom(root: &Path, smoke: bool) -> Result<()> {
     ensure!(
         fs::metadata(&rom)?.len() == 131_072,
         "ROM has an unexpected size"
+    );
+    let rom_bytes = fs::read(&rom)?;
+    ensure!(
+        rom_bytes
+            .windows(b"font8x8 by Daniel Hepper".len())
+            .any(|window| window == b"font8x8 by Daniel Hepper"),
+        "ROM does not contain the embedded font attribution"
     );
     println!("built {}", rom.strip_prefix(root)?.display());
     Ok(())
@@ -713,4 +1135,54 @@ fn run(command: &mut Command) -> Result<()> {
     let status = command.status().context("failed to start command")?;
     ensure!(status.success(), "command failed with {status}");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn font8x8_generates_only_printable_ascii_in_plane_zero() {
+        let root = workspace_root().unwrap();
+        let (_, glyphs) = load_font8x8(&root).unwrap();
+        let font = generate_sfc_font(&glyphs);
+
+        assert_eq!(font.len(), 4096);
+        for codepoint in 0..256 {
+            for row in 0..8 {
+                let plane_zero = font[codepoint * 16 + row * 2];
+                let plane_one = font[codepoint * 16 + row * 2 + 1];
+                let expected = if (0x20..=0x7e).contains(&codepoint) {
+                    glyphs[codepoint][row].reverse_bits()
+                } else {
+                    0
+                };
+                assert_eq!(plane_zero, expected);
+                assert_eq!(plane_one, 0);
+            }
+        }
+    }
+
+    #[test]
+    fn font_test_specimen_contains_every_printable_ascii_byte() {
+        let specimen = FONT_TEST_LINES[..6].concat();
+        assert_eq!(specimen, (0x20_u8..=0x7e).collect::<Vec<_>>());
+        assert!(FONT_TEST_LINES.iter().all(|line| line.len() <= 32));
+        let queued_bytes = FONT_TEST_LINES
+            .iter()
+            .map(|line| line.len() + 1)
+            .sum::<usize>();
+        assert!(queued_bytes <= 255);
+    }
+
+    #[test]
+    fn terminal_palette_is_black_and_dimmed_white() {
+        let root = workspace_root().unwrap();
+        let spec = read_spec(&root).unwrap();
+        let palette = generate_palette(&spec).unwrap();
+        assert_eq!(palette.len(), 512);
+        assert_eq!(&palette[..8], &[0x00, 0x00, 0x7b, 0x6f, 0, 0, 0, 0]);
+        assert_eq!(decode_bgr555(0x6f7b), [222, 222, 222]);
+        assert!(palette[8..].iter().all(|&byte| byte == 0));
+    }
 }

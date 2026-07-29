@@ -9,6 +9,7 @@ rust-version.workspace = true
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
+png = "0.18"
 reqwest = { version = "0.12.22", default-features = false, features = ["blocking", "rustls-tls"] }
 serde.workspace = true
 sha2 = "0.10.9"

@@ -4,6 +4,10 @@
 
 開発用 PC 上で Rust、cc65、QUsb2Snes を動かし、USB 接続した FXPAK PRO へ ROM を転送します。SFC 上のスモークテスト ROM は、NDM24 の状態を versioned WRAM block、循環トレース、制御メールボックスへ公開します。
 
+通常ROMとスモークテストROMはどちらも32文字幅ターミナルを表示します。通常ROMはNDM24を自動初期化せず、スモークテストROMはraw `R`、`AT`、受信echo、結果コードを起動後に表示します。
+
+フォント確認ROMはNDM24を初期化せず、印字可能ASCIIと判別用文字列を表示します。font8x8の出所、変換、配色は [font.md](font.md)を参照してください。
+
 ```mermaid
 flowchart LR
     PC["Windows PC<br/>cargo / ndm24-tools"] <-->|"WebSocket :23074"| Q["QUsb2Snes"]
@@ -34,8 +38,14 @@ cargo xtask rom
 # 起動直後から NDM24 初期化を始める ROM
 cargo xtask rom --smoke
 
+# font8x8 の全印字可能 ASCII を確認する ROM
+cargo xtask rom --font-test
+
 # ビルド、FXPAK PRO への転送、起動
 cargo xtask deploy --smoke
+
+# フォント確認 ROM を転送して起動
+cargo xtask deploy --font-test
 
 # 一度だけ診断スナップショット
 cargo run -p ndm24-tools -- monitor --once
@@ -55,9 +65,19 @@ cargo run -p ndm24-tools -- mailbox clear-trace
 cargo run -p ndm24-tools -- mailbox resume-trace
 ```
 
+NDM24自身の識別情報を読み取り専用ATコマンドで収集する場合は、hardware revisionを指定します。
+
+```powershell
+cargo run -p ndm24-tools -- identify --revision B
+```
+
+`ATI`、`ATI0`～`ATI9`、`AT+GMI`、`AT+GMM`、`AT+GMR`、`AT+GSN`、`AT+GCAP` を順に実行します。未対応コマンドの `ERROR` も機器特性として記録し、発信や設定変更は行いません。raw response、行単位の応答、trace、snapshotは `build/hardware-tests/<test-id>/at-identification.json` に保存します。
+
 既定の WebSocket endpoint は QUsb2Snes の `ws://localhost:23074` です。別の endpoint、ROM の SD カード上の配置先、label file は各コマンドの option で変更できます。
 
-`deploy` は QUsb2Snes の `PutFile` で ROM を 1024 バイト以下の chunk に分けて送り、`Boot` を要求します。WRAM の監視とメールボックス操作には `GetAddress` と `PutAddress` を使います。
+`deploy` は QUsb2Snes の `PutFile` で ROM を 1024 バイト以下の chunk に分けて送り、同じ WebSocket 接続上で `Boot` と `Info` を続けて要求します。`Info` が転送先 ROM を実行中と返すまで接続を維持し、実際の起動を確認してから成功とします。
+
+FXPAK PRO の `SNES` 空間にある `$F50000` 以降は、実WRAMではなくカートリッジ側の観測用コピーです。診断読み取りには `GetAddress` を使えますが、同じ場所への通常の `PutAddress` はSFC CPUから見えません。メールボックス命令は、レジスタを保存してWRAMの入力arguments、command、host sequenceを書き換える短い65816コードを `$3F0000` のscratchへ置き、`PutAddress` の `SETX` flagで次のNMIに実行します。processed sequence、status/result、SFC専用outputは観測用コピーから読み戻します。mailbox ABI version 3ではホスト入力とSFC出力を別の32byte領域に分離しています。
 
 ## PC 側疑似回線 peer
 
@@ -69,11 +89,27 @@ cargo run -p ndm24-tools -- peer --port COM5 --baud 115200
 
 これは PC と相手モデム間の DTE baud です。回線上の通信速度とは別なので、使用するモデムの設定に合わせます。疑似電話交換機を含む配線と試験条件は [hardware-test.md](hardware-test.md)を参照してください。
 
+接続・切断までの自動実機試験では、後期NDM24を接続したsmoke ROMを起動してから次を実行します。
+
+```powershell
+cargo run -p ndm24-tools -- connect-test --revision B --port COM5
+```
+
+このコマンドはDFM-56UをV.22bis 2400bpsの自動応答に設定し、SFCへ `AT&F`、`AT%B2400`、`ATS7=60`、`ATX3`、`ATDT0` を順次要求します。両側の `CONNECT` 後に10秒保持し、DFM-56UのDTRを落としてNDM24側の `NO CARRIER` まで確認します。結果は `build/hardware-tests/<test-id>/connect-test.json` に保存し、終了時にDFM-56Uへ `ATZ` を送ります。
+
+接続後の8bit透過性を確認するには、同じ配線で次を実行します。
+
+```powershell
+cargo run -p ndm24-tools -- binary-test --revision B --port COM5
+```
+
+このコマンドは双方のflow controlを使わずV.22bis 2400bpsで接続し、`0x00` から `0xFF` までをNDM24→DFM-56U、DFM-56U→NDM24の順に転送します。SFC側とはQUsb2Snes mailboxを介して最大31byteずつ受け渡し、値、順序、欠落、重複、ring overflowを照合します。受信方向は各chunkの回線到着を待ち、mailboxで取り出す直前のRX ringも記録します。結果は `build/hardware-tests/<test-id>/binary-pattern-test.json` に保存します。
+
 ## 仕様変更
 
 1. `spec/ndm24.toml` を変更します。
 2. `cargo xtask generate` を実行します。
-3. 生成された Assembly、Rust、Markdown の差分を確認します。
+3. 生成された Assembly、Rust、Markdown、font、palette、PNG の差分を確認します。
 4. `cargo xtask check` を通します。
 
 CI でも `cargo xtask check` を実行するため、生成物だけ、または正本だけを変更した状態は通りません。

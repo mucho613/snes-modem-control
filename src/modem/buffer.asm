@@ -13,8 +13,11 @@
 .import modemReceiveAcceptedCount, modemReceiveDiscardedCount
 .import modemTransmitByteCount, modemReceiveOverflowCount
 .import modemTransmitOverflowCount, modemPollLimitCount
+.import modemAtStatus, modemAtExpectedResult
+.import modemSessionLastResult, modemSessionLineLength, modemAtStartFrame
 .import modemReceiveBuffer, modemTransmitBuffer
 .import modemMailbox
+.import terminalMirrorReceivedByte
 
 .export modemInitializeDiagnostics
 .export modemResetQueues
@@ -70,6 +73,14 @@
   stz modemTraceNextSequence + 1
   stz modemTraceNextSequence + 2
   stz modemTraceNextSequence + 3
+  stz modemAtStatus
+  stz modemAtExpectedResult
+  stz modemSessionLastResult
+  stz modemSessionLineLength
+  stz modemAtStartFrame
+  stz modemAtStartFrame + 1
+  stz modemAtStartFrame + 2
+  stz modemAtStartFrame + 3
 
   lda #MODEM_MAILBOX_MAGIC_0
   sta modemMailbox
@@ -107,6 +118,10 @@
   stz modemReceiveWriteIndex
   stz modemTransmitReadIndex
   stz modemTransmitWriteIndex
+  stz modemAtStatus
+  stz modemAtExpectedResult
+  stz modemSessionLastResult
+  stz modemSessionLineLength
   rts
 .endproc
 
@@ -143,6 +158,7 @@
   pla
   sta modemReceiveBuffer, y
   sta modemLastReceiveByte
+  jsr terminalMirrorReceivedByte
   iny
   sty modemReceiveWriteIndex
   modemIncrement32 modemReceiveAcceptedCount

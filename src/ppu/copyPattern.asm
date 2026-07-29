@@ -3,7 +3,7 @@
 
 .data
 Font:
-  .incbin "../../assets/pattern.bin"
+  .incbin "../../assets/font.bin"
 
 .code
 
@@ -14,42 +14,25 @@ Font:
 
   pha
   phb
+  phd
   phx
-  phy
 
   setDP $2100
-
   stz .lobyte(VMADDL)
   setDBR .bankbyte(Font)
 
   ldx #$0000
-  @outerLoop:
+@copy:
+  lda Font, x
+  sta .lobyte(VMDATAL)
+  inx
+  inx
+  cpx #$1000
+  bne @copy
 
-    ldy #$0008
-    @innerLoop1:
-      lda Font, x
-
-      sta .lobyte(VMDATAL)
-
-      inx
-      inx
-      dey
-      bne @innerLoop1
-
-    ldy #$0008
-    @innerLoop2:
-      stz .lobyte(VMDATAL)
-
-      dey
-      bne @innerLoop2
-
-    cpx #$6B40
-    bne @outerLoop
-
-  ply
   plx
+  pld
   plb
   pla
-
   rts
 .endproc

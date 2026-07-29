@@ -1,3 +1,6 @@
+mod binary_test;
+mod connect_test;
+mod identification_test;
 mod labels;
 mod peer;
 mod qusb2snes;
@@ -23,6 +26,42 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    Identify {
+        #[arg(long, default_value = "B")]
+        revision: String,
+        #[arg(long, default_value = "ws://localhost:23074")]
+        websocket: String,
+        #[arg(long, default_value = "build/smoke/modem-control.lbl")]
+        labels: PathBuf,
+        #[arg(long, default_value = "build/hardware-tests")]
+        output: PathBuf,
+    },
+    BinaryTest {
+        #[arg(long, default_value = "B")]
+        revision: String,
+        #[arg(long, default_value = "COM5")]
+        port: String,
+        #[arg(long, default_value = "ws://localhost:23074")]
+        websocket: String,
+        #[arg(long, default_value = "build/smoke/modem-control.lbl")]
+        labels: PathBuf,
+        #[arg(long, default_value = "build/hardware-tests")]
+        output: PathBuf,
+    },
+    ConnectTest {
+        #[arg(long, default_value = "B")]
+        revision: String,
+        #[arg(long, default_value = "COM5")]
+        port: String,
+        #[arg(long, default_value = "ws://localhost:23074")]
+        websocket: String,
+        #[arg(long, default_value = "build/smoke/modem-control.lbl")]
+        labels: PathBuf,
+        #[arg(long, default_value = "build/hardware-tests")]
+        output: PathBuf,
+        #[arg(long, default_value_t = 10)]
+        hold_seconds: u64,
+    },
     Monitor {
         #[arg(long, default_value = "ws://localhost:23074")]
         websocket: String,
@@ -103,6 +142,41 @@ impl MailboxCommand {
 #[tokio::main]
 async fn main() -> Result<()> {
     match Cli::parse().command {
+        Command::Identify {
+            revision,
+            websocket,
+            labels,
+            output,
+        } => {
+            let report = identification_test::run(&websocket, &labels, &revision, &output).await?;
+            println!("AT identification report saved at {}", report.display());
+            Ok(())
+        }
+        Command::BinaryTest {
+            revision,
+            port,
+            websocket,
+            labels,
+            output,
+        } => {
+            let report = binary_test::run(&websocket, &labels, &port, &revision, &output).await?;
+            println!("binary pattern test passed; report {}", report.display());
+            Ok(())
+        }
+        Command::ConnectTest {
+            revision,
+            port,
+            websocket,
+            labels,
+            output,
+            hold_seconds,
+        } => {
+            let report =
+                connect_test::run(&websocket, &labels, &port, &revision, &output, hold_seconds)
+                    .await?;
+            println!("connect test passed; report {}", report.display());
+            Ok(())
+        }
         Command::Monitor {
             websocket,
             labels,

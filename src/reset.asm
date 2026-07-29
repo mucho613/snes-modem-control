@@ -1,21 +1,18 @@
 .import initializeRegisters
-.import transferText
-.import bg1YScrollPos
 .import clearBG1Tile
-.import setBG1Tile
 .import copyPalette
 .import copyPattern
 .import VBlank
 .import clearRamAll
 .import readController1
+.import terminalInitialize
 .import modemInitializeDiagnostics
-.import modemInitialize, modemPoll, modemSessionPoll, modemMailboxPoll
-.import bufW12SEL
-.import bufWH0
-.import bufWH1
+.import modemInitialize
+.import modemPoll, modemSessionPoll, modemMailboxPoll
 
 .include "./registers.inc"
 .include "./macro/utility.asm"
+.include "./modem/generated.inc"
 .include "./ram/clearAll.inc"
 
 .code
@@ -52,29 +49,27 @@
   rep #$20
   .a16
   jsr clearBG1Tile
-  jsr setBG1Tile
   jsr copyPalette
   jsr copyPattern
+  jsr terminalInitialize
 
   sep #$30
   .a8
   .i8
   jsr modemInitializeDiagnostics
 
-  lda #$fa
+  ; BG1 tilemap at VRAM $4000, 32x64 tiles.
+  lda #TERMINAL_BG1SC
   sta BG1SC
   lda #$01
   sta TM
-  sta TS
+  stz TS
   lda #$0f
   sta INIDISP
 
   rep #$30
   .a16
   .i16
-  lda #$01ff
-  sta bg1YScrollPos
-
   .ifdef MODEM_SMOKE_TEST
     jsr modemInitialize
   .endif
@@ -88,23 +83,19 @@
   sta NMITIMEN
   cli
 
-  lda #$03
-  sta W12SEL
-  lda #$18
-  sta WH0
-  lda #$e4
-  sta WH1
-  lda #$01
-  sta TMW
-  sta TSW
-
 @mainLoop:
-  rep #$30
-  .a16
-  .i16
-  jsr readController1
-  jsr modemMailboxPoll
-  jsr modemPoll
-  jsr modemSessionPoll
+  .ifdef MODEM_FONT_TEST
+    ; The font specimen is a static display test. Leave controller-port and
+    ; NDM24 activity disabled while NMI continues rendering the display queue.
+    wai
+  .else
+    rep #$30
+    .a16
+    .i16
+    jsr readController1
+    jsr modemMailboxPoll
+    jsr modemPoll
+    jsr modemSessionPoll
+  .endif
   bra @mainLoop
 .endproc

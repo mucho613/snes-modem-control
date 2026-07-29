@@ -6,7 +6,8 @@
 
 .import modemLastDataReport, modemLastStatusReport
 .import modemLastDiscardReason, modemTransferHadTransmit
-.import modemPeekTransmitByte, modemConsumeTransmitByte
+.import modemTransmitReadIndex, modemTransmitWriteIndex, modemTransmitBuffer
+.import modemConsumeTransmitByte
 .import modemStoreReceivedByte, modemRecordDiscard
 .import modemRecordTrace
 
@@ -21,24 +22,25 @@
   stz modemLastStatusReport + 1
   stz modemTransferHadTransmit
 
-  stz .lobyte(JOYOUT)
+  ; Match the transfer waveform used by the original working implementation.
+  ; Bank $80 provides direct absolute access to the I/O registers and mirrors
+  ; the first 8 KiB of WRAM, where the driver state and rings reside.
+  phb
+  pea $8000
+  plb
+  plb
+
   lda #MODEM_LATCH_ASSERT
   sta .lobyte(JOYOUT)
   stz .lobyte(JOYOUT)
 
-  ; The first output bit says whether a transmit byte follows.
-  jsr modemPeekTransmitByte
-  bcs @noTransmitStartBit
-  lda #$01
-  sta modemTransferHadTransmit
-  lda #MODEM_TX_ASSERT
-  bra @writeStartBit
+  lda modemTransmitReadIndex
+  cmp modemTransmitWriteIndex
+  beq @noTransmitStartBit
+  inc modemTransferHadTransmit
+  stz WRIO
 
 @noTransmitStartBit:
-  lda #MODEM_TX_RELEASE
-
-@writeStartBit:
-  sta .lobyte(WRIO)
   nop8Times
   nop8Times
 
@@ -48,21 +50,21 @@
   lsr
   rol modemLastStatusReport
 
-  jsr modemPeekTransmitByte
-  bcc @transmitByteLoaded
-  lda #$ff
+  lda modemTransferHadTransmit
+  beq @transmitBufferEmpty
+  ldy modemTransmitReadIndex
+  lda modemTransmitBuffer, y
+  bra @loadTransmitByteEnd
 
-@transmitByteLoaded:
+@transmitBufferEmpty:
+  lda #MODEM_TX_RELEASE
+
+@loadTransmitByteEnd:
   ldy #$08
 @bitLoop:
+  sta WRIO
   asl
   xba
-  lda #MODEM_TX_RELEASE
-  bcs @writeTransmitBit
-  lda #MODEM_TX_ASSERT
-
-@writeTransmitBit:
-  sta .lobyte(WRIO)
   nop8Times
 
   lda .lobyte(JOYSER1)
@@ -77,10 +79,10 @@
   bne @bitLoop
 
   lda #MODEM_TX_RELEASE
-  sta .lobyte(WRIO)
+  sta WRIO
 
-  ; Align the first sampled bit with the same 16-bit representation used by a
-  ; complete report: flag in Data1 low byte, value in Data1 high byte.
+  ; Align the 8 data bits and final transfer RX-present bit: asserted flag in
+  ; Data1 low byte, value in Data1 high byte.
   ldy #$07
 @alignReports:
   clc
@@ -92,6 +94,8 @@
   dey
   bne @alignReports
 
+  plb
+
   lda modemTransferHadTransmit
   beq @receiveDecision
   jsr modemConsumeTransmitByte
@@ -99,25 +103,10 @@
   jsr modemRecordTrace
 
 @receiveDecision:
-  lda modemLastStatusReport + 1
-  bit #MODEM_STATUS_READY_MASK
-  bne @statusReady
-
-  lda #MODEM_DISCARD_STATUS_NOT_READY
-  sta modemLastDiscardReason
   lda modemLastDataReport
-  bit #MODEM_RX_PRESENT_MASK
-  beq @recordTransfer
-  lda #MODEM_DISCARD_STATUS_NOT_READY
-  jsr modemRecordDiscard
-  lda #MODEM_TRACE_RX_DISCARDED
-  jsr modemRecordTrace
-  bra @recordTransfer
-
-@statusReady:
-  lda modemLastDataReport
-  bit #MODEM_RX_PRESENT_MASK
-  bne @receivePresent
+  and #MODEM_RX_PRESENT_MASK
+  cmp #MODEM_RX_PRESENT_ASSERTED
+  beq @receivePresent
   lda #MODEM_DISCARD_NO_DATA
   sta modemLastDiscardReason
   bra @recordTransfer

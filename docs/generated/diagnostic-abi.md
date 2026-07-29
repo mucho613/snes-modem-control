@@ -2,7 +2,7 @@
 
 # NTT DATA NDM24 diagnostic ABI
 
-ABI version: `1`. Block size: `128` bytes.
+ABI version: `2`. Block size: `128` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|
@@ -35,10 +35,16 @@ ABI version: `1`. Block size: `128` bytes.
 | `0x3C` | 4 | `u32` | `reinitialize` | Initialization request count |
 | `0x40` | 4 | `u32` | `trace_overwritten` | Trace events written after the first full ring |
 | `0x44` | 4 | `u32` | `reset_start_frame` | Frame at which the R command was sent |
+| `0x48` | 4 | `u32` | `terminal_dropped` | Oldest display-mirror bytes discarded to retain newer output |
+| `0x4C` | 1 | `u8` | `at_status` | Current generic AT transaction status |
+| `0x4D` | 1 | `u8` | `at_expected_result` | Result code expected by the generic AT transaction |
+| `0x4E` | 1 | `u8` | `session_last_result` | Most recent parsed AT result code |
+| `0x4F` | 1 | `u8` | `session_line_length` | Bytes currently accumulated by the AT line parser |
+| `0x50` | 4 | `u32` | `at_start_frame` | Frame at which the current generic AT transaction started |
 
 ## Mailbox ABI
 
-ABI version: `1`. Block size: `64` bytes.
+ABI version: `3`. Block size: `96` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|
@@ -51,4 +57,5 @@ ABI version: `1`. Block size: `64` bytes.
 | `0x11` | 1 | `u8` | `status` | Command status |
 | `0x12` | 2 | `u16` | `result` | Command-specific result |
 | `0x14` | 32 | `bytes` | `arguments` | Command arguments |
-| `0x34` | 12 | `bytes` | `reserved` | Reserved; must be zero |
+| `0x34` | 32 | `bytes` | `output` | Command output; written only by the SFC |
+| `0x54` | 12 | `bytes` | `reserved` | Reserved; must be zero |

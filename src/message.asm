@@ -2,16 +2,9 @@
 
 .export startup
 startup:
-.byte "Modem control test - @mucho613", $0a, "--------------------------------", $0a, $00
+.byte "modem-control-test", $0a, "--------------------------------", $0a, $00
 
-.export startModemConfiguration
-startModemConfiguration:
-.byte "Start modem configuration.", $0a, $00
-
-.export dialing
-dialing:
-.byte "Dialing...", $0a, $00
-
-.export pleaseConnectModemMessage
-pleaseConnectModemMessage:
-.byte "Please connect NDM24 modem to controller port 2.", $0a, $00
+; Generated font specimen and embedded provenance. The attribution label is
+; intentionally linked into every ROM even though only the font-test ROM
+; displays the short Public Domain line contained in fontTestScreen.
+.include "./terminal/generated-font.inc"

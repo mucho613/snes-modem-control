@@ -1,15 +1,125 @@
-.macpack generic
-
 .include "../registers.inc"
 .include "../macro/utility.asm"
-
-.import terminalTextPointer
+.include "../modem/constants.inc"
 
 .code
 
-; args:
-; 0: string terminated with 0x00
+.import startup
+.ifdef MODEM_FONT_TEST
+  .import fontTestScreen
+.endif
+.import terminalDisplayReadIndex, terminalDisplayWriteIndex
+.import terminalDisplayBuffer, terminalCursor, terminalVerticalScroll
+.import terminalQueueScratchByte, terminalRenderScratchByte
+.import modemTerminalDroppedCount
+
+.assert TERMINAL_QUEUE_STORAGE_SIZE = $0100, error, "terminal queue requires 8-bit indices"
+.assert TERMINAL_QUEUE_CAPACITY = TERMINAL_QUEUE_STORAGE_SIZE - 1, error, "terminal queue capacity"
+.assert TERMINAL_COLUMNS * TERMINAL_ROWS = TERMINAL_TILEMAP_MASK + 1, error, "terminal tilemap geometry"
+
+.export terminalInitialize
+.export terminalQueueByte
+.export terminalMirrorReceivedByte
+.export terminalRenderVBlank
 .export print
+
+; Initialize the independent display mirror and enqueue the startup display.
+; The caller uses 16-bit accumulator and index registers.
+.proc terminalInitialize
+  .a16
+  .i16
+
+  pha
+  phb
+  phx
+
+  setDBR $7e
+  sep #$20
+  .a8
+  stz terminalDisplayReadIndex
+  stz terminalDisplayWriteIndex
+  stz terminalCursor
+  stz terminalCursor + 1
+  stz terminalVerticalScroll
+  stz terminalVerticalScroll + 1
+  stz terminalQueueScratchByte
+  stz terminalRenderScratchByte
+  stz modemTerminalDroppedCount
+  stz modemTerminalDroppedCount + 1
+  stz modemTerminalDroppedCount + 2
+  stz modemTerminalDroppedCount + 3
+
+  rep #$30
+  .a16
+  .i16
+  .ifdef MODEM_FONT_TEST
+    setDBR .bankbyte(fontTestScreen)
+    pea fontTestScreen
+  .else
+    setDBR .bankbyte(startup)
+    pea startup
+  .endif
+  jsr print
+  pla
+
+  plx
+  plb
+  pla
+  rts
+.endproc
+
+; Queue one display-only byte. Input A is 8-bit. The routine preserves A and
+; X, works with either index width, and cannot be split by VBlank.
+.proc terminalQueueByte
+  .a8
+
+  php
+  sei
+  rep #$10
+  .i16
+  phx
+  phb
+  setDBR $7e
+
+  sta terminalQueueScratchByte
+  lda terminalDisplayWriteIndex
+  inc
+  cmp terminalDisplayReadIndex
+  bne spaceAvailable
+
+  lda terminalDisplayReadIndex
+  inc
+  sta terminalDisplayReadIndex
+  modemIncrement32 modemTerminalDroppedCount
+
+spaceAvailable:
+  lda terminalDisplayWriteIndex
+  rep #$20
+  .a16
+  and #$00ff
+  tax
+  sep #$20
+  .a8
+  lda terminalQueueScratchByte
+  sta terminalDisplayBuffer, x
+  inc terminalDisplayWriteIndex
+
+  lda terminalQueueScratchByte
+  plb
+  plx
+  plp
+  rts
+.endproc
+
+; Explicit name used by the modem RX producer.
+.proc terminalMirrorReceivedByte
+  .a8
+  jmp terminalQueueByte
+.endproc
+
+; Compatibility string output for existing local messages. The argument is a
+; stack-passed, NUL-terminated pointer. Bytes enter the same display queue as
+; modem RX and are therefore rendered only during VBlank.
 .proc print
   .a16
   .i16
@@ -19,121 +129,166 @@
   phx
   phy
 
-  lda #$2100
-  tcd
-
-  lda terminalTextPointer
-  add #$4000 ; BG1 tilemap base address
-  sta .lobyte(VMADDL) ; set text position
-
-  ldx terminalTextPointer
-
-  ; X is cursor position
-  ; Y is pointer of text
   sep #$20
   .a8
-
   ldy #$0000
 
-  @loop:
-    lda ($0a, s), y ; a + b + x + y + return address
+@loop:
+  lda ($0a, s), y
+  beq @done
+  jsr terminalQueueByte
+  iny
+  cpy #$00ff
+  bne @loop
 
-    cmp #$0d ; check for carriage return
-    bne @checkLineFeed
-    rep #$20
-    .a16
-    txa
-    and #$ffe0 ; clear lower 5 bits
-    tax
-
-    clc
-    adc #$4000
-    sta .lobyte(VMADDL)
-    sep #$20
-    .a8
-    bra @endCarriageReturn
-
-    @checkLineFeed:
-    cmp #$0a ; check for line feed
-    bne @checkBackSpace
-    rep #$20
-    .a16
-    txa
-    and #$ffe0 ; clear lower 5 bits
-    add #$20
-    tax
-
-    add #$4000
-    sta .lobyte(VMADDL)
-    sep #$20
-    .a8
-    bra @endLineFeed
-
-    @checkBackSpace:
-    cmp #$08 ; check for backspace
-    bne @checkNullTerminator
-    rep #$20
-    .a16
-    dex ; move back one character
-    txa
-    clc
-    adc #$4000
-    sta .lobyte(VMADDL)
-    sep #$20
-    .a8
-    bra @endBackSpace
-
-    @checkNullTerminator:
-    cmp #$00 ; check for null terminator
-    beq @transferEnd
-
-    @transferNormalCharacter:
-    sta .lobyte(VMDATAL) ; write character to VRAM
-    stz .lobyte(VMDATAH)
-    inx
-
-    @endCarriageReturn:
-    @endLineFeed:
-    @endBackSpace:
-
-    ; if text pointer reached end of BG1 tilemap, reset it
-    cpx #$0800 ; X - $0800
-    bne @noReset
-    ldx #$4000 ; reset to base address
-    stx .lobyte(VMADDL)
-    ldx #$0000
-
-    @noReset:
-    iny
-    cpy #$0080 ; up to 128 characters
-    bne @loop
-
-  @transferEnd:
-
-  stx terminalTextPointer ; save text pointer position
-
+@done:
   rep #$20
   .a16
-
-  ; scrolling to follow new line
-  txa
-  and #$ffe0
-  lsr
-  lsr
-  sub #$d9
-
-  sep #$20
-  .a8
-  sta $0e ; write to scroll position register
-  xba
-  sta $0e
-  rep #$20
-  .a16
-
   ply
   plx
   plb
   pla
+  rts
+.endproc
 
+; Drain at most 32 display bytes while VRAM is safely writable. The terminal
+; is a 32x64 tilemap at VRAM $4000 and follows the cursor automatically.
+.proc terminalRenderVBlank
+  .a8
+  .i16
+
+  ; Save P before normalizing X/Y. This keeps the stack frame balanced even
+  ; if a future caller enters while the index registers are 8-bit.
+  php
+  rep #$10
+  .i16
+  pha
+  phb
+  phd
+  phx
+  phy
+
+  setDBR $7e
+  setDP $2100
+  sep #$20
+  .a8
+  rep #$10
+  .i16
+
+  ldx #TERMINAL_RENDER_BUDGET
+@nextByte:
+  lda terminalDisplayReadIndex
+  cmp terminalDisplayWriteIndex
+  beq @updateScroll
+
+  rep #$20
+  .a16
+  and #$00ff
+  tay
+  sep #$20
+  .a8
+  lda terminalDisplayBuffer, y
+  sta terminalRenderScratchByte
+  inc terminalDisplayReadIndex
+  jsr @renderByte
+  dex
+  bne @nextByte
+
+@updateScroll:
+  rep #$20
+  .a16
+  lda terminalCursor
+  and #(TERMINAL_TILEMAP_MASK ^ (TERMINAL_COLUMNS - 1))
+  lsr
+  lsr
+  sec
+  sbc #TERMINAL_SCROLL_ANCHOR
+  sta terminalVerticalScroll
+
+  sep #$20
+  .a8
+  lda terminalVerticalScroll
+  sta .lobyte(BG1VOFS)
+  lda terminalVerticalScroll + 1
+  sta .lobyte(BG1VOFS)
+
+  rep #$10
+  .i16
+  ply
+  plx
+  pld
+  plb
+  pla
+  plp
+  rts
+
+@renderByte:
+  lda terminalRenderScratchByte
+  cmp #$0d
+  beq @carriageReturn
+  cmp #$0a
+  beq @lineFeed
+  cmp #$08
+  beq @backspace
+  cmp #$20
+  bcc @renderDone
+  cmp #$7f
+  bcs @renderDone
+
+  rep #$20
+  .a16
+  lda terminalCursor
+  clc
+  adc #TERMINAL_TILEMAP_BASE
+  sta .lobyte(VMADDL)
+  sep #$20
+  .a8
+  lda terminalRenderScratchByte
+  sta .lobyte(VMDATAL)
+  stz .lobyte(VMDATAH)
+  rep #$20
+  .a16
+  lda terminalCursor
+  inc
+  and #TERMINAL_TILEMAP_MASK
+  sta terminalCursor
+  sep #$20
+  .a8
+  rts
+
+@carriageReturn:
+  rep #$20
+  .a16
+  lda terminalCursor
+  and #(TERMINAL_TILEMAP_MASK ^ (TERMINAL_COLUMNS - 1))
+  sta terminalCursor
+  sep #$20
+  .a8
+  rts
+
+@lineFeed:
+  rep #$20
+  .a16
+  lda terminalCursor
+  and #(TERMINAL_TILEMAP_MASK ^ (TERMINAL_COLUMNS - 1))
+  clc
+  adc #TERMINAL_COLUMNS
+  and #TERMINAL_TILEMAP_MASK
+  sta terminalCursor
+  sep #$20
+  .a8
+  rts
+
+@backspace:
+  rep #$20
+  .a16
+  lda terminalCursor
+  dec
+  and #TERMINAL_TILEMAP_MASK
+  sta terminalCursor
+  sep #$20
+  .a8
+
+@renderDone:
   rts
 .endproc

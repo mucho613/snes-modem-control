@@ -7,11 +7,12 @@
 
 .import frameCounter
 .import modemDriverState, modemFlags, modemPollTick, modemBurstPending
+.import modemPollStage
 .import modemResetStartFrame
 .import modemLastDataReport, modemLastStatusReport, modemLastDiscardReason
 .import modemTransmitReadIndex, modemTransmitWriteIndex
 .import modemSnapshotBegin, modemSnapshotEnd
-.import modemRecordDiscard, modemRecordPollLimit
+.import modemStoreReceivedByte, modemRecordPollLimit
 .import modemTransfer9, modemRecordTrace, modemSetState
 
 .export modemPoll
@@ -33,6 +34,8 @@
   sep #$30
   .a8
   .i8
+  lda #$10
+  sta modemPollStage
 
   lda modemDriverState
   cmp #MODEM_STATE_OFF
@@ -54,7 +57,11 @@
   jmp @return
 
 @workAvailable:
+  lda #$20
+  sta modemPollStage
   jsr modemSnapshotBegin
+  lda #$21
+  sta modemPollStage
   stz modemPollTick
   stz modemBurstPending
 
@@ -74,10 +81,13 @@
 
   lda #MODEM_STATE_PROBING
   jsr modemSetState
+  lda #$22
+  sta modemPollStage
 
 @readCompleteReport:
-  ; A complete 16-bit read reports status and identity. JRA PAT does not
-  ; deliver the embedded data byte to software.
+  ; A complete 16-bit read reports status and identity. It can also consume
+  ; the first pending RX byte. RX-present is authoritative for the current
+  ; byte; Data2 remains only a hint for starting a transfer.
   stz modemLastDataReport
   stz modemLastDataReport + 1
   stz modemLastStatusReport
@@ -110,12 +120,23 @@
   sta modemLastDiscardReason
   lda #MODEM_TRACE_POLL16
   jsr modemRecordTrace
+  lda #$23
+  sta modemPollStage
 
   lda modemLastDataReport
   bit #MODEM_RX_PRESENT_MASK
   beq @fullReportHandled
-  lda #MODEM_DISCARD_FULL_REPORT
-  jsr modemRecordDiscard
+
+  lda #MODEM_DISCARD_NONE
+  sta modemLastDiscardReason
+  lda modemLastDataReport + 1
+  jsr modemStoreReceivedByte
+  bcs @fullReportOverflow
+  lda #MODEM_TRACE_RX_ACCEPTED
+  jsr modemRecordTrace
+  bra @fullReportHandled
+
+@fullReportOverflow:
   lda #MODEM_TRACE_RX_DISCARDED
   jsr modemRecordTrace
 
@@ -126,8 +147,16 @@
 
   ldx #MODEM_POLL_BUDGET
 @checkTransfer:
+  lda #$24
+  sta modemPollStage
+  ; Once a burst has started, RX-present is the authoritative indication for
+  ; the byte just returned. Keep clocking while valid bytes are arriving even
+  ; if Data2 deasserts; Data2 can fall before the trailing LF is transferred.
+  lda modemLastDiscardReason
+  cmp #MODEM_DISCARD_NONE
+  beq @transfer
   lda modemLastStatusReport + 1
-  bit #MODEM_STATUS_READY_MASK
+  bit #MODEM_STATUS_TRANSFER_HINT_MASK
   bne @transfer
   lda modemTransmitReadIndex
   cmp modemTransmitWriteIndex
@@ -138,8 +167,11 @@
   dex
   bne @checkTransfer
 
+  lda modemLastDiscardReason
+  cmp #MODEM_DISCARD_NONE
+  beq @budgetReached
   lda modemLastStatusReport + 1
-  bit #MODEM_STATUS_READY_MASK
+  bit #MODEM_STATUS_TRANSFER_HINT_MASK
   bne @budgetReached
   lda modemTransmitReadIndex
   cmp modemTransmitWriteIndex
@@ -151,6 +183,8 @@
   jsr modemRecordPollLimit
 
 @pollEnd:
+  lda #$25
+  sta modemPollStage
   lda #MODEM_TX_RELEASE
   sta .lobyte(WRIO)
   stz .lobyte(JOYOUT)
@@ -158,8 +192,12 @@
   sta .lobyte(JOYOUT)
   stz .lobyte(JOYOUT)
   jsr modemSnapshotEnd
+  lda #$26
+  sta modemPollStage
 
 @return:
+  lda #$30
+  sta modemPollStage
   rep #$30
   .a16
   .i16

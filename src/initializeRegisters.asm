@@ -17,10 +17,9 @@
   lda #$01
   sta MEMSEL ; set FastROM mode
 
-  ; JRA PAT initializes the NDM24 controller-port I/O line with an explicit
-  ; low-to-high transition.
-  stz WRIO
-  lda #$80
+  ; Keep every programmable I/O output released during SFC startup. The
+  ; NDM24-specific R sequence is issued later by modemInitialize.
+  lda #$ff
   sta WRIO
 
   stz OBJSEL
@@ -28,8 +27,7 @@
   stz OAMADDL ; disable OAM priority rotation
   stz OAMADDH
 
-  lda #$05
-  sta BGMODE
+  stz BGMODE
   stz MOSAIC
 
   stz BG1SC
@@ -109,8 +107,7 @@
   lda #$e0
   sta COLDATA ; set Fixed color data to black
 
-  lda #$0b
-  sta SETINI ; Enable Hi-res, OBJ interlace, and Screen interlace
+  stz SETINI
 
   rep #$20
   .a16

@@ -6,7 +6,6 @@
 
 .import controllerPollTick
 .import controller1Input, controller1InputPrev, controller1InputPulse
-.import terminalScrollLineNumber
 
 .export readController1
 .proc readController1
@@ -61,32 +60,6 @@
   eor controller1InputPrev + 1
   and controller1Input + 1
   sta controller1InputPulse + 1
-
-  ; Preserve the terminal's existing Up/Down scrolling behavior.
-  lda controller1InputPulse + 1
-  bit #$08
-  bne @inputUp
-  bit #$04
-  bne @inputDown
-  bra @done
-
-@inputUp:
-  lda terminalScrollLineNumber
-  dec
-  cmp #$ff
-  bne @storeScroll
-  lda #23
-  bra @storeScroll
-
-@inputDown:
-  lda terminalScrollLineNumber
-  inc
-  cmp #24
-  bne @storeScroll
-  lda #0
-
-@storeScroll:
-  sta terminalScrollLineNumber
 
 @done:
   rep #$30
