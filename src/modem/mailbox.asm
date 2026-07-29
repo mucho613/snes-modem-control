@@ -135,6 +135,10 @@
   beq @binaryTransmit
   cmp #MODEM_MAILBOX_COMMAND_BINARY_RECEIVE
   beq @binaryReceive
+  cmp #MODEM_MAILBOX_COMMAND_BINARY_STRESS_TRANSMIT
+  bne :+
+  jmp @binaryStressTransmit
+:
   lda #MODEM_MAILBOX_STATUS_FAILED
   sta modemMailboxStatus
   lda #$ff
@@ -217,6 +221,29 @@
   inx
   bra @binaryReceiveLoop
 @binaryReceiveDone:
+  stx modemMailboxResult
+  lda #MODEM_MAILBOX_STATUS_PASSED
+  sta modemMailboxStatus
+  bra @commitCommand
+
+@binaryStressTransmit:
+  lda modemDriverState
+  cmp #MODEM_STATE_CONNECTED
+  bne @binaryInvalid
+  lda modemTransmitReadIndex
+  cmp modemTransmitWriteIndex
+  bne @binaryInvalid
+  ; Fill the 255-byte usable TX ring with 0x00..0xFE before modemPoll can
+  ; consume it. This deliberately creates the largest possible controller-
+  ; interface burst for backpressure and byte-acceptance diagnostics.
+  ldx #$00
+@binaryStressTransmitLoop:
+  txa
+  jsr modemQueueByte
+  bcs @binaryInvalid
+  inx
+  cpx #MODEM_RING_CAPACITY
+  bne @binaryStressTransmitLoop
   stx modemMailboxResult
   lda #MODEM_MAILBOX_STATUS_PASSED
   sta modemMailboxStatus

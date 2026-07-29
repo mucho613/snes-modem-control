@@ -74,18 +74,20 @@ cargo run -p ndm24-tools -- identify --revision B
 - AT parserが末尾LFまで消費し、試験終了時のRX ringが空。
 - 日時・revision・AT transcript・SFC snapshot・transaction別traceを `build/hardware-tests/<test-id>/connect-test.json` へ保存する。
 
-`binary-test` は接続設定に加えてDFM-56Uへ `AT&K0` を送り、DTE flow controlを無効にします。接続後、全256値を昇順にNDM24→DFM-56U、DFM-56U→NDM24へ1回ずつ転送します。SFC側mailboxの1命令は最大31byteとし、TX ringが空になったことを確認してから次のchunkへ進みます。DFM-56U→NDM24ではV.22bis上のchunk到着時間と100msの余裕を待ち、RX ringを直接記録してからmailboxでdrainします。これにより回線・低レベルpollの結果とmailbox返却値を分離して診断します。
+`binary-test` は接続設定に加えてDFM-56Uへ `AT&K0` を送り、DTE flow controlを無効にします。接続後、全256値を昇順にNDM24→DFM-56U、DFM-56U→NDM24へ1回ずつ転送します。SFC側mailboxの1命令は最大31byteとし、TX ringが空になったことを確認してから次のchunkへ進みます。DFM-56U→NDM24ではV.22bis上のchunk到着時間と100msの余裕を待ち、RX ringを直接記録してからmailboxでdrainします。これにより回線・低レベルpollの結果とmailbox返却値を分離して診断します。report schema version 3以降は、NDM24→DFM-56Uの256byte送信が終わった直後にtraceをfreezeして `sfc_to_peer_trace` へ保存し、後半の受信試験でTX eventが上書きされることを防ぎます。
+
+report schema version 4以降は通常の31byte chunk試験に加え、SFCの255byte TX ringを `0x00`～`0xFE` で一度に満たす最大burst試験を行います。DFM-56Uで受信した列を完全比較し、burst前後のsnapshotと直後のtraceを独立保存します。255byteは32-transferのpoll budgetを7回使い切り、最後の31byteで完了するため、この区間に限ってpoll limit countの増分7とflagを期待値として扱います。通常送信では見えないNDM24入力bufferの飽和やbackpressure信号を探索するための試験です。
 
 QUsb2Snesからmailboxを読む際は、96byte全体が2回連続で一致するまで制御結果を確定しません。SFC専用outputは別のQUsb2Snes接続から32byteだけを2回読み、一致した値を採用します。完了済みの制御欄と更新前のoutput欄が混在した一時的な読み取りを、受信データとして扱わないためです。
 
-mailbox ABI version 3では、arguments 32byteをホスト→SFC専用、output 32byteをSFC→ホスト専用にします。FXPAK PROの `SETX` でホストが書いた領域をSFC出力として再利用しません。
+mailbox ABI version 4では、version 3のarguments/output所有権分離を維持し、デバッグ専用の255byte TX stress命令を追加します。arguments 32byteはホスト→SFC専用、output 32byteはSFC→ホスト専用で、FXPAK PROの `SETX` でホストが書いた領域をSFC出力として再利用しません。
 
 binary pattern試験の合格条件:
 
-- 双方向とも受信列が `0x00`～`0xFF` と完全一致し、欠落、重複、順序変更がない。
-- 転送後のRX/TX ringが空で、error、timeout、RX/TX overflow、poll limitが0。
+- 双方向とも受信列が `0x00`～`0xFF` と完全一致し、最大burstのSFC→DFM-56U受信列も `0x00`～`0xFE` と完全一致して、欠落、重複、順序変更がない。
+- 転送後のRX/TX ringが空で、error、timeout、RX/TX overflowが0。poll limitは最大burstによる増分7だけを許容し、それ以外の増加は不合格とする。
 - DTR切断後にNDM24が `NO CARRIER` を返して `READY` へ戻る。
-- expected/received byte列、chunkごとのdrain前RX ring、AT transcript、SFC snapshot、transfer traceを `build/hardware-tests/<test-id>/binary-pattern-test.json` へ保存する。
+- expected/received byte列、chunkごとのdrain前RX ring、AT transcript、SFC snapshot、SFC送信直後trace、受信試験traceを `build/hardware-tests/<test-id>/binary-pattern-test.json` へ保存する。
 
 接続失敗時は自動再発信しません。30分soak中もRX/TX ring、error、timeout、overflow、poll limit、discardを監視し、保持終了後のDTR切断、`NO CARRIER`、`READY`復帰までを同じconnect reportへ保存します。
 
@@ -100,11 +102,13 @@ binary pattern試験の合格条件:
 | AT識別情報 | 取得済み (2026-07-29) | 取得済み (2026-07-29) |
 | 疑似 PSTN connect | 合格 (2026-07-29) | 合格 (2026-07-29) |
 | binary pattern | 合格 (2026-07-29) | 合格 (2026-07-29) |
+| TX 255byte最大burst | 合格 (2026-07-29) | 合格 (2026-07-29) |
 | 30 分 soak | 合格 (2026-07-29) | 未実施 |
+| NMITIMEN gating回帰 | 合格 (2026-07-29) | 合格 (2026-07-29) |
 
-revision B の最新の疑似 PSTN connect 合格記録は test ID `unix-1785312449-revision-b` です。`AT&F`、`AT%B2400`、`ATS7=60`、`ATX3`、`ATDT0` のechoはすべて完全で、各transaction前後のRX discard counterは0のままでした。DFM-56U は `RING`、`CONNECT 115200` を返し、NDM24 は `CONNECT 2400` を受信して `CONNECTED` へ遷移しました。10秒保持中の未処理RXは0byteです。DFM-56UのDTRを下げた後にはキャリア切断過渡の `7F D5 86 8C CA 58 BA` が入り、続く `NO CARRIER` を受信して `READY` へ戻りました。最終snapshotはRX read/write indexがともに103、error、timeout、RX/TX overflow、poll limit、terminal droppedがすべて0です。transaction別trace、双方のAT transcript、切断前後のraw RX列は `build/hardware-tests/unix-1785312449-revision-b/connect-test.json` に保存されています。
+revision B の最新の疑似 PSTN connect 合格記録は test ID `unix-1785329111-revision-b` です。`AT&F`、`AT%B2400`、`ATS7=60`、`ATX3`、`ATDT0` のechoはすべて完全で、各transaction前後のRX discard counterは0のままでした。DFM-56U は `RING`、`CONNECT 115200` を返し、NDM24 は `CONNECT 2400` を受信して `CONNECTED` へ遷移しました。10秒保持中の未処理RXは0byteです。DFM-56UのDTRを下げた直後にはキャリア切断過渡の `07 99 62 A1 74 DD 6B EE 1E` が入り、続く `NO CARRIER` を受信して `READY` へ戻りました。最終snapshotはRX read/write indexがともに105、TX read/write indexがともに42で、error、timeout、RX/TX overflow、poll limit、discard、terminal droppedがすべて0です。transaction別trace、双方のAT transcript、切断前後のraw RX列は `build/hardware-tests/unix-1785329111-revision-b/connect-test.json` に保存されています。
 
-revision B のbinary pattern合格記録は test ID `unix-1785315378-revision-b` です。V.22bis 2400bpsで `0x00`～`0xFF` を双方へ256byteずつ転送し、NDM24→DFM-56U、DFM-56U→NDM24とも不一致0でした。DFM-56U→NDM24の全9chunkは、drain前RX ringとmailbox ABI version 3のSFC専用outputの両方が期待値と完全一致しました。転送中は `CONNECTED`、DTR切断と `NO CARRIER` 後は `READY` で、最終RX read/write indexは104/104、TX read/write indexは42/42です。error、timeout、RX/TX overflow、poll limit、discard、terminal droppedはすべて0で、256件のtransfer traceと切断過渡raw byte列を `build/hardware-tests/unix-1785315378-revision-b/binary-pattern-test.json` に保存しています。
+revision B の最新のbinary pattern合格記録は test ID `unix-1785330333-revision-b` です。V.22bis 2400bpsで `0x00`～`0xFF` を双方へ256byteずつ転送し、NDM24→DFM-56U、DFM-56U→NDM24とも不一致0でした。さらにTX ring全容量へ一度にqueueした `0x00`～`0xFE` の255byte最大burstもDFM-56Uで完全一致しました。burst前後のTX byte countは298から553、TX ringは42/42から41/41へ一周して空に戻り、予定どおりpoll budgetを7回使い切りました。stress traceに残った96件のTX eventはすべてData2=`$0200`で、途中の状態変化はありません。最終状態は `READY`、RX read/write index 105/105、TX read/write index 41/41です。error、timeout、RX/TX overflow、discard、terminal droppedは0、poll limitは最大burstの期待値7です。記録は `build/hardware-tests/unix-1785330333-revision-b/binary-pattern-test.json` に保存しています。
 
 revision B のAT識別情報は [NDM24 AT識別情報](ndm24-hardware-identification.md)にまとめています。正式記録のtest IDは `unix-1785316604-revision-b-identification` で、16コマンドすべてが `OK` または `ERROR` まで完了し、最終状態は `READY`、error、timeout、overflow、discard、trace overwriteはいずれも0でした。
 
@@ -114,8 +118,18 @@ revision A のquick testではraw `R`を含む初期化と `AT` probeを2回実�
 
 revision A の疑似 PSTN connect合格記録はtest ID `unix-1785319664-revision-a` です。DFM-56Uは `CONNECT 115200`、NDM24は `CONNECT 2400` を返し、10秒保持中の未処理RXは0byteでした。DTR切断直後にはキャリア切断過渡の `F0 0D C9 D7 5D 3A D8 79 FD 1A 05` が入り、その後 `NO CARRIER` を受信して `READY` へ戻りました。最終RX read/write indexは107/107、TX read/write indexは42/42で、error、timeout、RX/TX overflow、poll limit、discard、terminal droppedはすべて0です。記録は `build/hardware-tests/unix-1785319664-revision-a/connect-test.json` に保存しています。
 
-revision A のbinary pattern合格記録はtest ID `unix-1785319727-revision-a` です。V.22bis 2400bpsで `0x00`～`0xFF` を双方へ256byteずつ転送し、NDM24→DFM-56U、DFM-56U→NDM24とも不一致0でした。DFM-56U→NDM24の全9chunkはdrain前RX ringとmailbox outputの両方が期待値と完全一致しています。最終状態は `READY`、RX read/write indexは205/205、TX read/write indexは80/80で、error、timeout、RX/TX overflow、poll limit、discard、terminal droppedはすべて0です。記録は `build/hardware-tests/unix-1785319727-revision-a/binary-pattern-test.json` に保存しています。
+revision A の最新のbinary pattern合格記録はtest ID `unix-1785330743-revision-a` です。V.22bis 2400bpsで通常の `0x00`～`0xFF` を双方へ256byteずつ転送し、さらにTX ring全容量へ一度にqueueした `0x00`～`0xFE` の255byte最大burstをNDM24→DFM-56Uへ転送しました。3列とも不一致0です。burst前後のTX byte countは298から553、TX ringは42/42から41/41へ一周して空に戻り、poll budgetを期待値どおり7回使い切りました。stress traceに残った96件のTX eventはすべてData2=`$0200`で、途中の状態変化はありません。最終状態は `READY`、RX read/write index 107/107、TX read/write index 41/41です。error、timeout、RX/TX overflow、discard、terminal droppedは0、poll limitは最大burstの期待値7です。記録は `build/hardware-tests/unix-1785330743-revision-a/binary-pattern-test.json` に保存しています。
 
 revision A の30分carrier soak合格記録はtest ID `unix-1785320450-revision-a` です。V.22bis 2400bpsのcarrierを1800秒保持し、5分ごとの中間snapshotはいずれも `CONNECTED`、RX/TX ring空、error、timeout、RX/TX overflow、poll limit、discard、terminal droppedが0でした。保持終了後、DTR切断直後にキャリア切断過渡の `01 A1 20 46 D3 E3 DE 74 C8 FE D2 87` が入り、その後 `NO CARRIER` を受信して `READY`へ復帰しました。最終RX read/write indexは108/108、TX read/write indexは42/42で、全エラーカウンタは0です。記録は `build/hardware-tests/unix-1785320450-revision-a/connect-test.json` に保存しています。
+
+NMITIMEN gatingの初回候補実装に対するrevision A回帰試験は、疑似PSTN connectがtest ID `unix-1785323651-revision-a`、binary patternが `unix-1785323703-revision-a` で合格しました。ただし、実機試験後の静的確認でDP=`$4000`から `.lobyte($4200)` を使っていたため、NMITIMENではなく `$4000` を書いていたことが判明しました。この2記録は既存動作に回帰がないことだけを示し、NMI gatingの合格根拠には使用しません。
+
+実際の `$4200` を操作する最初の修正版では、VBlank中にNMI enableを復元したときの即時NMI再発火により、フレームカウンターが実時間より異常に速く進み、`AT` probeが無応答のままtimeoutしました。最終実装では無効化前と復元前に `$4212` (`HVBJOY`) bit 7が0になるまで待ち、切り替えを表示期間中に限定しています。生成ROMの静的確認では `$4212` のabsolute read、`$4200` のabsolute `STZ` / `STA` を確認し、誤ったdirect-page `$00` 書き込みがないことも確認しました。
+
+最終実装のrevision A回帰では、起動時probeが受信9byte、timeout 0で `READY` へ到達しました。続くNMI有効状態からのクイック再初期化も約10秒で合格し、`reinitialize=2`、累計受信18byte、timeout 0、`reset_start_frame=1392` でした。この試験はraw `R`区間でNMIを退避・復元した後、NMIで更新される600フレームのguardを完走しなければ成功しないため、NMI復帰の動作確認を兼ねます。
+
+同じ最終実装によるrevision A疑似PSTN connectはtest ID `unix-1785324347-revision-a`、binary patternは `unix-1785324397-revision-a` で合格しました。connectの最終状態は `READY`、RX read/write index 107/107、TX read/write index 42/42で、error、timeout、RX/TX overflow、poll limit、discard、terminal droppedはすべて0です。binary patternの最終状態も `READY`、双方向の全byte列が一致し、RX read/write index 205/205、TX read/write index 80/80、全エラーカウンターは0です。
+
+revision Bでも同じNMITIMEN gating最終実装を再試験しました。交換中に入った過渡データを除外するためROMを再起動して診断状態を初期化し、起動時probeとNMI有効状態からのクイック再初期化を取り直しています。最終状態は `READY`、累計受信18byte、送信8byte、`reinitialize=2`で、timeout、RX/TX overflow、poll limit、discard、terminal droppedはすべて0でした。続く疑似PSTN connectとbinary patternも上記の最新test IDで合格したため、revision BのNMITIMEN gating回帰を合格とします。
 
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。

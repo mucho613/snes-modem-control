@@ -9,6 +9,7 @@
 .import modemInitializeDiagnostics
 .import modemInitialize
 .import modemPoll, modemSessionPoll, modemMailboxPoll
+.import nmitimenShadow
 
 .include "./registers.inc"
 .include "./macro/utility.asm"
@@ -80,6 +81,10 @@
 
   ; NMI enabled, automatic joypad reading disabled.
   lda #$80
+  phb
+  setDBR $7e
+  sta nmitimenShadow
+  plb
   sta NMITIMEN
   cli
 

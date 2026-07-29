@@ -98,6 +98,9 @@
 
   lda modemTransferHadTransmit
   beq @receiveDecision
+  ; The controller protocol has no identified per-byte TX acknowledgement.
+  ; Consume after the complete waveform; this records delivery to the NDM24
+  ; interface, not delivery across the telephone carrier.
   jsr modemConsumeTransmitByte
   lda #MODEM_TRACE_TX
   jsr modemRecordTrace

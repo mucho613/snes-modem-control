@@ -5,6 +5,7 @@
 .code
 
 .import frameCounter
+.import nmitimenShadow
 .import modemResetStartFrame, modemReinitializeCount
 .import modemSessionProbeSent, modemSessionRetryCount, modemSessionLineLength
 .import modemResetQueues, modemSnapshotBegin, modemSnapshotEnd
@@ -84,7 +85,7 @@
 
   pha
   php
-  sei
+  sei ; Mask IRQ. NMI is gated explicitly around the raw waveform below.
   phb
   phd
   phx
@@ -104,6 +105,7 @@
   stz modemSessionLineLength
 
   ; Use the hardware-verified raw "R" waveform verbatim.
+  suspendNmi nmitimenShadow
   rep #$30
   .a16
   .i16
@@ -111,6 +113,7 @@
   sep #$30
   .a8
   .i8
+  restoreNmi nmitimenShadow
 
   rep #$20
   .a16

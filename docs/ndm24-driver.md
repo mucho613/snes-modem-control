@@ -11,7 +11,8 @@
 - NMI/VBlank は 32 ビットのフレームカウンタを更新し、コントローラーとモデムの処理要求を立てるだけです。
 - コントローラーの手動読み取り、メールボックス、NDM24 I/O、AT セッションはメインループだけが実行します。
 - SFC の自動ジョイパッド読み取りは無効です。コントローラーポート 2 を NMI が途中で触らないためです。
-- bit-bang の転送間隔を NMI の処理時間で引き延ばさないよう、初期化、1 回の上限付き poll、手動コントローラー読み取りの間だけ NMI を保留し、終了時に元の状態へ戻します。
+- bit-bang の転送間隔を NMI の処理時間で引き延ばさないよう、write-onlyの `$4200` (`NMITIMEN`) をWRAMの `nmitimenShadow` で管理します。初期化のraw `R`波形、1回の上限付きpoll、手動コントローラー読み取りでは現在値をstackへ退避してNMI enableを解除し、波形終了後に同じ値を復元します。`SEI` はmask可能IRQだけを保護し、NMI保護としては扱いません。
+- VBlank中にNMI enableを0から1へ戻すと即時にNMIが再発火し得るため、無効化前と復元前には `$4212` (`HVBJOY`) のbit 7が0、すなわち表示期間へ戻ったことを確認します。これにより波形を現行VBlankの後へ配置し、復元時のNMI再発火ループも防ぎます。
 - ドライバは再入可能ではありません。同じ API を割り込みとメインループから同時に呼びません。
 - 1 回の `modemPoll` は最大 32 回の 9 ビット転送で戻ります。残件があれば次のメインループで継続します。
 
@@ -47,6 +48,8 @@ stateDiagram-v2
 
 SFC起動時の `$4201` は、全programmable I/O出力をreleaseする `$FF` で初期化します。ロジックアナライザで観測したJRA PATのLow→Highは現時点では再現せず、NDM24固有の初期化は後続の `R` 専用シーケンスで行います。`modemInitialize` 内でもLow→Highは繰り返しません。
 
+SFC起動中の `$4200` は0で、通常運転へ入る直前にNMI enableだけを立てた `$80` と、その値を `nmitimenShadow` へ同時に設定します。bit-bang区間が通常運転前や既にNMI無効の文脈から呼ばれても、終了時に無条件で `$80` を書かず、呼び出し前の値へ戻します。これにより起動時のraw `R`がNMIを予定より早く有効化することもありません。
+
 `R` (`$52`) は AT コマンドではなく、NDM24 固有の初期化バイトとして扱います。raw `R` 後は600フレーム（NTSCで約10秒）待ってから `AT CR LF` を送ります。1フレーム待機では300フレームのtimeoutを2回消費し、約10秒後の3回目だけが成功しました。600フレーム待機では最初のprobeで `OK` を受信し、timeout 0を実機確認済みです。`ERROR` または300フレームのタイムアウトは最大3回まで再試行し、その後 `ERROR` に固定します。エラー時は原因を保持するためトレースを自動凍結します。
 
 `R` の直前は、過去の実機動作済み実装と同じく、latch後に16回の `JOYSER1` dummy readを連続して行います。この最初のレポートは診断値へ組み立てず、次の通常pollで完全なレポートを記録します。`R` の8データビットも通常の9-bit転送とは別の専用経路で送り、byteをstack上で `ROL`、carryを `ROR` で `$4201` bit 7へ移し、追加NOPを挟まず直後に `JOYSER1` を読みます。この波形で電源ランプの点滅を実機確認済みです。
@@ -57,7 +60,9 @@ AT 行パーサーには `OK`、`ERROR`、`BUSY`、`CONNECT...`、`NO CARRIER`�
 
 期待結果コード0は識別情報照会専用のwildcardです。`OK`、`ERROR`など実際に受けた終端結果をmailbox resultへ返し、未対応の読み取り専用コマンドでもドライバを `ERROR` 状態にしません。接続や切断を伴う通常のtransactionは従来どおり期待結果を明示し、不一致を失敗として扱います。
 
-mailbox ABI version 3の `binary_transmit` と `binary_receive` はraw byte転送用です。`binary_transmit` は `CONNECTED` 中に限り、入力arguments先頭のlengthと、それに続く最大31byteを空のTX ringへqueueし、受理数をresultへ返します。`binary_receive` は `CONNECTED` または `READY` でRX ringから最大31byteをSFC専用のoutputへ取り出し、取得数をresultへ返します。`READY` での利用は識別照会の終端後に遅れて到着したbyteの診断的drainに限定します。AT行パーサーを通さないため `0x00`、CR、LF、`0xFF` も同じデータとして扱います。現段階では実機試験専用の薄い境界であり、PPP層はこの上に別途実装します。
+mailbox ABI version 4の `binary_transmit` と `binary_receive` はraw byte転送用です。`binary_transmit` は `CONNECTED` 中に限り、入力arguments先頭のlengthと、それに続く最大31byteを空のTX ringへqueueし、受理数をresultへ返します。`binary_receive` は `CONNECTED` または `READY` でRX ringから最大31byteをSFC専用のoutputへ取り出し、取得数をresultへ返します。`READY` での利用は識別照会の終端後に遅れて到着したbyteの診断的drainに限定します。AT行パーサーを通さないため `0x00`、CR、LF、`0xFF` も同じデータとして扱います。現段階では実機試験専用の薄い境界であり、PPP層はこの上に別途実装します。
+
+ABI version 4のデバッグ専用 `binary_stress_transmit` は、空のTX ringへ `0x00`～`0xFE` の255byteを一度にqueueします。main loopが `modemPoll`へ戻る前に使用可能容量全体を埋めるため、NDM24入力側のbackpressure、Data2変化、欠落・重複を最大burst条件で調べられます。
 
 QUsb2Snesの `SETX` でホストが書いたWRAMと、同じ場所へSFCが書き戻す値は観測コピー上で安定しなかったため、96byte mailbox内の所有権を分離しています。arguments 32byteはホスト→SFC専用、output 32byteはSFC→ホスト専用で、逆方向からは書きません。ホストは `processed_sequence` と完了statusを見ただけでは結果を確定せず、96byteのmailbox全体が2回連続で一致してから制御結果を採用します。outputは別のQUsb2Snes接続から32byteだけを2回読み、一致した値を採用します。`host_sequence` は最後に書き、SFC側もoutputとresultの更新後に `processed_sequence` をcommitします。
 
@@ -66,6 +71,10 @@ QUsb2Snesの `SETX` でホストが書いたWRAMと、同じ場所へSFCが書�
 9-bit転送は、過去の実機動作済み実装と同じ命令順序にしています。latch後にTX queueを確認してTX Data Presentを出力し、16個のNOP後に最初の `JOYSER1` を読みます。続く8bitは、`$4201` への書き込み、`ASL`、`XBA`、8個のNOP、`JOYSER1` 読み取り、`XBA` の順です。タイミング区間にはsubroutine callを入れません。送信待ちがない場合の後続値は、動作済み実装と同じ `$80` です。
 
 この命令列ではDBRをbank `$80` にします。これにより `$4201` をdirect absoluteでアクセスでき、同時にbank `$80:$0000-$1FFF` のWRAM mirrorを介してdriver stateと256-byte ringsへアクセスできます。したがって、この低レベル転送から参照するWRAMは先頭8KiB以内に置く必要があります。
+
+TX queueのbyteは、TX Data Presentと8 data bitの波形を完了した直後にringから消費します。現時点でNDM24からのbyte単位ACKやCTS相当bitは特定できていないため、診断値の `tx_bytes` と `last_tx_byte` は「NDM24のcontroller interfaceへclockした」ことを表し、電話回線の相手へ到達したことまでは保証しません。
+
+revision A/BのAT transactionでは、送信event時のData2は全件 `$0000` でした。両revisionのV.22bis接続中は、31byte burstを含む通常送信と255byte最大burstの全観測eventで `$0200` のまま変化せず、受信側のbyte列は完全一致しました。`$0200` は `CONNECT 2400` 応答の末尾で立ち、`CONNECTED` と切断待ちの間維持され、`NO CARRIER`直前に落ちるため、byte ACKではなくDCD相当のcarrier状態bitと推定します。両revisionの最大burstでもbackpressureは観測されなかったため、明示的な受理条件が判明するまでは波形完了時の消費を維持します。
 
 完全な16ビット読み取りは状態・識別だけでなく、待機中の先頭RX byteを消費する場合があります。実機では汎用AT transactionの `AT&F` と `ATX3` の先頭 `A` がそれぞれ `Data1=$4183 / Data2=$4000` として16-bit pollに現れ、従来実装が破棄した結果、受信echoと画面表示が `T&F`、`TX3` になりました。Data2 hintを追加の受理条件にした試験では `ATDT0` の先頭 `A` がなお欠落したため、16-bit reportも9-bit reportと同様にData1のRX-presentだけを現在byteの受理条件とします。Data2は9-bit transferを開始するhintであり、現在byteの有効性判定には使いません。
 

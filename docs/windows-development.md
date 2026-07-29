@@ -56,6 +56,9 @@ cargo run -p ndm24-tools -- monitor
 # メールボックス経由の AT クイックテスト
 cargo run -p ndm24-tools -- test
 
+# 任意の AT コマンドを1回送り、OKまで確認
+cargo run -p ndm24-tools -- at ATM0
+
 # 有効な循環トレースを時系列 JSON で出力
 cargo run -p ndm24-tools -- trace-live
 
@@ -77,7 +80,7 @@ cargo run -p ndm24-tools -- identify --revision B
 
 `deploy` は QUsb2Snes の `PutFile` で ROM を 1024 バイト以下の chunk に分けて送り、同じ WebSocket 接続上で `Boot` と `Info` を続けて要求します。`Info` が転送先 ROM を実行中と返すまで接続を維持し、実際の起動を確認してから成功とします。
 
-FXPAK PRO の `SNES` 空間にある `$F50000` 以降は、実WRAMではなくカートリッジ側の観測用コピーです。診断読み取りには `GetAddress` を使えますが、同じ場所への通常の `PutAddress` はSFC CPUから見えません。メールボックス命令は、レジスタを保存してWRAMの入力arguments、command、host sequenceを書き換える短い65816コードを `$3F0000` のscratchへ置き、`PutAddress` の `SETX` flagで次のNMIに実行します。processed sequence、status/result、SFC専用outputは観測用コピーから読み戻します。mailbox ABI version 3ではホスト入力とSFC出力を別の32byte領域に分離しています。
+FXPAK PRO の `SNES` 空間にある `$F50000` 以降は、実WRAMではなくカートリッジ側の観測用コピーです。診断読み取りには `GetAddress` を使えますが、同じ場所への通常の `PutAddress` はSFC CPUから見えません。メールボックス命令は、レジスタを保存してWRAMの入力arguments、command、host sequenceを書き換える短い65816コードを `$3F0000` のscratchへ置き、`PutAddress` の `SETX` flagで次のNMIに実行します。processed sequence、status/result、SFC専用outputは観測用コピーから読み戻します。mailbox ABI version 4ではホスト入力とSFC出力を別の32byte領域に分離し、TX最大burst用のデバッグ命令を追加しています。
 
 ## PC 側疑似回線 peer
 
@@ -103,7 +106,7 @@ cargo run -p ndm24-tools -- connect-test --revision B --port COM5
 cargo run -p ndm24-tools -- binary-test --revision B --port COM5
 ```
 
-このコマンドは双方のflow controlを使わずV.22bis 2400bpsで接続し、`0x00` から `0xFF` までをNDM24→DFM-56U、DFM-56U→NDM24の順に転送します。SFC側とはQUsb2Snes mailboxを介して最大31byteずつ受け渡し、値、順序、欠落、重複、ring overflowを照合します。受信方向は各chunkの回線到着を待ち、mailboxで取り出す直前のRX ringも記録します。結果は `build/hardware-tests/<test-id>/binary-pattern-test.json` に保存します。
+このコマンドは双方のflow controlを使わずV.22bis 2400bpsで接続し、`0x00` から `0xFF` までをNDM24→DFM-56U、DFM-56U→NDM24の順に転送します。さらに、SFCのTX ring全容量へ `0x00`～`0xFE` の255byteを一度にqueueする最大burst試験も行います。SFC側とはQUsb2Snes mailboxを介して値、順序、欠落、重複、ring overflow、Data2 traceを照合します。受信方向は各chunkの回線到着を待ち、mailboxで取り出す直前のRX ringも記録します。結果は `build/hardware-tests/<test-id>/binary-pattern-test.json` に保存します。
 
 ## 仕様変更
 

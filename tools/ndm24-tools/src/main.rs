@@ -9,12 +9,13 @@ mod trace;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use anyhow::Result;
+use anyhow::{Result, ensure};
 use clap::{Parser, Subcommand, ValueEnum};
 use ndm24_protocol::{
     MODEM_MAILBOX_COMMAND_CLEAR_TRACE, MODEM_MAILBOX_COMMAND_FREEZE_TRACE,
-    MODEM_MAILBOX_COMMAND_INITIALIZE, MODEM_MAILBOX_COMMAND_QUICK_TEST,
-    MODEM_MAILBOX_COMMAND_RESUME_TRACE,
+    MODEM_MAILBOX_COMMAND_AT_TRANSACTION, MODEM_MAILBOX_COMMAND_INITIALIZE,
+    MODEM_MAILBOX_COMMAND_QUICK_TEST, MODEM_MAILBOX_COMMAND_RESUME_TRACE,
+    MODEM_SESSION_RESULT_OK,
 };
 
 #[derive(Debug, Parser)]
@@ -61,6 +62,15 @@ enum Command {
         output: PathBuf,
         #[arg(long, default_value_t = 10)]
         hold_seconds: u64,
+    },
+    At {
+        command: String,
+        #[arg(long, default_value = "ws://localhost:23074")]
+        websocket: String,
+        #[arg(long, default_value = "build/smoke/modem-control.lbl")]
+        labels: PathBuf,
+        #[arg(long, default_value_t = 10)]
+        timeout_seconds: u64,
     },
     Monitor {
         #[arg(long, default_value = "ws://localhost:23074")]
@@ -175,6 +185,30 @@ async fn main() -> Result<()> {
                 connect_test::run(&websocket, &labels, &port, &revision, &output, hold_seconds)
                     .await?;
             println!("connect test passed; report {}", report.display());
+            Ok(())
+        }
+        Command::At {
+            command,
+            websocket,
+            labels,
+            timeout_seconds,
+        } => {
+            let arguments =
+                connect_test::at_arguments(command.as_bytes(), MODEM_SESSION_RESULT_OK, 300)?;
+            let outcome = qusb2snes::mailbox_command_with_arguments(
+                &websocket,
+                &labels,
+                MODEM_MAILBOX_COMMAND_AT_TRANSACTION,
+                &arguments,
+                Duration::from_secs(timeout_seconds),
+            )
+            .await?;
+            ensure!(
+                outcome.result == MODEM_SESSION_RESULT_OK as u16,
+                "NDM24 returned result {}, expected OK",
+                outcome.result
+            );
+            println!("{command}: OK");
             Ok(())
         }
         Command::Monitor {

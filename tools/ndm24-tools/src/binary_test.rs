@@ -8,8 +8,11 @@ use ndm24_protocol::{
     DiagnosticSnapshot, DriverState, MODEM_FLAG_POLL_LIMIT, MODEM_FLAG_RX_OVERFLOW,
     MODEM_FLAG_TIMEOUT, MODEM_FLAG_TX_OVERFLOW, MODEM_MAILBOX_ARGUMENT_SIZE,
     MODEM_MAILBOX_COMMAND_AT_TRANSACTION, MODEM_MAILBOX_COMMAND_BINARY_RECEIVE,
-    MODEM_MAILBOX_COMMAND_BINARY_TRANSMIT, MODEM_SESSION_RESULT_CONNECT,
-    MODEM_SESSION_RESULT_NO_CARRIER, MODEM_SESSION_RESULT_OK, TraceEvent,
+    MODEM_MAILBOX_COMMAND_BINARY_STRESS_TRANSMIT, MODEM_MAILBOX_COMMAND_BINARY_TRANSMIT,
+    MODEM_MAILBOX_COMMAND_CLEAR_TRACE, MODEM_MAILBOX_COMMAND_FREEZE_TRACE,
+    MODEM_MAILBOX_COMMAND_RESUME_TRACE, MODEM_SESSION_RESULT_CONNECT,
+    MODEM_SESSION_RESULT_NO_CARRIER, MODEM_SESSION_RESULT_OK, MODEM_POLL_BUDGET,
+    MODEM_RING_CAPACITY, TraceEvent,
 };
 use serde::Serialize;
 
@@ -26,6 +29,7 @@ const BINARY_CHUNK_MAX_LENGTH: usize = MODEM_MAILBOX_ARGUMENT_SIZE - 1;
 const LINE_BITS_PER_BYTE: u64 = 10;
 const LINE_BAUD: u64 = 2_400;
 const RX_SETTLE_MARGIN: Duration = Duration::from_millis(100);
+const STRESS_EXPECTED_POLL_LIMITS: u32 = (MODEM_RING_CAPACITY / MODEM_POLL_BUDGET) as u32;
 
 #[derive(Debug, Serialize)]
 struct BinaryReceiveChunk {
@@ -53,11 +57,17 @@ struct BinaryTestReport {
     sfc_to_peer_received: Vec<u8>,
     peer_to_sfc_received: Vec<u8>,
     peer_to_sfc_chunks: Vec<BinaryReceiveChunk>,
+    stress_expected_pattern: Vec<u8>,
+    stress_received: Vec<u8>,
+    stress_before_snapshot: Option<DiagnosticSnapshot>,
+    stress_after_snapshot: Option<DiagnosticSnapshot>,
+    stress_trace: Vec<TraceEvent>,
     post_dtr_rx_before_parser: Vec<u8>,
     initial_snapshot: Option<DiagnosticSnapshot>,
     connected_snapshot: Option<DiagnosticSnapshot>,
     transfer_snapshot: Option<DiagnosticSnapshot>,
     final_snapshot: Option<DiagnosticSnapshot>,
+    sfc_to_peer_trace: Vec<TraceEvent>,
     transfer_trace: Vec<TraceEvent>,
 }
 
@@ -79,7 +89,7 @@ pub async fn run(
         .with_context(|| format!("create test output {}", output_dir.display()))?;
 
     let mut report = BinaryTestReport {
-        schema_version: 2,
+        schema_version: 4,
         test_id,
         started_unix_seconds,
         hardware_revision: revision_label,
@@ -96,11 +106,17 @@ pub async fn run(
         sfc_to_peer_received: Vec::new(),
         peer_to_sfc_received: Vec::new(),
         peer_to_sfc_chunks: Vec::new(),
+        stress_expected_pattern: stress_pattern(),
+        stress_received: Vec::new(),
+        stress_before_snapshot: None,
+        stress_after_snapshot: None,
+        stress_trace: Vec::new(),
         post_dtr_rx_before_parser: Vec::new(),
         initial_snapshot: None,
         connected_snapshot: None,
         transfer_snapshot: None,
         final_snapshot: None,
+        sfc_to_peer_trace: Vec::new(),
         transfer_trace: Vec::new(),
     };
 
@@ -192,12 +208,42 @@ async fn run_connected(
     );
     report.connected_snapshot = Some(connected);
 
+    clear_trace(websocket, labels).await?;
     let expected = pattern();
     for chunk in expected.chunks(BINARY_CHUNK_MAX_LENGTH) {
         sfc_transmit_chunk(websocket, labels, chunk).await?;
         wait_for_tx_empty(websocket, labels, DATA_TIMEOUT).await?;
     }
     report.sfc_to_peer_received = peer.read_data_exact(expected.len(), DATA_TIMEOUT)?;
+    report.sfc_to_peer_trace = capture_and_restart_trace(websocket, labels).await?;
+
+    let stress_before = qusb2snes::read_snapshot(websocket, labels).await?;
+    validate_snapshot(&stress_before)?;
+    let expected_stress_poll_limit =
+        stress_before.poll_limit + STRESS_EXPECTED_POLL_LIMITS;
+    report.stress_before_snapshot = Some(stress_before);
+
+    let stress_expected = stress_pattern();
+    let stress_outcome = qusb2snes::mailbox_command_with_arguments(
+        websocket,
+        labels,
+        MODEM_MAILBOX_COMMAND_BINARY_STRESS_TRANSMIT,
+        &[],
+        Duration::from_secs(5),
+    )
+    .await?;
+    ensure!(
+        stress_outcome.result as usize == stress_expected.len(),
+        "SFC queued {} of {} stress TX bytes",
+        stress_outcome.result,
+        stress_expected.len()
+    );
+    wait_for_tx_empty(websocket, labels, DATA_TIMEOUT).await?;
+    let stress_after = qusb2snes::read_snapshot(websocket, labels).await?;
+    validate_snapshot_with_poll_limit(&stress_after, expected_stress_poll_limit)?;
+    report.stress_after_snapshot = Some(stress_after);
+    report.stress_received = peer.read_data_exact(stress_expected.len(), DATA_TIMEOUT)?;
+    report.stress_trace = capture_and_restart_trace(websocket, labels).await?;
 
     for chunk in expected.chunks(BINARY_CHUNK_MAX_LENGTH) {
         peer.write_data(chunk)?;
@@ -213,7 +259,7 @@ async fn run_connected(
     }
 
     let transfer_snapshot = qusb2snes::read_snapshot(websocket, labels).await?;
-    validate_snapshot(&transfer_snapshot)?;
+    validate_snapshot_with_poll_limit(&transfer_snapshot, expected_stress_poll_limit)?;
     ensure!(
         transfer_snapshot.rx_read_index == transfer_snapshot.rx_write_index,
         "binary RX drain left bytes in the SFC ring"
@@ -224,21 +270,7 @@ async fn run_connected(
     );
     report.transfer_snapshot = Some(transfer_snapshot);
 
-    qusb2snes::mailbox_command(
-        websocket,
-        labels,
-        ndm24_protocol::MODEM_MAILBOX_COMMAND_FREEZE_TRACE,
-        Duration::from_secs(5),
-    )
-    .await?;
-    report.transfer_trace = qusb2snes::read_trace_events(websocket, labels).await?;
-    qusb2snes::mailbox_command(
-        websocket,
-        labels,
-        ndm24_protocol::MODEM_MAILBOX_COMMAND_RESUME_TRACE,
-        Duration::from_secs(5),
-    )
-    .await?;
+    report.transfer_trace = capture_and_restart_trace(websocket, labels).await?;
 
     peer.set_dtr(false)?;
     thread::sleep(Duration::from_secs(1));
@@ -255,7 +287,7 @@ async fn run_connected(
     .context("wait for NDM24 NO CARRIER")?;
 
     let final_snapshot = qusb2snes::read_snapshot(websocket, labels).await?;
-    validate_snapshot(&final_snapshot)?;
+    validate_snapshot_with_poll_limit(&final_snapshot, expected_stress_poll_limit)?;
     ensure!(
         final_snapshot.driver_state == DriverState::Ready,
         "SFC modem driver is {:?}, expected Ready after disconnect",
@@ -271,6 +303,10 @@ async fn run_connected(
         "SFC to peer binary pattern mismatch"
     );
     ensure!(
+        report.stress_received == stress_expected,
+        "SFC to peer 255-byte stress pattern mismatch"
+    );
+    ensure!(
         report.peer_to_sfc_received == expected,
         "peer to SFC binary pattern mismatch"
     );
@@ -280,6 +316,37 @@ async fn run_connected(
 fn rx_settle_time(length: usize) -> Duration {
     let line_milliseconds = (length as u64 * LINE_BITS_PER_BYTE * 1_000).div_ceil(LINE_BAUD);
     Duration::from_millis(line_milliseconds) + RX_SETTLE_MARGIN
+}
+
+async fn clear_trace(websocket: &str, labels: &Path) -> Result<()> {
+    qusb2snes::mailbox_command(
+        websocket,
+        labels,
+        MODEM_MAILBOX_COMMAND_CLEAR_TRACE,
+        Duration::from_secs(5),
+    )
+    .await?;
+    Ok(())
+}
+
+async fn capture_and_restart_trace(websocket: &str, labels: &Path) -> Result<Vec<TraceEvent>> {
+    qusb2snes::mailbox_command(
+        websocket,
+        labels,
+        MODEM_MAILBOX_COMMAND_FREEZE_TRACE,
+        Duration::from_secs(5),
+    )
+    .await?;
+    let trace = qusb2snes::read_trace_events(websocket, labels).await?;
+    clear_trace(websocket, labels).await?;
+    qusb2snes::mailbox_command(
+        websocket,
+        labels,
+        MODEM_MAILBOX_COMMAND_RESUME_TRACE,
+        Duration::from_secs(5),
+    )
+    .await?;
+    Ok(trace)
 }
 
 async fn run_at(
@@ -402,8 +469,40 @@ fn validate_snapshot(snapshot: &DiagnosticSnapshot) -> Result<()> {
     Ok(())
 }
 
+fn validate_snapshot_with_poll_limit(
+    snapshot: &DiagnosticSnapshot,
+    expected_poll_limit: u32,
+) -> Result<()> {
+    let fatal_flags =
+        MODEM_FLAG_RX_OVERFLOW | MODEM_FLAG_TX_OVERFLOW | MODEM_FLAG_TIMEOUT;
+    ensure!(snapshot.last_error == 0, "SFC last_error is non-zero");
+    ensure!(
+        snapshot.flags & fatal_flags == 0,
+        "SFC driver has fatal flags 0x{:02x}",
+        snapshot.flags & fatal_flags
+    );
+    ensure!(snapshot.rx_overflow == 0, "SFC RX overflowed");
+    ensure!(snapshot.tx_overflow == 0, "SFC TX overflowed");
+    ensure!(snapshot.timeout == 0, "SFC transaction timed out");
+    ensure!(
+        snapshot.poll_limit == expected_poll_limit,
+        "SFC poll limit count is {}, expected {} after stress burst",
+        snapshot.poll_limit,
+        expected_poll_limit
+    );
+    ensure!(
+        snapshot.flags & MODEM_FLAG_POLL_LIMIT != 0,
+        "SFC poll limit flag was not set by stress burst"
+    );
+    Ok(())
+}
+
 fn pattern() -> Vec<u8> {
     (0u8..=u8::MAX).collect()
+}
+
+fn stress_pattern() -> Vec<u8> {
+    (0..MODEM_RING_CAPACITY).map(|byte| byte as u8).collect()
 }
 
 #[cfg(test)]
@@ -423,5 +522,14 @@ mod tests {
     fn receive_settle_time_covers_v22bis_line_time() {
         assert_eq!(rx_settle_time(31), Duration::from_millis(230));
         assert_eq!(rx_settle_time(8), Duration::from_millis(134));
+    }
+
+    #[test]
+    fn stress_pattern_fills_the_usable_tx_ring() {
+        let data = stress_pattern();
+        assert_eq!(data.len(), 255);
+        assert_eq!(data.first(), Some(&0x00));
+        assert_eq!(data.last(), Some(&0xfe));
+        assert_eq!(STRESS_EXPECTED_POLL_LIMITS, 7);
     }
 }

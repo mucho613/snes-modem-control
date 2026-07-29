@@ -21,13 +21,13 @@ ABI version: `2`. Block size: `128` bytes.
 | `0x14` | 1 | `u8` | `tx_read_index` | TX ring read index |
 | `0x15` | 1 | `u8` | `tx_write_index` | TX ring write index |
 | `0x16` | 1 | `u8` | `last_rx_byte` | Last accepted RX byte |
-| `0x17` | 1 | `u8` | `last_tx_byte` | Last transmitted byte |
+| `0x17` | 1 | `u8` | `last_tx_byte` | Last byte clocked to the NDM24 interface |
 | `0x18` | 2 | `u16` | `last_data_report` | Raw Data1 report |
 | `0x1A` | 2 | `u16` | `last_status_report` | Raw Data2 report |
 | `0x1C` | 4 | `u32` | `trace_next_sequence` | Sequence assigned to the next trace event |
 | `0x20` | 4 | `u32` | `rx_accepted` | Accepted receive bytes |
 | `0x24` | 4 | `u32` | `rx_discarded` | Discarded receive candidates |
-| `0x28` | 4 | `u32` | `tx_bytes` | Transmitted bytes |
+| `0x28` | 4 | `u32` | `tx_bytes` | Bytes clocked to the NDM24 interface |
 | `0x2C` | 4 | `u32` | `rx_overflow` | RX ring overflow count |
 | `0x30` | 4 | `u32` | `tx_overflow` | TX ring overflow count |
 | `0x34` | 4 | `u32` | `poll_limit` | Poll budget exhaustion count |
@@ -44,7 +44,7 @@ ABI version: `2`. Block size: `128` bytes.
 
 ## Mailbox ABI
 
-ABI version: `3`. Block size: `96` bytes.
+ABI version: `4`. Block size: `96` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|

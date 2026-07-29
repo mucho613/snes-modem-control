@@ -13,6 +13,11 @@ controller1InputPulse: .res $2
 .export controllerPollTick
 controllerPollTick: .res $1
 
+; Software mirror of the write-only NMITIMEN register. Low-level controller
+; port waveforms save, clear, and restore this byte around bit-bang sections.
+.export nmitimenShadow
+nmitimenShadow: .res $1
+
 ; Public, versioned diagnostic ABI. Keep labels in the same order as
 ; spec/ndm24.toml and assert every externally visible offset below.
 .export modemState, modemStateEnd

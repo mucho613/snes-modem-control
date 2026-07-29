@@ -4,7 +4,7 @@
 
 .code
 
-.import controllerPollTick
+.import controllerPollTick, nmitimenShadow
 .import controller1Input, controller1InputPrev, controller1InputPulse
 
 .export readController1
@@ -14,7 +14,7 @@
 
   pha
   php
-  sei
+  sei ; Mask IRQ. NMI is gated explicitly around the controller waveform.
   phb
   phd
   phx
@@ -36,6 +36,8 @@
   stz controller1Input
   stz controller1Input + 1
 
+  suspendNmi nmitimenShadow
+
   ; JOYOUT latches both ports, but only JOYSER0 is clocked here. The modem
   ; driver always latches port 2 again before reading it.
   stz .lobyte(JOYOUT)
@@ -51,6 +53,8 @@
   rol controller1Input + 1
   dex
   bne @readBit
+
+  restoreNmi nmitimenShadow
 
   lda controller1Input
   eor controller1InputPrev

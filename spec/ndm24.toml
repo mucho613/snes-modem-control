@@ -152,7 +152,7 @@ name = "last_tx_byte"
 offset = 23
 size = 1
 type = "u8"
-description = "Last transmitted byte"
+description = "Last byte clocked to the NDM24 interface"
 
 [[diagnostic.fields]]
 name = "last_data_report"
@@ -194,7 +194,7 @@ name = "tx_bytes"
 offset = 40
 size = 4
 type = "u32"
-description = "Transmitted bytes"
+description = "Bytes clocked to the NDM24 interface"
 
 [[diagnostic.fields]]
 name = "rx_overflow"
@@ -289,7 +289,7 @@ description = "Frame at which the current generic AT transaction started"
 
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]
-version = 3
+version = 4
 size = 96
 argument_size = 32
 
@@ -415,6 +415,7 @@ resume_trace = 5
 at_transaction = 6
 binary_transmit = 7
 binary_receive = 8
+binary_stress_transmit = 9
 
 [mailbox_status]
 idle = 0

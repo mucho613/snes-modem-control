@@ -6,6 +6,7 @@
 .code
 
 .import frameCounter
+.import nmitimenShadow
 .import modemDriverState, modemFlags, modemPollTick, modemBurstPending
 .import modemPollStage
 .import modemResetStartFrame
@@ -22,7 +23,7 @@
 
   pha
   php
-  sei
+  sei ; Mask IRQ. NMI is gated explicitly while controller port 2 is active.
   phb
   phd
   phx
@@ -59,6 +60,7 @@
 @workAvailable:
   lda #$20
   sta modemPollStage
+  suspendNmi nmitimenShadow
   jsr modemSnapshotBegin
   lda #$21
   sta modemPollStage
@@ -192,6 +194,7 @@
   sta .lobyte(JOYOUT)
   stz .lobyte(JOYOUT)
   jsr modemSnapshotEnd
+  restoreNmi nmitimenShadow
   lda #$26
   sta modemPollStage
 
