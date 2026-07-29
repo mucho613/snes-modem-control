@@ -4,7 +4,7 @@
 
 スーパーファミコンと NTT DATA NDM24 をコントローラーポート経由で通信させるための、実験用ドライバと Windows 向け開発ツールです。JRA PAT の実通信をロジックアナライザで観測した結果を基準に、初期化、非同期送受信、状態管理、常設診断機能を整理しています。
 
-現時点の到達点は、NDM24 固有の `R` 初期化、`ATM0` による応答確認とスピーカー無効化、256 バイトの送受信リング、32文字幅ターミナル、QUsb2Snes 経由の監視・テスト・ROM 転送です。PPPはRFC 1662非同期フレーミングをRustと65816の両方へ実装し、NDM24のRX/TXリングへ中断・再開可能な形で接続済みです。Rust参照実装ではLCP packet codecとConfigure交渉状態機械まで、65816ではLCP packet parser、Configure交渉、peer option方針、restart timer、main-loopのframe所有権管理まで実装済みです。実対向とのLCP試験、認証、IPCP、IPv4、UDP、TCP、NTPはまだ実装していません。
+現時点の到達点は、NDM24 固有の `R` 初期化、`ATM0` による応答確認とスピーカー無効化、256 バイトの送受信リング、32文字幅ターミナル、QUsb2Snes 経由の監視・テスト・ROM 転送です。PPPはRFC 1662非同期フレーミングをRustと65816の両方へ実装し、NDM24のRX/TXリングへ中断・再開可能な形で接続済みです。Rust参照実装ではLCP packet codecとConfigure交渉状態機械まで、65816ではLCP packet parser、Configure交渉、peer option方針、restart timer、main-loopのframe所有権管理まで実装済みです。DFM-56Uを使うWSL2対向環境は構築済みですが、実対向とのLCP試験、認証、IPCP、IPv4、UDP、TCP、NTPはまだ実施・実装していません。
 
 ## Windows での開始
 
@@ -40,9 +40,11 @@ cargo run -p ndm24-tools -- ppp-monitor
 cargo run -p ndm24-tools -- identify --revision B
 cargo run -p ndm24-tools -- connect-test --revision B --port COM5
 cargo run -p ndm24-tools -- binary-test --revision B --port COM5
+.\tools\ppp-server\ndm24-ppp-server.ps1 Install
+.\tools\ppp-server\ndm24-ppp-server.ps1 Probe
 ```
 
-実機を使う手順と合格条件は [ハードウェアテスト手順](docs/hardware-test.md)、取得済みの機器情報は [NDM24 AT識別情報](docs/ndm24-hardware-identification.md)、ドライバ API は [NDM24 ドライバ設計](docs/ndm24-driver.md)、次段階は [PPP実装方針](docs/ppp.md)を参照してください。
+実機を使う手順と合格条件は [ハードウェアテスト手順](docs/hardware-test.md)、取得済みの機器情報は [NDM24 AT識別情報](docs/ndm24-hardware-identification.md)、ドライバ API は [NDM24 ドライバ設計](docs/ndm24-driver.md)、PPP対向環境は [WSL2 PPPサーバー](docs/ppp-server.md)、次段階は [PPP実装方針](docs/ppp.md)を参照してください。
 
 ## 仕様と生成物の同期
 
@@ -63,6 +65,7 @@ cargo xtask check
 - [32文字幅ターミナル](docs/terminal.md)
 - [font8x8の出所・生成・確認手順](docs/font.md)
 - [Windows 開発環境](docs/windows-development.md)
+- [WSL2 PPPサーバー](docs/ppp-server.md)
 - [生成済みモデム・PPP診断／メールボックス ABI](docs/generated/diagnostic-abi.md)
 - [JRA PAT モデム設定プロファイル](profiles/jra-pat.toml)
 - [第三者由来データの通知](THIRD_PARTY_NOTICES.md)

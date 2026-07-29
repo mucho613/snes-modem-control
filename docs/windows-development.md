@@ -114,6 +114,21 @@ cargo run -p ndm24-tools -- binary-test --revision B --port COM5
 
 このコマンドは双方のflow controlを使わずV.22bis 2400bpsで接続し、`0x00` から `0xFF` までをNDM24→DFM-56U、DFM-56U→NDM24の順に転送します。さらに、SFCのTX ring全容量へ `0x00`～`0xFE` の255byteを一度にqueueする最大burst試験も行います。SFC側とはQUsb2Snes mailboxを介して値、順序、欠落、重複、ring overflow、Data2 traceを照合します。受信方向は各chunkの回線到着を待ち、mailboxで取り出す直前のRX ringも記録します。結果は `build/hardware-tests/<test-id>/binary-pattern-test.json` に保存します。
 
+## WSL2 PPPサーバー
+
+LCP以降の試験では、DFM-56UをUSBIPでUbuntu 22.04へattachし、WSL2上の
+`pppd`を対向serverとして使います。導入、回線を使わないAT probe、待受開始、
+状態確認、ログ取得、停止はPowerShellから統合して操作できます。
+
+```powershell
+.\tools\ppp-server\ndm24-ppp-server.ps1 Install
+.\tools\ppp-server\ndm24-ppp-server.ps1 Probe
+.\tools\ppp-server\ndm24-ppp-server.ps1 Stop
+```
+
+疑似PSTNへ接続する前提、DFM-56Uの固定条件、LCP試験の合格条件は
+[WSL2 PPPサーバー](ppp-server.md)を参照してください。
+
 ## 仕様変更
 
 1. `spec/ndm24.toml` を変更します。

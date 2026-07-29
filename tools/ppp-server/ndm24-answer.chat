@@ -1,0 +1,22 @@
+# DFM-56U answer sequence for the closed pseudo-PSTN test environment.
+#
+# The peer is forced to V.22bis 2400 bit/s to match NTT DATA NDM24.
+# DTE flow control is disabled here and in pppd.
+ABORT "BUSY"
+ABORT "NO CARRIER"
+ABORT "NO ANSWER"
+ABORT "NO DIALTONE"
+ABORT "ERROR"
+TIMEOUT 5
+"" "AT"
+OK "ATZ"
+OK "ATE0"
+OK "AT&D2"
+OK "AT+MS=V22B,0,2400,2400,2400,2400"
+OK "AT&K0"
+OK "ATM0"
+OK "ATS0=0"
+TIMEOUT 300
+RING "ATA"
+TIMEOUT 60
+CONNECT "\c"

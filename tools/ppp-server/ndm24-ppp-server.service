@@ -1,0 +1,14 @@
+[Unit]
+Description=NTT DATA NDM24 pseudo-PSTN PPP server
+Documentation=file:///etc/ppp/peers/ndm24-lcp
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/pppd call ndm24-lcp
+Restart=no
+TimeoutStopSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

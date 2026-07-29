@@ -93,6 +93,17 @@ binary pattern試験の合格条件:
 
 接続失敗時は自動再発信しません。30分soak中もRX/TX ring、error、timeout、overflow、`poll_budget_yield`、discardを監視し、保持終了後のDTR切断、`NO CARRIER`、`READY`復帰までを同じconnect reportへ保存します。`poll_budget_yield` は推移を保存しますが、単独では失敗としません。
 
+## PPP LCP接続試験
+
+DFM-56UをWindowsのCOM5からWSL2の`/dev/ttyACM0`へUSBIPで切り替え、
+`pppd`を対向serverとして使います。serverの導入、V.22bis固定条件、PAP要求、
+ログ取得、停止手順は[WSL2 PPPサーバー](ppp-server.md)を正本とします。
+
+最初の試験ではPAP認証成功やIPCPを要求しません。双方の
+Configure-Request/Ack、SFC側の`Opened`到達、`pppd`のPAP待ち、切断後の
+`Closed`復帰までを、SFC診断ABIと`pppd`ログで照合します。試験中は従来の
+`connect-test --port COM5`と`binary-test --port COM5`を同時に実行しません。
+
 ## hardware revision matrix
 
 各試験は 2 種類の NDM24 hardware revision で実施します。技適番号そのものは個体管理表に記録し、ここでは revision A/B とします。
@@ -107,6 +118,7 @@ binary pattern試験の合格条件:
 | TX 255byte最大burst | 合格 (2026-07-29) | 合格 (2026-07-29) |
 | 30 分 soak | 合格 (2026-07-29) | 未実施 |
 | NMITIMEN gating回帰 | 合格 (2026-07-29) | 合格 (2026-07-29) |
+| PPP LCP実対向 | 未実施 | 未実施 |
 
 revision B の最新の疑似 PSTN connect 合格記録は test ID `unix-1785329111-revision-b` です。`AT&F`、`AT%B2400`、`ATS7=60`、`ATX3`、`ATDT0` のechoはすべて完全で、各transaction前後のRX discard counterは0のままでした。DFM-56U は `RING`、`CONNECT 115200` を返し、NDM24 は `CONNECT 2400` を受信して `CONNECTED` へ遷移しました。10秒保持中の未処理RXは0byteです。DFM-56UのDTRを下げた直後にはキャリア切断過渡の `07 99 62 A1 74 DD 6B EE 1E` が入り、続く `NO CARRIER` を受信して `READY` へ戻りました。最終snapshotはRX read/write indexがともに105、TX read/write indexがともに42で、error、timeout、RX/TX overflow、`poll_budget_yield`、discard、terminal droppedがすべて0です。transaction別trace、双方のAT transcript、切断前後のraw RX列は `build/hardware-tests/unix-1785329111-revision-b/connect-test.json` に保存されています。旧schemaのJSONでは `poll_budget_yield` と同じ値が `poll_limit` という名前で記録されています。
 

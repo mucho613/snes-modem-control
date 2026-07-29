@@ -1,0 +1,43 @@
+# pppd peer profile for the first real NTT DATA NDM24 LCP test.
+/dev/ttyACM0
+115200
+modem
+nocrtscts
+lock
+
+connect "/usr/sbin/chat -v -f /etc/ppp/ndm24-answer.chat"
+
+nodetach
+debug
+dump
+logfile /var/log/ndm24-pppd.log
+maxfail 1
+
+lcp-restart 3
+lcp-max-configure 10
+lcp-max-terminate 2
+lcp-echo-interval 0
+
+mru 1500
+mtu 1500
+asyncmap 0
+noaccomp
+nopcomp
+
+auth
+require-pap
+refuse-chap
+refuse-mschap
+refuse-mschap-v2
+refuse-eap
+name ndm24-server
+
+novj
+nobsdcomp
+nodeflate
+noccp
+noipv6
+
+10.24.0.1:10.24.0.2
+nodefaultroute
+noproxyarp

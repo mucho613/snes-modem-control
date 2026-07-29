@@ -238,4 +238,8 @@ Opened中にpeer Configure-Requestを受けた場合は応答packetと新しいl
 
 ## 次の実装
 
-オフラインで確定できるLCP処理はmain-loop接続まで完了しました。次は疑似PSTNの対向PPPサーバーを用意し、実際のV.22bis回線上でConfigure-Request/Ack、PAP要求option、timer、診断snapshotを照合する接続試験です。ここから先は対向PPPサーバーが必要です。
+オフラインで確定できるLCP処理はmain-loop接続まで完了しました。疑似PSTNの
+対向には[WSL2 PPPサーバー](ppp-server.md)を用意し、DFM-56UをV.22bis
+2400 bit/sへ固定してPAPを要求します。次は実際の回線上で
+Configure-Request/Ack、PAP要求option、timer、診断snapshotを照合する
+接続試験です。

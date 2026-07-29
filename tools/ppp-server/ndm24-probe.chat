@@ -1,0 +1,12 @@
+# Read-only DFM-56U identification probe. Every command must end in OK.
+ABORT "ERROR"
+ABORT "NO CARRIER"
+TIMEOUT 5
+"" "AT"
+OK "ATE0"
+OK "ATI"
+OK "ATI3"
+OK "AT+GMI"
+OK "AT+GMM"
+OK "AT+GMR"
+OK ""
