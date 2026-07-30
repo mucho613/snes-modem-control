@@ -399,4 +399,20 @@ Closeと定期LCP Echoが重なったため`transmit_abort_count=1`ですが、P
 `Status=OK`、`AttachedTo=COM5`へ戻ったことを確認しました。この試験では
 実サービスへの発信や実資格情報の入力を行っていません。
 
+同日、revision AのNDM24を発信確認済みのアナログ電話ポートへ単独接続し、
+SFC実機からNiftyへ1回だけ発信しました。`AT&F`、`ATM0`、`AT%B2400`、
+`ATS7=60`、`ATX4`はすべて`OK`となり、`ATDT0570077705`で`CONNECT`しました。
+Niftyが要求したCHAP-MD5でChallenge、Response、Successが成立し、続くIPCPも
+`Opened`となりました。割当local/peer public IPはGit管理文書へ保存しません。
+IPCPで得たPrimary DNS `61.207.9.37`へ`example.com`のA問い合わせを1回送り、
+回答2件を82frameで受信しました。FCS error、invalid、RX overflow、
+backpressure、IPv4/UDP checksum error、DNS drop/timeoutはすべて0でした。
+
+runnerの後始末により一時資格情報はclearされ、Peer-ID/Passwordの長さは
+ともに0となりました。再送を含むlocal Terminate-Request 2件に対してmatching
+Terminate-Ack 1件、timeout 0でLCP/IPCPは`Closed`となり、PPP receiveも停止
+しました。最後に`NO CARRIER`、carrier loss 1件、残留tail 0を確認しています。
+@nifty ID、password、CHAP payload、割当public IPは試験artifactにも保存して
+いません。
+
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。

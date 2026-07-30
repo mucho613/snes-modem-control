@@ -4,7 +4,7 @@
 
 最初のPPPマイルストーンは、NDM24から受け取る任意位置で分割されたbyte列を、FCS検証済みのPPPフレームへ復元する層です。`crates/ndm24-ppp` を仕様の参照実装とし、同じ状態遷移と試験ベクトルを65816へ移植しています。
 
-現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP、PAP/CHAP-MD5 client、IPCP、IPv4 packet層、ICMP Echo responder/requester、UDP datagram層、NTP client、最小DNS A clientまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ack、IPCP `Opened`まで確認し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。同日にIPv4、ICMP Echo、UDP/NTP/DNSはMesenCE、FXPAK PRO実機、疑似PSTNのV.22bis 2400 bit/s回線上で送受信に合格しました。さらにWSL2のNATを介し、SFC実機から公開IPv4 `1.1.1.1`へのICMP Echo往復と公開DNS問い合わせにも合格しています。NTPでは2回連続で相関済み応答からUnix秒を取得しています。CHAP-MD5はMesenCEの閉じたtranscriptまで合格し、実回線試験は未実施です。TCPは未実装です。
+現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP、PAP/CHAP-MD5 client、IPCP、IPv4 packet層、ICMP Echo responder/requester、UDP datagram層、NTP client、最小DNS A clientまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ack、IPCP `Opened`まで確認し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。同日にIPv4、ICMP Echo、UDP/NTP/DNSはMesenCE、FXPAK PRO実機、疑似PSTNのV.22bis 2400 bit/s回線上で送受信に合格しました。さらにWSL2のNATを介し、SFC実機から公開IPv4 `1.1.1.1`へのICMP Echo往復と公開DNS問い合わせにも合格しています。NTPでは2回連続で相関済み応答からUnix秒を取得しています。2026-07-31にはrevision AのNDM24からNiftyへ実回線発信し、CHAP-MD5認証、IPCP、IPCPで得たDNSを使う公開DNS問い合わせ、正常切断まで合格しました。割当public IPと認証情報は記録していません。TCPは未実装です。
 
 PPP接続は次の順序で進みます。
 

@@ -5,7 +5,8 @@
 実回線試験用のSFC側一時資格情報経路、PAP/CHAP-MD5 client、Windows CLIは
 実装済みです。
 2026-07-31にDFM-56Uをアナログ電話ポートへ単独接続し、WSL2の`pppd`
-clientで基準試験を行いました。NDM24によるNiftyへの発信はまだ行っていません。
+clientで基準試験を行いました。続いてrevision AのNDM24を使ったSFC実機試験でも、
+Niftyへの発信、CHAP-MD5認証、IPCP、DNS問い合わせ、正常切断まで合格しました。
 NDM24とDFM-56Uを同じ回線へ同時接続しません。
 
 DFM-56Uをアナログ電話ポートへ単独接続し、USB bus IDを`usbipd list`で確認した
@@ -95,3 +96,18 @@ Git管理文書には認証方式、MRU/ACCM、IPCP/DNS option、成否だけを
 場合は、Gitから除外されている`build/hardware-tests/`以下だけに保存します。
 PAP/CHAP payload、@nifty ID、ログインパスワードはローカルartifactにも
 保存しません。
+
+## SFC実機試験結果
+
+2026-07-31にrevision AのNDM24を発信確認済みのアナログ電話ポートへ単独接続し、
+`nifty-dial`で1回だけ発信しました。`AT&F`、`ATM0`、`AT%B2400`、
+`ATS7=60`、`ATX4`はすべて`OK`となり、`ATDT0570077705`で`CONNECT`しました。
+LCP、CHAP-MD5、IPCPはすべて成立し、IPCPで得たPrimary DNS
+`61.207.9.37`を使う`example.com`のA問い合わせも成功しました。回答2件を
+82frameで受信し、FCS、IPv4 checksum、UDP checksum、DNS drop/timeoutは
+すべて0でした。
+
+試験後は一時資格情報の長さがともに0で、clear済みを示す診断状態になりました。
+LCP/IPCPは`Closed`、PPP receiveは停止し、`NO CARRIER`とcarrier lossを
+確認しています。割り当てられたpublic IP address、@nifty ID、password、
+CHAP payloadはGit管理文書や試験artifactへ保存していません。
