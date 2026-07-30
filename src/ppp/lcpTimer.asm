@@ -53,12 +53,12 @@
   m16
   lda frameCounter
   jsr pppLcpArmRestartTimerAt
-  assert_m8_i16
+  m8
   plb
   rts
 .endproc
 
-; Input A16=current frame. Output A8, timer active.
+; Input/output A16=current frame on entry, timer active on return.
 .proc pppLcpArmRestartTimerAt
   .a16
   .i16
@@ -69,6 +69,7 @@
   m8
   lda #$01
   sta pppLcpTimerActive
+  m16
   rts
 .endproc
 
@@ -85,7 +86,7 @@
   m16
   lda frameCounter
   jsr pppLcpPollTimeoutAt
-  assert_m8_i16
+  m8
   plb
   rts
 .endproc
@@ -121,12 +122,13 @@
   beq @configuring
   stz pppLcpTimerActive
   stz pppLcpDeferredRequest
+  m16
   plb
   clc
   rts
 
 @configuring:
-  assert_m8_i16
+  m8
   jsr pppSnapshotBegin
   lda pppLcpRestartRemaining
   beq @finished
@@ -142,12 +144,13 @@
   stz pppLcpTimerActive
   stz pppLcpDeferredRequest
   jsr pppSnapshotEnd
+  m16
   plb
   sec
   rts
 
 @finished:
-  assert_m8_i16
+  m8
   lda #PPP_LCP_STATE_STOPPED
   sta pppLcpState
   stz pppLcpRestartRemaining
@@ -155,13 +158,13 @@
   stz pppLcpTimerActive
   stz pppLcpDeferredRequest
   jsr pppSnapshotEnd
+  m16
   plb
   sec
   rts
 
 @unchanged:
   assert_m16_i16
-  m8
   plb
   clc
   rts
@@ -260,7 +263,7 @@
   m16
   lda #$fff0
   jsr pppLcpArmRestartTimerAt
-  assert_m8_i16
+  m8
   lda pppLcpTimerActive
   pppLcpTimerRequireNonzero @fail50
   m16
@@ -271,7 +274,7 @@
   ; One frame before the deadline does nothing.
   lda #$00a3
   jsr pppLcpPollTimeoutAt
-  assert_m8_i16
+  m8
   pppLcpTimerRequireCarryClear @fail51
   lda pppLcpPendingAction
   pppLcpTimerRequireEqual @fail51
@@ -280,7 +283,7 @@
   m16
   lda #$00a4
   jsr pppLcpPollTimeoutAt
-  assert_m8_i16
+  m8
   pppLcpTimerRequireCarrySet @fail52
   lda pppLcpPendingAction
   cmp #PPP_LCP_ACTION_CONFIGURE_REQUEST
@@ -299,11 +302,11 @@
   m16
   lda #$0100
   jsr pppLcpArmRestartTimerAt
-  assert_m8_i16
+  m8
   m16
   lda pppLcpRestartDeadline
   jsr pppLcpPollTimeoutAt
-  assert_m8_i16
+  m8
   pppLcpTimerRequireCarrySet @fail53
   lda pppLcpState
   cmp #PPP_LCP_STATE_STOPPED
@@ -323,11 +326,11 @@
   m16
   lda #$0200
   jsr pppLcpArmRestartTimerAt
-  assert_m8_i16
+  m8
   m16
   lda pppLcpRestartDeadline
   jsr pppLcpPollTimeoutAt
-  assert_m8_i16
+  m8
   pppLcpTimerRequireCarrySet @fail54
   lda pppLcpState
   cmp #PPP_LCP_STATE_REQUEST_SENT
