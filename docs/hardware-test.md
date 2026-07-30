@@ -308,4 +308,12 @@ backpressure中のframe保持、送信後の診断countを検査します。ROM�
 ためステータス画面コードをbank 1へ移し、main loopとNMIからの4入口を
 `JSL`/`RTL`化した構成も同じ実機試験で動作しました。
 
+同日、65816幅リンター導入後のsmoke ROMをrevision AのFXPAK PROへ転送し、
+起動確認後に型状態付きQUsb2Snes実行ペイロードからmailbox `ppp-self-test`
+（command 10、sequence 1）を実行して合格しました。NMIは割り込み時のPを先に
+保存してからA/X/Yを16-bitで保存する構成です。NDM24は`Ready`、driver error、
+RX/TX overflow、timeoutはいずれも0で、`ATM0`までの初期化応答も受信しました。
+8.020秒の測定で`frameCounter`は482進み、60.099Hzでした。ソフトウェア時計は
+未同期のためUnix秒とsubsecondが0のままなのが期待値です。
+
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。
