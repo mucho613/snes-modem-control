@@ -56,15 +56,12 @@ NETWORK_COUNTER_COLUMN = 10
   sta statusFormatValue
   cpy #$0000
   bne :+
-  sep #$20
-  .a8
+  m8
   lda statusFormatStarted
   beq :++
-  rep #$20
-  .a16
+  m16
 :
-  sep #$20
-  .a8
+  m8
   tya
   clc
   adc #'0'
@@ -73,8 +70,7 @@ NETWORK_COUNTER_COLUMN = 10
   lda #$01
   sta statusFormatStarted
 :
-  rep #$20
-  .a16
+  m16
 .endmacro
 
 .segment "DATA"
@@ -297,31 +293,23 @@ NETWORK_COUNTER_COLUMN = 10
 @dnsAddressDone:
 
   networkClearFrom 6, NETWORK_LONG_VALUE_COLUMN
-  rep #$20
-  .a16
+  m16
   lda pppDnsAnswerCount
   ldx #(6 * TERMINAL_COLUMNS) + NETWORK_LONG_VALUE_COLUMN
   jsr @writeDecimal16
-  sep #$20
-  .a8
-
+  m8
   networkClearFrom 7, NETWORK_VALUE_COLUMN
-  rep #$20
-  .a16
+  m16
   lda pppDnsTransactionId
   ldx #(7 * TERMINAL_COLUMNS) + NETWORK_VALUE_COLUMN
   jsr @writeHex16
-  sep #$20
-  .a8
-
+  m8
   networkClearFrom 8, NETWORK_VALUE_COLUMN
-  rep #$20
-  .a16
+  m16
   lda pppDnsRttFrames
   ldx #(8 * TERMINAL_COLUMNS) + NETWORK_VALUE_COLUMN
   jsr @writeDecimal16
-  sep #$20
-  .a8
+  m8
   networkWriteAtX " FRAMES"
 
   networkClearFrom 9, NETWORK_VALUE_COLUMN
@@ -383,29 +371,23 @@ NETWORK_COUNTER_COLUMN = 10
   jsr @writeIpv4
 
   networkClearFrom 5, NETWORK_VALUE_COLUMN
-  rep #$20
-  .a16
+  m16
   lda pppIcmpRequestIdentifier
   ldx #(5 * TERMINAL_COLUMNS) + NETWORK_VALUE_COLUMN
   jsr @writeHex16
-  sep #$20
-  .a8
+  m8
   networkClearFrom 6, NETWORK_VALUE_COLUMN
-  rep #$20
-  .a16
+  m16
   lda pppIcmpRequestSequence
   ldx #(6 * TERMINAL_COLUMNS) + NETWORK_VALUE_COLUMN
   jsr @writeDecimal16
-  sep #$20
-  .a8
+  m8
   networkClearFrom 7, NETWORK_VALUE_COLUMN
-  rep #$20
-  .a16
+  m16
   lda pppIcmpRequestRttFrames
   ldx #(7 * TERMINAL_COLUMNS) + NETWORK_VALUE_COLUMN
   jsr @writeDecimal16
-  sep #$20
-  .a8
+  m8
   networkWriteAtX " FRAMES"
   networkClearFrom 8, NETWORK_VALUE_COLUMN
   lda pppIcmpRequestLastError
@@ -455,29 +437,23 @@ NETWORK_COUNTER_COLUMN = 10
   ldx #(17 * TERMINAL_COLUMNS) + NETWORK_VALUE_COLUMN
   jsr @writeIpv4
   networkClearFrom 18, NETWORK_VALUE_COLUMN
-  rep #$20
-  .a16
+  m16
   lda pppIcmpInboundIdentifier
   ldx #(18 * TERMINAL_COLUMNS) + NETWORK_VALUE_COLUMN
   jsr @writeHex16
-  sep #$20
-  .a8
+  m8
   networkClearFrom 19, NETWORK_VALUE_COLUMN
-  rep #$20
-  .a16
+  m16
   lda pppIcmpInboundSequence
   ldx #(19 * TERMINAL_COLUMNS) + NETWORK_VALUE_COLUMN
   jsr @writeDecimal16
-  sep #$20
-  .a8
+  m8
   networkClearFrom 20, NETWORK_VALUE_COLUMN
-  rep #$20
-  .a16
+  m16
   lda pppIcmpInboundPayloadLength
   ldx #(20 * TERMINAL_COLUMNS) + NETWORK_VALUE_COLUMN
   jsr @writeDecimal16
-  sep #$20
-  .a8
+  m8
 @inboundSnapshotDone:
 
   networkClearFrom 21, NETWORK_COUNTER_COLUMN
@@ -854,24 +830,20 @@ NETWORK_COUNTER_COLUMN = 10
 @writeDecimal16:
   .a16
   sta statusFormatValue
-  sep #$20
-  .a8
+  m8
   stz statusFormatStarted
-  rep #$20
-  .a16
+  m16
   networkDecimalDigit 10000
   networkDecimalDigit 1000
   networkDecimalDigit 100
   networkDecimalDigit 10
   lda statusFormatValue
-  sep #$20
-  .a8
+  m8
   clc
   adc #'0'
   sta statusTileBuffer, x
   inx
-  rep #$20
-  .a16
+  m16
   rts
 
 ; Y points to a little-endian u32. Large counters stay honest without an
@@ -884,19 +856,16 @@ NETWORK_COUNTER_COLUMN = 10
   networkWriteAtX ">65535"
   rts
 @counterLow:
-  rep #$20
-  .a16
+  m16
   lda $0000, y
   jsr @writeDecimal16
-  sep #$20
-  .a8
+  m8
   rts
 
 @writeHex16:
   .a16
   sta statusFormatValue
-  sep #$20
-  .a8
+  m8
   lda #'$'
   sta statusTileBuffer, x
   inx
@@ -904,8 +873,7 @@ NETWORK_COUNTER_COLUMN = 10
   jsr @writeHex8
   lda statusFormatValue
   jsr @writeHex8
-  rep #$20
-  .a16
+  m16
   rts
 
 @writeHex8:

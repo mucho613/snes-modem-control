@@ -59,8 +59,7 @@
   stz pppNtpStratum
   stz pppNtpPollExponent
   stz pppNtpPrecision
-  rep #$20
-  .a16
+  m16
   stz pppNtpReferenceId
   stz pppNtpReferenceId + 2
   stz pppNtpCookieSeconds
@@ -87,8 +86,7 @@
   stz pppNtpTimeoutCount
   stz pppNtpTimeoutCount + 2
   stz pppNtpPacketOffset
-  sep #$20
-  .a8
+  m8
   plb
   rts
 .endproc
@@ -123,8 +121,7 @@
   stz pppNtpStratum
   stz pppNtpPollExponent
   stz pppNtpPrecision
-  rep #$20
-  .a16
+  m16
   lda #(PPP_NTP_COOKIE_SECONDS & $ffff)
   sta pppNtpCookieSeconds
   lda #((PPP_NTP_COOKIE_SECONDS >> 16) & $ffff)
@@ -146,8 +143,7 @@
   stz pppNtpUnixSeconds
   stz pppNtpUnixSeconds + 2
   stz pppNtpDeadline
-  sep #$20
-  .a8
+  m8
   jsr pppSnapshotEnd
   plb
   clc
@@ -196,9 +192,7 @@ linkIsOpen:
   phx
   phy
   setDBR $7e
-  sep #$20
-  .a8
-
+  m8
   lda pppNtpState
   cmp #PPP_NTP_STATE_REQUESTED
   beq requested
@@ -226,15 +220,12 @@ copyDestination:
   cpx #$0004
   bne copyDestination
 
-  rep #$20
-  .a16
+  m16
   lda #PPP_NTP_CLIENT_PORT
   sta pppUdpTransmitSourcePort
   lda #PPP_NTP_SERVER_PORT
   sta pppUdpTransmitDestinationPort
-  sep #$20
-  .a8
-
+  m8
   ldx #$0000
 clearPacket:
   stz pppTransmitBuffer + PPP_UDP_TRANSMIT_PAYLOAD_OFFSET, x
@@ -244,8 +235,7 @@ clearPacket:
   lda #((4 << PPP_NTP_VERSION_SHIFT) | PPP_NTP_MODE_CLIENT)
   sta pppTransmitBuffer + PPP_UDP_TRANSMIT_PAYLOAD_OFFSET
 
-  rep #$20
-  .a16
+  m16
   lda pppNtpCookieSeconds + 2
   xba
   sta pppTransmitBuffer + PPP_UDP_TRANSMIT_PAYLOAD_OFFSET + 40
@@ -260,8 +250,7 @@ clearPacket:
   sta pppTransmitBuffer + PPP_UDP_TRANSMIT_PAYLOAD_OFFSET + 46
 
   ldx #PPP_NTP_PACKET_LENGTH
-  sep #$20
-  .a8
+  m8
   jsr pppUdpBeginTransmit
   bcs transmitFailed
 
@@ -270,14 +259,12 @@ clearPacket:
   sta pppNtpState
   stz pppNtpLastError
   pppIncrement32 pppNtpRequestCount
-  rep #$20
-  .a16
+  m16
   lda frameCounter
   clc
   adc #PPP_NTP_RESPONSE_TIMEOUT_FRAMES
   sta pppNtpDeadline
-  sep #$20
-  .a8
+  m8
   jsr pppSnapshotEnd
   jmp done
 
@@ -290,14 +277,12 @@ transmitFailed:
 waiting:
   jsr linkIsOpen
   bcs linkClosed
-  rep #$20
-  .a16
+  m16
   lda frameCounter
   sec
   sbc pppNtpDeadline
   bmi done16
-  sep #$20
-  .a8
+  m8
   jsr pppSnapshotBegin
   lda #PPP_NTP_STATE_FAILED
   sta pppNtpState
@@ -318,12 +303,9 @@ linkClosed:
   bra done
 
 done16:
-  sep #$20
-  .a8
+  m8
 done:
-  rep #$30
-  .a16
-  .i16
+  mi16
   ply
   plx
   plb
@@ -365,8 +347,7 @@ linkIsOpen:
   jmp receiveDone
 
 ports:
-  rep #$20
-  .a16
+  m16
   lda pppUdpSourcePort
   cmp #PPP_NTP_SERVER_PORT
   bne wrongPort16
@@ -376,20 +357,17 @@ ports:
   lda pppUdpPayloadLength
   cmp #PPP_NTP_PACKET_LENGTH
   bcs source
-  sep #$20
-  .a8
+  m8
   pppNtpFail PPP_NTP_ERROR_TRUNCATED
   jmp receiveDone
 
 wrongPort16:
-  sep #$20
-  .a8
+  m8
   pppNtpFail PPP_NTP_ERROR_WRONG_PORT
   jmp receiveDone
 
 source:
-  sep #$20
-  .a8
+  m8
   ldx #$0000
 compareSource:
   lda pppIpv4SourceAddress, x
@@ -401,16 +379,13 @@ compareSource:
   cpx #$0004
   bne compareSource
 
-  rep #$20
-  .a16
+  m16
   lda pppUdpPacketOffset
   clc
   adc #PPP_UDP_HEADER_LENGTH
   sta pppNtpPacketOffset
   tax
-  sep #$20
-  .a8
-
+  m8
   lda pppFrameBuffer + 0, x
   pha
   lsr
@@ -479,8 +454,7 @@ synchronized:
   jmp receiveDone
 
 cookie:
-  rep #$20
-  .a16
+  m16
   lda pppFrameBuffer + 24, x
   xba
   cmp pppNtpCookieSeconds + 2
@@ -556,8 +530,7 @@ convertUnix:
   lda pppNtpUnixSeconds
   jsr clockSetUnixTime
 
-  sep #$20
-  .a8
+  m8
   lda #PPP_NTP_STATE_RECEIVED
   sta pppNtpState
   stz pppNtpLastError
@@ -567,13 +540,11 @@ convertUnix:
   jmp receiveDone
 
 cookieMismatch16:
-  sep #$20
-  .a8
+  m8
   pppNtpFail PPP_NTP_ERROR_ORIGINATE_MISMATCH
   bra receiveDone
 preUnix16:
-  sep #$20
-  .a8
+  m8
   pppNtpFail PPP_NTP_ERROR_PRE_UNIX_EPOCH
   bra receiveDone
 sourceMismatch:
@@ -609,8 +580,7 @@ receiveDone:
   phx
   phy
   setDBR $7e
-  rep #$20
-  .a16
+  m16
   lda frameCounter
   sta pppNtpTestSavedFrameCounter
   lda frameCounter + 2
@@ -623,8 +593,7 @@ receiveDone:
   sta pppNtpTestSavedClockSubsecond
   lda clockSubsecond + 2
   sta pppNtpTestSavedClockSubsecond + 2
-  sep #$20
-  .a8
+  m8
   lda clockValid
   sta pppNtpTestSavedClockValid
   jsr prepareLink
@@ -645,11 +614,9 @@ receiveDone:
   lda pppNtpState
   cmp #PPP_NTP_STATE_REQUESTED
   pppNtpRequireEqual fail99
-  rep #$20
-  .a16
+  m16
   jsr pppNtpPoll
-  sep #$20
-  .a8
+  m8
   lda pppNtpState
   cmp #PPP_NTP_STATE_WAITING
   pppNtpRequireEqual fail9a
@@ -684,8 +651,7 @@ receiveDone:
   lda pppNtpStratum
   cmp #$02
   pppNtpRequireEqual fail9b
-  rep #$20
-  .a16
+  m16
   lda pppNtpServerTransmitSeconds
   cmp #$6f80
   pppNtpRequireEqual fail9b_16
@@ -710,8 +676,7 @@ receiveDone:
   lda clockSubsecond + 2
   cmp #$8000
   pppNtpRequireEqual fail9c_16
-  sep #$20
-  .a8
+  m8
   lda clockValid
   cmp #$01
   pppNtpRequireEqual fail9c_16
@@ -734,8 +699,7 @@ receiveDone:
   ; Crossing a second boundary must not let display formatting corrupt the X
   ; frame-loop counter. From fraction $80000000, 60 nominal NTSC frames yield
   ; one whole second and fraction $7F943F2C.
-  rep #$20
-  .a16
+  m16
   ldx #60
   jsr clockAdvanceFrames
   lda clockUnixSeconds
@@ -750,15 +714,13 @@ receiveDone:
   lda clockSubsecond + 2
   cmp #$7f94
   pppNtpRequireEqual faila1_16
-  sep #$20
-  .a8
+  m8
   lda clockSecond
   cmp #21
   pppNtpRequireEqual faila1
 
   ; A stale or forged response cannot satisfy a new waiting request.
-  sep #$20
-  .a8
+  m8
   lda #PPP_NTP_STATE_WAITING
   sta pppNtpState
   inc pppFrameBuffer + PPP_UDP_TRANSMIT_PAYLOAD_OFFSET + 31
@@ -793,26 +755,22 @@ receiveDone:
   bcc :+
   jmp fail9f
 :
-  rep #$20
-  .a16
+  m16
   jsr pppNtpPoll
   lda pppNtpDeadline
   sta frameCounter
   jsr pppNtpPoll
-  sep #$20
-  .a8
+  m8
   lda pppNtpLastError
   cmp #PPP_NTP_ERROR_TIMEOUT
   pppNtpRequireEqual fail9f
-  rep #$20
-  .a16
+  m16
   lda pppNtpTimeoutCount
   cmp #$0001
   bne fail9f_16
 
   ; Requests below IPCP Opened are rejected synchronously.
-  sep #$20
-  .a8
+  m8
   stz pppIpcpState
   jsr pppNtpRequest
   bcs :+
@@ -834,14 +792,12 @@ fail9a:
   lda #$9a
   bra fail
 fail9b_16:
-  sep #$20
-  .a8
+  m8
 fail9b:
   lda #$9b
   bra fail
 fail9c_16:
-  sep #$20
-  .a8
+  m8
   lda #$9c
   bra fail
 fail9d:
@@ -851,8 +807,7 @@ fail9e:
   lda #$9e
   bra fail
 fail9f_16:
-  sep #$20
-  .a8
+  m8
 fail9f:
   lda #$9f
   bra fail
@@ -860,8 +815,7 @@ faila0:
   lda #$a0
   bra fail
 faila1_16:
-  sep #$20
-  .a8
+  m8
 faila1:
   lda #$a1
 fail:
@@ -899,8 +853,7 @@ prepareResponse:
   .a8
   lda #PPP_UDP_FLAG_VALID
   sta pppUdpFlags
-  rep #$20
-  .a16
+  m16
   lda #PPP_NTP_SERVER_PORT
   sta pppUdpSourcePort
   lda #PPP_NTP_CLIENT_PORT
@@ -909,8 +862,7 @@ prepareResponse:
   sta pppUdpPayloadLength
   lda #(PPP_UNCOMPRESSED_HEADER_LENGTH + PPP_IPV4_MINIMUM_HEADER_LENGTH)
   sta pppUdpPacketOffset
-  sep #$20
-  .a8
+  m8
   lda #$0a
   sta pppIpv4SourceAddress + 0
   lda #$18
@@ -979,8 +931,7 @@ prepareResponse:
 
 cleanup:
   .a8
-  rep #$20
-  .a16
+  m16
   lda pppNtpTestSavedFrameCounter
   sta frameCounter
   lda pppNtpTestSavedFrameCounter + 2
@@ -1002,8 +953,7 @@ cleanup:
 @restoreInvalidClock:
   jsr clockInitialize
 @clockRestored:
-  sep #$20
-  .a8
+  m8
   jsr pppTransmitInitialize
   jsr pppIpcpInitialize
   jsr pppIpv4Initialize

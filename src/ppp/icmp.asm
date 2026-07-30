@@ -68,8 +68,7 @@ notInbound:
   stz pppIcmpInboundSource + 1
   stz pppIcmpInboundSource + 2
   stz pppIcmpInboundSource + 3
-  rep #$20
-  .a16
+  m16
   stz pppIcmpIdentifier
   stz pppIcmpSequence
   stz pppIcmpPayloadLength
@@ -95,8 +94,7 @@ notInbound:
   stz pppIcmpInboundDropCount + 2
   stz pppIcmpPacketOffset
   stz pppIcmpChecksumAccumulator
-  sep #$20
-  .a8
+  m8
   jsr pppIcmpRequestInitialize
   plb
   rts
@@ -119,8 +117,7 @@ notInbound:
   stz pppIcmpLastType
   stz pppIcmpLastCode
   stz pppIcmpFlags
-  rep #$20
-  .a16
+  m16
   stz pppIcmpIdentifier
   stz pppIcmpSequence
   stz pppIcmpPayloadLength
@@ -129,24 +126,19 @@ notInbound:
   lda pppIpv4PayloadLength
   cmp #PPP_ICMP_ECHO_HEADER_LENGTH
   bcs packetOffset
-  sep #$20
-  .a8
+  m8
   pppIcmpReceiveError PPP_ICMP_ERROR_TRUNCATED
 
 packetOffset:
-  sep #$20
-  .a8
+  m8
   lda pppIpv4HeaderLength
-  rep #$20
-  .a16
+  m16
   and #$00ff
   clc
   adc #PPP_IPV4_FRAME_OFFSET
   sta pppIcmpPacketOffset
   tax
-  sep #$20
-  .a8
-
+  m8
   lda pppFrameBuffer + 0, x
   sta pppIcmpLastType
   cmp #PPP_ICMP_TYPE_ECHO_REQUEST
@@ -162,8 +154,7 @@ readCode:
   pppIcmpReceiveError PPP_ICMP_ERROR_NONZERO_CODE
 
 readFields:
-  rep #$20
-  .a16
+  m16
   lda pppFrameBuffer + 2, x
   xba
   sta pppIcmpChecksum
@@ -182,14 +173,12 @@ readFields:
   jsr checksumReceiveMessage
   cmp #$ffff
   beq valid
-  sep #$20
-  .a8
+  m8
   pppIncrement32 pppIcmpChecksumErrorCount
   pppIcmpReceiveError PPP_ICMP_ERROR_INVALID_CHECKSUM
 
 valid:
-  sep #$20
-  .a8
+  m8
   lda pppIcmpLastType
   cmp #PPP_ICMP_TYPE_ECHO_REQUEST
   beq request
@@ -219,16 +208,14 @@ copyInboundSource:
   inx
   cpx #$0004
   bne copyInboundSource
-  rep #$20
-  .a16
+  m16
   lda pppIcmpIdentifier
   sta pppIcmpInboundIdentifier
   lda pppIcmpSequence
   sta pppIcmpInboundSequence
   lda pppIcmpPayloadLength
   sta pppIcmpInboundPayloadLength
-  sep #$20
-  .a8
+  m8
   pppIncrement32 pppIcmpEchoRequestCount
   lda pppTransmitActive
   beq transmitReply
@@ -286,11 +273,9 @@ checksumReceiveWord:
   lda pppIpv4PayloadLength
   and #$0001
   beq checksumReceiveDone
-  sep #$20
-  .a8
+  m8
   lda pppFrameBuffer, x
-  rep #$20
-  .a16
+  m16
   and #$00ff
   xba
   clc
@@ -398,17 +383,14 @@ copyMessage:
   stz pppTransmitBuffer + PPP_UNCOMPRESSED_HEADER_LENGTH + PPP_IPV4_MINIMUM_HEADER_LENGTH + 2
   stz pppTransmitBuffer + PPP_UNCOMPRESSED_HEADER_LENGTH + PPP_IPV4_MINIMUM_HEADER_LENGTH + 3
 
-  rep #$20
-  .a16
+  m16
   ldx #(PPP_UNCOMPRESSED_HEADER_LENGTH + PPP_IPV4_MINIMUM_HEADER_LENGTH)
   lda pppIpv4PayloadLength
   jsr pppIcmpChecksumTransmitMessage
   eor #$ffff
   xba
   sta pppTransmitBuffer + PPP_UNCOMPRESSED_HEADER_LENGTH + PPP_IPV4_MINIMUM_HEADER_LENGTH + 2
-  sep #$20
-  .a8
-
+  m8
   ldx #$0000
 copyDestination:
   lda pppIpv4SourceAddress, x
@@ -460,11 +442,9 @@ transmitFailed:
   pla
   and #$0001
   beq @done
-  sep #$20
-  .a8
+  m8
   lda pppTransmitBuffer, x
-  rep #$20
-  .a16
+  m16
   and #$00ff
   xba
   clc
@@ -530,8 +510,7 @@ transmitFailed:
   lda pppIcmpInboundSource + 3
   cmp #$01
   pppIcmpRequireEqual fail88
-  rep #$20
-  .a16
+  m16
   lda pppIcmpIdentifier
   cmp #$1234
   pppIcmpRequireEqual fail88_16
@@ -556,9 +535,7 @@ transmitFailed:
   lda pppIcmpInboundPayloadLength
   cmp #$0005
   pppIcmpRequireEqual fail88_16
-  sep #$20
-  .a8
-
+  m8
   lda pppTransmitActive
   cmp #$01
   pppIcmpRequireEqual fail89
@@ -579,8 +556,7 @@ transmitFailed:
   lda pppIpv4TransmitDestination + 3
   cmp #$01
   pppIcmpRequireEqual fail89
-  rep #$20
-  .a16
+  m16
   lda pppIcmpTransmitCount
   cmp #$0001
   pppIcmpRequireEqual fail89_16
@@ -590,9 +566,7 @@ transmitFailed:
   lda pppIcmpInboundReplyCount
   cmp #$0001
   pppIcmpRequireEqual fail89_16
-  sep #$20
-  .a8
-
+  m8
   ; The active first reply forces a second request to remain owned.
   jsr pppIcmpReceive
   bcs :+
@@ -619,17 +593,14 @@ transmitFailed:
   lda pppIcmpFlags
   cmp #(PPP_ICMP_FLAG_VALID | PPP_ICMP_FLAG_ECHO_REQUEST)
   pppIcmpRequireEqual fail8b
-  rep #$20
-  .a16
+  m16
   lda pppIcmpReceiveCount
   cmp #$0002
   pppIcmpRequireEqual fail8b_16
   lda pppIcmpTransmitCount
   cmp #$0002
   pppIcmpRequireEqual fail8b_16
-  sep #$20
-  .a8
-
+  m8
   jsr pppTransmitInitialize
   lda pppFrameBuffer + PPP_IPV4_FRAME_OFFSET + PPP_IPV4_MINIMUM_HEADER_LENGTH + 12
   eor #$01
@@ -647,8 +618,7 @@ transmitFailed:
   lda pppIcmpInboundLastError
   cmp #PPP_ICMP_ERROR_INVALID_CHECKSUM
   pppIcmpRequireEqual fail8c
-  rep #$20
-  .a16
+  m16
   lda pppIcmpChecksumErrorCount
   cmp #$0001
   pppIcmpRequireEqual fail8c_16
@@ -661,23 +631,19 @@ transmitFailed:
   lda pppIcmpInboundIdentifier
   cmp #$1234
   pppIcmpRequireEqual fail8c_16
-  sep #$20
-  .a8
-
+  m8
   jsr cleanup
   lda #$00
   clc
   bra return
 
 fail88_16:
-  sep #$20
-  .a8
+  m8
 fail88:
   lda #$88
   bra fail
 fail89_16:
-  sep #$20
-  .a8
+  m8
 fail89:
   lda #$89
   bra fail
@@ -685,14 +651,12 @@ fail8a:
   lda #$8a
   bra fail
 fail8b_16:
-  sep #$20
-  .a8
+  m8
 fail8b:
   lda #$8b
   bra fail
 fail8c_16:
-  sep #$20
-  .a8
+  m8
 fail8c:
   lda #$8c
 fail:
@@ -719,12 +683,10 @@ prepareRequest:
   stz pppIpv4SourceAddress + 2
   lda #$01
   sta pppIpv4SourceAddress + 3
-  rep #$20
-  .a16
+  m16
   lda #$000d
   sta pppIpv4PayloadLength
-  sep #$20
-  .a8
+  m8
   lda #$08
   sta pppFrameBuffer + PPP_IPV4_FRAME_OFFSET + PPP_IPV4_MINIMUM_HEADER_LENGTH + 0
   stz pppFrameBuffer + PPP_IPV4_FRAME_OFFSET + PPP_IPV4_MINIMUM_HEADER_LENGTH + 1

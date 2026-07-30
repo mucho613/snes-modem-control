@@ -15,9 +15,7 @@ Palette:
 
   setDP $2100
 
-  sep #$20
-  .a8
-
+  m8
   stz .lobyte(CGADD)
 
   setDBR .bankbyte(Palette)
@@ -33,9 +31,7 @@ Palette:
     cpx #$0200
     bne @loop
 
-  rep #$20
-  .a16
-
+  m16
   plb
 
   rts

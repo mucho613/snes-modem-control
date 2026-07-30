@@ -25,9 +25,7 @@ vramResetByte: .byte $00
   lda #.loword(vramResetByte)
   sta .lobyte(A1T0L)
 
-  sep #$20
-  .a8
-
+  m8
   lda #.bankbyte(vramResetByte)
   sta .lobyte(A1B0)
 
@@ -40,9 +38,7 @@ vramResetByte: .byte $00
   lda #$01
   sta MDMAEN
 
-  rep #$20
-  .a16
-
+  m16
   ply
   plb
   pla

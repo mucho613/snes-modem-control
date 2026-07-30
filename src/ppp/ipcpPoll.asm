@@ -32,9 +32,7 @@
   phx
   phy
   setDBR $7e
-  sep #$20
-  .a8
-
+  m8
   lda pppReceiveEnabled
   beq @lowerDown
   lda modemDriverState
@@ -60,15 +58,13 @@
 :
   lda pppFrameReady
   beq @timer
-  rep #$20
-  .a16
+  m16
   lda pppLastProtocol
   cmp #PPP_PROTOCOL_IPCP
   beq @receiveIpcp
   cmp #PPP_PROTOCOL_IP
   beq @done
-  sep #$20
-  .a8
+  m8
   ; Unknown network protocols have no later consumer.
   jsr pppReleaseFrame
   bra @timer
@@ -85,8 +81,7 @@
   bra @done
 
 @receiveIpcp:
-  sep #$20
-  .a8
+  m8
   jsr pppIpcpReceiveFrame
   bcs @release
   lda pppIpcpPendingAction
@@ -143,9 +138,7 @@
   jsr pppTransmitAbort
 
 @done:
-  rep #$30
-  .a16
-  .i16
+  mi16
   ply
   plx
   plb
@@ -220,11 +213,9 @@
   sta pppPapState
 
   ; The first eligible poll opens IPCP and submits its local request.
-  rep #$20
-  .a16
+  m16
   jsr pppIpcpPoll
-  sep #$20
-  .a8
+  m8
   lda pppIpcpState
   cmp #PPP_IPCP_STATE_REQUEST_SENT
   pppIpcpPollRequireEqual @fail77
@@ -253,21 +244,17 @@
   sta pppFrameBuffer + 12
   lda #PPP_IPCP_PEER_ADDRESS_3
   sta pppFrameBuffer + 13
-  rep #$20
-  .a16
+  m16
   lda #PPP_PROTOCOL_IPCP
   sta pppLastProtocol
   lda #PPP_IPCP_ADDRESS_CONFIGURE_FRAME_LENGTH
   sta pppLastFrameLength
-  sep #$20
-  .a8
+  m8
   lda #$01
   sta pppFrameReady
-  rep #$20
-  .a16
+  m16
   jsr pppIpcpPoll
-  sep #$20
-  .a8
+  m8
   lda pppIpcpPendingAction
   cmp #PPP_IPCP_ACTION_CONFIGURE_ACK
   pppIpcpPollRequireEqual @fail78
@@ -278,11 +265,9 @@
 
   ; Once TX is idle the Ack is submitted and the retained frame is released.
   jsr pppTransmitInitialize
-  rep #$20
-  .a16
+  m16
   jsr pppIpcpPoll
-  sep #$20
-  .a8
+  m8
   lda pppFrameReady
   ora pppIpcpPendingAction
   pppIpcpPollRequireEqual @fail78
@@ -295,11 +280,9 @@
 
   ; Losing the PAP upper layer lowers IPCP and aborts its active response.
   stz pppPapState
-  rep #$20
-  .a16
+  m16
   jsr pppIpcpPoll
-  sep #$20
-  .a8
+  m8
   lda pppIpcpState
   pppIpcpPollRequireEqual @fail79
   lda pppTransmitActive

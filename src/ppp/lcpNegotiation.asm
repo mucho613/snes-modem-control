@@ -118,14 +118,12 @@
 
 @terminateRequest:
   .a8
-  rep #$20
-  .a16
+  m16
   inc pppLcpTerminateRequestCount
   bne :+
   inc pppLcpTerminateRequestCount + 2
 :
-  sep #$20
-  .a8
+  m8
   stz pppLcpRestartRemaining
   stz pppLcpTimerActive
   stz pppLcpDeferredRequest
@@ -199,14 +197,12 @@
   lda pppLcpLastIdentifier
   cmp pppLcpRequestIdentifier
   bne @invalidResponse
-  rep #$20
-  .a16
+  m16
   lda pppLcpPacketLength
   cmp #PPP_LCP_HEADER_LENGTH
   bne @invalidResponse16
 
-  sep #$20
-  .a8
+  m8
   lda pppLcpState
   cmp #PPP_LCP_STATE_REQUEST_SENT
   beq @ackReceived
@@ -246,14 +242,12 @@
   lda pppLcpLastIdentifier
   cmp pppLcpRequestIdentifier
   bne @invalidResponse
-  rep #$20
-  .a16
+  m16
   lda pppLcpPacketLength
   cmp #PPP_LCP_HEADER_LENGTH
   bne @invalidResponse16
 
-  sep #$20
-  .a8
+  m8
   lda pppLcpState
   cmp #PPP_LCP_STATE_ACK_SENT
   beq @negativeKeepsAckSent
@@ -272,8 +266,7 @@
 
 @invalidResponse16:
   .a16
-  sep #$20
-  .a8
+  m8
 @invalidResponse:
   .a8
   lda #PPP_LCP_ERROR_INVALID_RESPONSE
@@ -323,12 +316,10 @@
   phb
   setDBR $7e
   jsr pppSnapshotBegin
-  rep #$20
-  .a16
+  m16
   lda pppLastProtocol
   sta pppLcpLastRejectedProtocol
-  sep #$20
-  .a8
+  m8
   inc pppLcpRejectIdentifier
   lda #PPP_LCP_ACTION_PROTOCOL_REJECT
   sta pppLcpPendingAction
@@ -415,38 +406,32 @@
   stz pppTransmitBuffer + 6
   lda #PPP_LCP_HEADER_LENGTH
   sta pppTransmitBuffer + 7
-  rep #$20
-  .a16
+  m16
   lda #PPP_LCP_MINIMUM_FRAME_LENGTH
   jmp @begin
 
 @copyResponse:
   .a8
-  rep #$20
-  .a16
+  m16
   ldx #$0000
 @copyLoop:
   .a16
   cpx pppLcpPacketLength
   beq @selectResponseCode
-  sep #$20
-  .a8
+  m8
   lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET, x
   sta pppTransmitBuffer + PPP_LCP_FRAME_OFFSET, x
-  rep #$20
-  .a16
+  m16
   inx
   bra @copyLoop
 
 @selectResponseCode:
   .a16
-  sep #$20
-  .a8
+  m8
   lda #PPP_LCP_CODE_CONFIGURE_ACK
   .a8
   sta pppTransmitBuffer + PPP_LCP_FRAME_OFFSET
-  rep #$20
-  .a16
+  m16
   lda pppLcpPacketLength
   clc
   adc #PPP_UNCOMPRESSED_HEADER_LENGTH
@@ -466,8 +451,7 @@
   stz pppTransmitBuffer + 6
   lda #PPP_LCP_HEADER_LENGTH
   sta pppTransmitBuffer + 7
-  rep #$20
-  .a16
+  m16
   lda #PPP_LCP_MINIMUM_FRAME_LENGTH
   jmp @begin
 
@@ -480,8 +464,7 @@
 
   ; LCP Length includes its four-byte header. Limit it to the received frame,
   ; the peer MRU, and this build's fixed 1500-byte transmit Information area.
-  rep #$20
-  .a16
+  m16
   lda pppLastFrameLength
   clc
   adc #$0002
@@ -500,14 +483,12 @@
 :
   sta pppLcpOutputCursor
   xba
-  sep #$20
-  .a8
+  m8
   sta pppTransmitBuffer + 6
   lda pppLcpOutputCursor
   sta pppTransmitBuffer + 7
 
-  rep #$20
-  .a16
+  m16
   lda pppLcpOutputCursor
   sec
   sbc #PPP_LCP_HEADER_LENGTH
@@ -518,12 +499,10 @@
   .a16
   lda pppLcpPacketEnd
   beq @protocolRejectLength
-  sep #$20
-  .a8
+  m8
   lda pppFrameBuffer, x
   sta pppTransmitBuffer, y
-  rep #$20
-  .a16
+  m16
   inx
   iny
   dec pppLcpPacketEnd
@@ -546,8 +525,7 @@
   ; Copy the complete Length-delimited rejected LCP packet when possible.
   ; The outer LCP packet is bounded by the peer MRU and the fixed transmit
   ; Information area. Preserve at least the rejected four-byte LCP header.
-  rep #$20
-  .a16
+  m16
   lda pppLcpPacketLength
   clc
   adc #PPP_LCP_HEADER_LENGTH
@@ -566,14 +544,12 @@
 :
   sta pppLcpOutputCursor
   xba
-  sep #$20
-  .a8
+  m8
   sta pppTransmitBuffer + 6
   lda pppLcpOutputCursor
   sta pppTransmitBuffer + 7
 
-  rep #$20
-  .a16
+  m16
   lda pppLcpOutputCursor
   sec
   sbc #PPP_LCP_HEADER_LENGTH
@@ -584,12 +560,10 @@
   .a16
   lda pppLcpPacketEnd
   beq @codeRejectLength
-  sep #$20
-  .a8
+  m8
   lda pppFrameBuffer, x
   sta pppTransmitBuffer, y
-  rep #$20
-  .a16
+  m16
   inx
   iny
   dec pppLcpPacketEnd
@@ -605,8 +579,7 @@
   .a16
   jsr pppTransmitBegin
   bcs @busy16
-  sep #$20
-  .a8
+  m8
   jsr pppSnapshotBegin
   lda pppLcpPendingAction
   cmp #PPP_LCP_ACTION_CONFIGURE_REQUEST
@@ -616,38 +589,32 @@
 @maybeTerminateAck:
   cmp #PPP_LCP_ACTION_TERMINATE_ACK
   bne @maybeProtocolReject
-  rep #$20
-  .a16
+  m16
   inc pppLcpTerminateAckCount
   bne :+
   inc pppLcpTerminateAckCount + 2
 :
-  sep #$20
-  .a8
+  m8
   bra @counterDone
 @maybeProtocolReject:
   cmp #PPP_LCP_ACTION_PROTOCOL_REJECT
   bne @maybeCodeReject
-  rep #$20
-  .a16
+  m16
   inc pppLcpProtocolRejectCount
   bne :+
   inc pppLcpProtocolRejectCount + 2
 :
-  sep #$20
-  .a8
+  m8
   bra @counterDone
 @maybeCodeReject:
   cmp #PPP_LCP_ACTION_CODE_REJECT
   bne @counterDone
-  rep #$20
-  .a16
+  m16
   inc pppLcpCodeRejectCount
   bne :+
   inc pppLcpCodeRejectCount + 2
 :
-  sep #$20
-  .a8
+  m8
 @counterDone:
   stz pppLcpPendingAction
   jsr pppSnapshotEnd
@@ -659,8 +626,7 @@
 
 @busy16:
   .a16
-  sep #$20
-  .a8
+  m8
 @busy:
   .a8
   ply
@@ -966,14 +932,12 @@
   stz pppFrameBuffer + 6
   lda #PPP_LCP_HEADER_LENGTH
   sta pppFrameBuffer + 7
-  rep #$20
-  .a16
+  m16
   lda #PPP_PROTOCOL_LCP
   sta pppLastProtocol
   lda #PPP_LCP_MINIMUM_FRAME_LENGTH
   sta pppLastFrameLength
-  sep #$20
-  .a8
+  m8
   rts
 
 ; Input A=Code, X low byte=Identifier. Adds MRU 1500.
@@ -993,13 +957,11 @@
   sta pppFrameBuffer + 10
   lda #$dc
   sta pppFrameBuffer + 11
-  rep #$20
-  .a16
+  m16
   lda #PPP_PROTOCOL_LCP
   sta pppLastProtocol
   lda #$000c
   sta pppLastFrameLength
-  sep #$20
-  .a8
+  m8
   rts
 .endproc

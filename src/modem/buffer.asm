@@ -43,15 +43,12 @@
   lda #MODEM_DIAGNOSTIC_MAGIC_3
   sta modemDiagnosticMagic + 3
 
-  rep #$20
-  .a16
+  m16
   lda #MODEM_DIAGNOSTIC_VERSION
   sta modemDiagnosticVersion
   lda #MODEM_DIAGNOSTIC_SIZE
   sta modemDiagnosticSize
-  sep #$20
-  .a8
-
+  m8
   lda #MODEM_STATE_OFF
   sta modemDriverState
   stz modemFlags
@@ -91,15 +88,12 @@
   lda #MODEM_MAILBOX_MAGIC_3
   sta modemMailbox + 3
 
-  rep #$20
-  .a16
+  m16
   lda #MODEM_MAILBOX_VERSION
   sta modemMailbox + 4
   lda #MODEM_MAILBOX_SIZE
   sta modemMailbox + 6
-  sep #$20
-  .a8
-
+  m8
   plb
   rts
 .endproc

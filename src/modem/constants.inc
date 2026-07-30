@@ -44,12 +44,10 @@ MODEM_BINARY_CHUNK_MAX_LENGTH = MODEM_MAILBOX_ARGUMENT_SIZE - MODEM_BINARY_ARGUM
 
 .macro modemIncrement32 address
   .local done
-  rep #$20
-  .a16
+  m16
   inc address
   bne done
   inc address + 2
 done:
-  sep #$20
-  .a8
+  m8
 .endmacro

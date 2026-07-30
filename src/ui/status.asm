@@ -73,9 +73,7 @@ STATUS_VALUE_COLUMN = 7
   phy
 
   setDBR $7e
-  sep #$20
-  .a8
-
+  m8
   ldx #$0000
   lda #' '
 @clearTileBuffer:
@@ -104,12 +102,10 @@ STATUS_VALUE_COLUMN = 7
   ; Populate the complete status tilemap immediately. Subsequent frames
   ; refresh one row at a time during VBlank.
   setDP $2100
-  rep #$20
-  .a16
+  m16
   lda #TERMINAL_STATUS_TILEMAP_BASE
   sta .lobyte(VMADDL)
-  sep #$20
-  .a8
+  m8
   ldx #$0000
 @copyInitial:
   lda statusTileBuffer, x
@@ -119,8 +115,7 @@ STATUS_VALUE_COLUMN = 7
   cpx #(TERMINAL_COLUMNS * TERMINAL_STATUS_ROWS)
   bne @copyInitial
 
-  rep #$20
-  .a16
+  m16
   ply
   plx
   pld
@@ -422,59 +417,49 @@ STATUS_VALUE_COLUMN = 7
   phy
   setDBR $7e
 
-  sep #$20
-  .a8
+  m8
   lda screenMode
   cmp #SCREEN_MODE_RAW_LOG
   bne @statusInput
 
-  rep #$20
-  .a16
+  m16
   lda controller1InputPulse
   and #CONTROLLER_BUTTON_L
   beq @update
-  sep #$20
-  .a8
+  m8
   stz screenMode
   bra @update
 
 @statusInput:
-  rep #$20
-  .a16
+  m16
   lda controller1InputPulse
   and #CONTROLLER_BUTTON_R
   beq @direction
-  sep #$20
-  .a8
+  m8
   lda #SCREEN_MODE_RAW_LOG
   sta screenMode
   bra @update
 
 @direction:
-  rep #$20
-  .a16
+  m16
   lda controller1Input
   and #(CONTROLLER_BUTTON_LEFT | CONTROLLER_BUTTON_RIGHT)
   bne @directionPressed
-  sep #$20
-  .a8
+  m8
   stz statusDirectionLatch
   bra @update
 
 @directionPressed:
-  sep #$20
-  .a8
+  m8
   lda statusDirectionLatch
   bne @update
   inc statusDirectionLatch
 
-  rep #$20
-  .a16
+  m16
   lda controller1Input
   and #CONTROLLER_BUTTON_LEFT
   beq @right
-  sep #$20
-  .a8
+  m8
   lda statusPage
   bne :+
   lda #STATUS_PAGE_COUNT
@@ -484,13 +469,11 @@ STATUS_VALUE_COLUMN = 7
   bra @update
 
 @right:
-  rep #$20
-  .a16
+  m16
   lda controller1Input
   and #CONTROLLER_BUTTON_RIGHT
   beq @update
-  sep #$20
-  .a8
+  m8
   inc statusPage
   lda statusPage
   cmp #STATUS_PAGE_COUNT
@@ -498,19 +481,16 @@ STATUS_VALUE_COLUMN = 7
   stz statusPage
 
 @update:
-  rep #$20
-  .a16
+  m16
   lda frameCounter
   cmp statusLastUpdateFrame
   beq @done
   sta statusLastUpdateFrame
-  sep #$20
-  .a8
+  m8
   jsr statusUpdateBuffer
 
 @done:
-  rep #$20
-  .a16
+  m16
   ply
   plx
   plb
@@ -525,8 +505,7 @@ STATUS_VALUE_COLUMN = 7
   .i16
 
   php
-  rep #$10
-  .i16
+  i16
   pha
   phb
   phd
@@ -535,8 +514,7 @@ STATUS_VALUE_COLUMN = 7
   setDBR $7e
   setDP $2100
 
-  rep #$20
-  .a16
+  m16
   lda statusRenderRow
   and #$00ff
   asl
@@ -549,8 +527,7 @@ STATUS_VALUE_COLUMN = 7
   adc #TERMINAL_STATUS_TILEMAP_BASE
   sta .lobyte(VMADDL)
 
-  sep #$20
-  .a8
+  m8
   ldy #TERMINAL_COLUMNS
 @copyRow:
   lda statusTileBuffer, x

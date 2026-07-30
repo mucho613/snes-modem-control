@@ -37,10 +37,8 @@
 .endmacro
 
 .macro pppUdpEnterA16
-  sep #$20
-  .a8
-  rep #$20
-  .a16
+  m8
+  m16
 .endmacro
 
 .proc pppUdpInitialize
@@ -51,8 +49,7 @@
   setDBR $7e
   stz pppUdpLastError
   stz pppUdpFlags
-  rep #$20
-  .a16
+  m16
   stz pppUdpSourcePort
   stz pppUdpDestinationPort
   stz pppUdpLength
@@ -70,8 +67,7 @@
   stz pppUdpChecksumAccumulator
   stz pppUdpTransmitSourcePort
   stz pppUdpTransmitDestinationPort
-  sep #$20
-  .a8
+  m8
   plb
   rts
 .endproc
@@ -91,8 +87,7 @@
   pppIncrement32 pppUdpReceiveCount
   stz pppUdpLastError
   stz pppUdpFlags
-  rep #$20
-  .a16
+  m16
   stz pppUdpSourcePort
   stz pppUdpDestinationPort
   stz pppUdpLength
@@ -102,16 +97,13 @@
   lda pppIpv4PayloadLength
   cmp #PPP_UDP_HEADER_LENGTH
   bcs packetOffset
-  sep #$20
-  .a8
+  m8
   pppUdpReceiveError PPP_UDP_ERROR_TRUNCATED_HEADER
 
 packetOffset:
-  sep #$20
-  .a8
+  m8
   lda pppIpv4HeaderLength
-  rep #$20
-  .a16
+  m16
   and #$00ff
   clc
   adc #PPP_IPV4_FRAME_OFFSET
@@ -129,8 +121,7 @@ packetOffset:
   sta pppUdpLength
   cmp #PPP_UDP_HEADER_LENGTH
   bcs lengthAvailable
-  sep #$20
-  .a8
+  m8
   pppUdpReceiveError PPP_UDP_ERROR_INVALID_LENGTH
 
 lengthAvailable:
@@ -138,8 +129,7 @@ lengthAvailable:
   cmp pppIpv4PayloadLength
   bcc readChecksum
   beq readChecksum
-  sep #$20
-  .a8
+  m8
   pppUdpReceiveError PPP_UDP_ERROR_TRUNCATED_DATAGRAM
 
 readChecksum:
@@ -155,49 +145,40 @@ readChecksum:
   beq valid
 
   jsr checksumReceiveDatagram
-  rep #$20
-  .a16
+  m16
   cmp #$ffff
   beq checksumValid
-  sep #$20
-  .a8
+  m8
   pppIncrement32 pppUdpChecksumErrorCount
   pppUdpReceiveError PPP_UDP_ERROR_INVALID_CHECKSUM
 
 checksumValid:
-  sep #$20
-  .a8
+  m8
   lda #PPP_UDP_FLAG_CHECKSUM_PRESENT
   sta pppUdpFlags
 
 valid:
-  sep #$20
-  .a8
+  m8
   lda pppUdpFlags
   ora #PPP_UDP_FLAG_VALID
   sta pppUdpFlags
   stz pppUdpLastError
-  rep #$20
-  .a16
+  m16
   lda pppUdpDestinationPort
   cmp #PPP_NTP_CLIENT_PORT
   bne dnsApplication
-  sep #$20
-  .a8
+  m8
   jsr pppNtpReceive
   bra applicationDone8
 dnsApplication:
-  rep #$20
-  .a16
+  m16
   cmp #PPP_DNS_CLIENT_PORT
   bne applicationDone
-  sep #$20
-  .a8
+  m8
   jsr pppDnsReceive
   bra applicationDone8
 applicationDone:
-  sep #$20
-  .a8
+  m8
 applicationDone8:
   jsr pppSnapshotEnd
   ply
@@ -244,11 +225,9 @@ checksumReceiveDatagram:
   lda pppUdpLength
   and #$0001
   beq @done
-  sep #$20
-  .a8
+  m8
   lda pppFrameBuffer, x
-  rep #$20
-  .a16
+  m16
   and #$00ff
   xba
   jsr addChecksumWord
@@ -288,8 +267,7 @@ addChecksumWord:
   bra transmitError
 
 lengthValid:
-  rep #$20
-  .a16
+  m16
   txa
   clc
   adc #PPP_UDP_HEADER_LENGTH
@@ -307,8 +285,7 @@ lengthValid:
   stz pppTransmitBuffer + PPP_UNCOMPRESSED_HEADER_LENGTH + PPP_IPV4_MINIMUM_HEADER_LENGTH + 6
 
   jsr checksumTransmitDatagram
-  rep #$20
-  .a16
+  m16
   eor #$ffff
   bne :+
   lda #$ffff
@@ -318,8 +295,7 @@ lengthValid:
   sta pppTransmitBuffer + PPP_UNCOMPRESSED_HEADER_LENGTH + PPP_IPV4_MINIMUM_HEADER_LENGTH + 6
 
   ldx pppUdpLength
-  sep #$20
-  .a8
+  m8
   lda #PPP_IPV4_PROTOCOL_UDP
   jsr pppIpv4BeginTransmit
   bcc transmitAccepted
@@ -384,11 +360,9 @@ checksumTransmitDatagram:
   lda pppUdpLength
   and #$0001
   beq @done
-  sep #$20
-  .a8
+  m8
   lda pppTransmitBuffer, x
-  rep #$20
-  .a16
+  m16
   and #$00ff
   xba
   jsr addChecksumWord
@@ -438,8 +412,7 @@ initialValid:
   lda pppUdpFlags
   cmp #(PPP_UDP_FLAG_VALID | PPP_UDP_FLAG_CHECKSUM_PRESENT)
   pppUdpRequireEqual fail92
-  rep #$20
-  .a16
+  m16
   lda pppUdpSourcePort
   cmp #$c000
   pppUdpRequireEqual fail93_16
@@ -461,14 +434,12 @@ initialValid:
 
   ; A zero IPv4 UDP checksum is explicitly valid and skips verification.
   stz pppFrameBuffer + PPP_IPV4_FRAME_OFFSET + PPP_IPV4_MINIMUM_HEADER_LENGTH + 6
-  sep #$20
-  .a8
+  m8
   jsr pppUdpReceive
   lda pppUdpFlags
   cmp #PPP_UDP_FLAG_VALID
   pppUdpRequireEqual fail8e
-  rep #$20
-  .a16
+  m16
   lda pppUdpReceiveCount
   cmp #$0002
   pppUdpRequireEqual fail8e_16
@@ -476,8 +447,7 @@ initialValid:
   ; Restore the checksum and corrupt the odd final payload byte.
   lda #$c8ed
   sta pppFrameBuffer + PPP_IPV4_FRAME_OFFSET + PPP_IPV4_MINIMUM_HEADER_LENGTH + 6
-  sep #$20
-  .a8
+  m8
   lda pppFrameBuffer + PPP_IPV4_FRAME_OFFSET + PPP_IPV4_MINIMUM_HEADER_LENGTH + 12
   eor #$01
   sta pppFrameBuffer + PPP_IPV4_FRAME_OFFSET + PPP_IPV4_MINIMUM_HEADER_LENGTH + 12
@@ -485,8 +455,7 @@ initialValid:
   lda pppUdpLastError
   cmp #PPP_UDP_ERROR_INVALID_CHECKSUM
   pppUdpRequireEqual fail8f
-  rep #$20
-  .a16
+  m16
   lda pppUdpChecksumErrorCount
   cmp #$0001
   pppUdpRequireEqual fail8f_16
@@ -495,8 +464,7 @@ initialValid:
   pppUdpRequireEqual fail8f_16
 
   ; A length below the fixed header is structurally invalid.
-  sep #$20
-  .a8
+  m8
   lda #$34
   sta pppFrameBuffer + PPP_IPV4_FRAME_OFFSET + PPP_IPV4_MINIMUM_HEADER_LENGTH + 12
   stz pppFrameBuffer + PPP_IPV4_FRAME_OFFSET + PPP_IPV4_MINIMUM_HEADER_LENGTH + 4
@@ -529,14 +497,12 @@ initialValid:
   stz pppIpv4TransmitDestination + 2
   lda #$c7
   sta pppIpv4TransmitDestination + 3
-  rep #$20
-  .a16
+  m16
   lda #$c000
   sta pppUdpTransmitSourcePort
   lda #$007b
   sta pppUdpTransmitDestinationPort
-  sep #$20
-  .a8
+  m8
   lda #$4e
   sta pppTransmitBuffer + PPP_UDP_TRANSMIT_PAYLOAD_OFFSET + 0
   lda #$44
@@ -558,8 +524,7 @@ initialValid:
   lda pppTransmitBuffer + PPP_UNCOMPRESSED_HEADER_LENGTH + PPP_IPV4_MINIMUM_HEADER_LENGTH + 7
   cmp #$c8
   pppUdpRequireEqual fail91
-  rep #$20
-  .a16
+  m16
   lda pppUdpTransmitCount
   cmp #$0001
   pppUdpRequireEqual fail91_16
@@ -567,28 +532,24 @@ initialValid:
   cmp #$0001
   pppUdpRequireEqual fail91_16
 
-  sep #$20
-  .a8
+  m8
   jsr cleanup
   lda #$00
   clc
   bra return
 
 fail8d_16:
-  sep #$20
-  .a8
+  m8
 fail8d:
   lda #$8d
   bra fail
 fail8e_16:
-  sep #$20
-  .a8
+  m8
 fail8e:
   lda #$8e
   bra fail
 fail8f_16:
-  sep #$20
-  .a8
+  m8
 fail8f:
   lda #$8f
   bra fail
@@ -596,8 +557,7 @@ fail90:
   lda #$90
   bra fail
 fail91_16:
-  sep #$20
-  .a8
+  m8
 fail91:
   lda #$91
   bra fail
@@ -605,33 +565,27 @@ fail92:
   lda #$92
   bra fail
 fail93_16:
-  sep #$20
-  .a8
+  m8
   lda #$93
   bra fail
 fail94_16:
-  sep #$20
-  .a8
+  m8
   lda #$94
   bra fail
 fail95_16:
-  sep #$20
-  .a8
+  m8
   lda #$95
   bra fail
 fail96_16:
-  sep #$20
-  .a8
+  m8
   lda #$96
   bra fail
 fail97_16:
-  sep #$20
-  .a8
+  m8
   lda #$97
   bra fail
 fail98_16:
-  sep #$20
-  .a8
+  m8
   lda #$98
   bra fail
 fail:
@@ -661,12 +615,10 @@ prepareDatagram:
   sta pppIpv4SourceAddress + 3
   lda #$c7
   sta pppIpv4DestinationAddress + 3
-  rep #$20
-  .a16
+  m16
   lda #$000d
   sta pppIpv4PayloadLength
-  sep #$20
-  .a8
+  m8
   lda #$c0
   sta pppFrameBuffer + PPP_IPV4_FRAME_OFFSET + PPP_IPV4_MINIMUM_HEADER_LENGTH + 0
   stz pppFrameBuffer + PPP_IPV4_FRAME_OFFSET + PPP_IPV4_MINIMUM_HEADER_LENGTH + 1

@@ -122,22 +122,19 @@
   lda pppFrameBuffer + 1, y
   sta pppLcpOptionLength
   stz pppLcpOptionLength + 1
-  rep #$20
-  .a16
+  m16
   tya
   clc
   adc pppLcpOptionLength
   tay
-  sep #$20
-  .a8
+  m8
   rts
 
 ; Publish peer values only after every option was accepted.
 @commitAcceptedConfiguration:
   .a8
   stz pppLcpPeerFlags
-  rep #$20
-  .a16
+  m16
   lda #PPP_DEFAULT_MRU
   sta pppLcpPeerMru
   lda #$ffff
@@ -145,9 +142,7 @@
   sta pppLcpPeerAccm + 2
   stz pppLcpPeerMagic
   stz pppLcpPeerMagic + 2
-  sep #$20
-  .a8
-
+  m8
   ldy #PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH
 @commitLoop:
   .a8
@@ -284,8 +279,7 @@
   lda pppLcpPeerFlags
   cmp #(PPP_LCP_PEER_FLAG_MRU | PPP_LCP_PEER_FLAG_ACCM | PPP_LCP_PEER_FLAG_PAP | PPP_LCP_PEER_FLAG_MAGIC_NUMBER)
   pppLcpBranchEqualOrJump @fail40
-  rep #$20
-  .a16
+  m16
   lda pppLcpPeerMru
   cmp #$05d4
   pppLcpBranchEqualOrJump @fail40_16
@@ -298,9 +292,7 @@
   lda pppLcpPeerMagic + 2
   cmp #$1234
   pppLcpBranchEqualOrJump @fail40_16
-  sep #$20
-  .a8
-
+  m8
   ; Invalid MRU and CHAP are Nak candidates in original option order.
   lda #$0d
   jsr @preparePacket
@@ -330,8 +322,7 @@
   .a16
   cmp #$0010
   pppLcpBranchEqualOrJump @fail41_16
-  sep #$20
-  .a8
+  m8
   lda pppTransmitBuffer + 4
   cmp #PPP_LCP_CODE_CONFIGURE_NAK
   pppLcpBranchEqualOrJump @fail41
@@ -394,8 +385,7 @@
   .a16
   cmp #$000d
   pppLcpBranchEqualOrJump @fail42_16
-  sep #$20
-  .a8
+  m8
   lda pppTransmitBuffer + 4
   cmp #PPP_LCP_CODE_CONFIGURE_REJECT
   pppLcpBranchEqualOrJump @fail42
@@ -450,8 +440,7 @@
   .a16
   cmp #$0010
   pppLcpBranchEqualOrJump @fail43_16
-  sep #$20
-  .a8
+  m8
   lda pppTransmitBuffer + 7
   cmp #$0c
   pppLcpBranchEqualOrJump @fail43
@@ -472,29 +461,25 @@
 
 @fail40_16:
   .a16
-  sep #$20
-  .a8
+  m8
 @fail40:
   lda #$40
   bra @fail
 @fail41_16:
   .a16
-  sep #$20
-  .a8
+  m8
 @fail41:
   lda #$41
   bra @fail
 @fail42_16:
   .a16
-  sep #$20
-  .a8
+  m8
 @fail42:
   lda #$42
   bra @fail
 @fail43_16:
   .a16
-  sep #$20
-  .a8
+  m8
 @fail43:
   lda #$43
 
@@ -520,14 +505,12 @@
   stz pppFrameBuffer + 6
   lda #PPP_LCP_CODE_CONFIGURE_REQUEST
   sta pppFrameBuffer + 4
-  rep #$20
-  .a16
+  m16
   lda pppLcpPacketLength
   clc
   adc #PPP_LCP_FRAME_OFFSET
   sta pppLcpPacketEnd
-  sep #$20
-  .a8
+  m8
   rts
 .endproc
 
@@ -638,8 +621,7 @@
   sta pppTransmitBuffer + 4
   lda pppFrameBuffer + 5
   sta pppTransmitBuffer + 5
-  rep #$20
-  .a16
+  m16
   lda #PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH
   sta pppLcpOutputCursor
   ldy #PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH
@@ -650,8 +632,7 @@
   bne :+
   jmp @finish
 :
-  sep #$20
-  .a8
+  m8
   jsr pppLcpClassifyPeerOption
   pha
   lda pppLcpPendingAction
@@ -688,14 +669,12 @@
   sta pppTransmitBuffer + 2, x
   lda #$23
   sta pppTransmitBuffer + 3, x
-  rep #$20
-  .a16
+  m16
   lda pppLcpOutputCursor
   clc
   adc #$0004
   sta pppLcpOutputCursor
-  sep #$20
-  .a8
+  m8
   bra @advanceInput
 
 @writeMruNak:
@@ -709,14 +688,12 @@
   sta pppTransmitBuffer + 2, x
   lda #$dc
   sta pppTransmitBuffer + 3, x
-  rep #$20
-  .a16
+  m16
   lda pppLcpOutputCursor
   clc
   adc #$0004
   sta pppLcpOutputCursor
-  sep #$20
-  .a8
+  m8
   bra @advanceInput
 
 @writeAccmNak:
@@ -731,22 +708,18 @@
   sta pppTransmitBuffer + 3, x
   sta pppTransmitBuffer + 4, x
   sta pppTransmitBuffer + 5, x
-  rep #$20
-  .a16
+  m16
   lda pppLcpOutputCursor
   clc
   adc #$0006
   sta pppLcpOutputCursor
-  sep #$20
-  .a8
-
+  m8
 @advanceInput:
   .a8
   lda pppFrameBuffer + 1, y
   sta pppLcpOptionLength
   stz pppLcpOptionLength + 1
-  rep #$20
-  .a16
+  m16
   tya
   clc
   adc pppLcpOptionLength
@@ -766,8 +739,7 @@
   ldx pppLcpOutputCursor
   lda pppFrameBuffer, y
   sta pppTransmitBuffer, x
-  rep #$20
-  .a16
+  m16
   inc pppLcpOptionOffset
   inc pppLcpOutputCursor
   dec pppLcpOptionLength
@@ -777,8 +749,7 @@
   jmp @optionLoop
 @copyByte16:
   .a16
-  sep #$20
-  .a8
+  m8
   bra @copyByte
 
 @finish:
@@ -787,13 +758,11 @@
   sec
   sbc #PPP_LCP_FRAME_OFFSET
   xba
-  sep #$20
-  .a8
+  m8
   sta pppTransmitBuffer + 6
   xba
   sta pppTransmitBuffer + 7
-  rep #$20
-  .a16
+  m16
   lda pppLcpOutputCursor
   ply
   plx

@@ -6,8 +6,7 @@ ramResetByte: .byte $00
   .a16
   .i16
 
-  sep #$20
-  .a8
+  m8
   .i16
 
   ; Fill WRAM with zeros using two 64KiB fixed address DMA transfers to WMDATA
@@ -35,8 +34,6 @@ ramResetByte: .byte $00
   stx DAS0L ; Transfer size = 64KiB
   sta MDMAEN ; Second DMA transfer
 
-  rep #$30
-  .a16
-  .i16
+  mi16
 .endmacro
 

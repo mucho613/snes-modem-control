@@ -1,13 +1,12 @@
 .export initializeRegisters
 
+.include "./macro/utility.asm"
 .include "./registers.inc"
 
 .code
 
 .proc initializeRegisters
-  sep #$20
-  .a8
-
+  m8
   stz NMITIMEN ; disable interrupts
   stz HDMAEN ; disable HDMA
 
@@ -109,8 +108,6 @@
 
   stz SETINI
 
-  rep #$20
-  .a16
-
+  m16
   rts
 .endproc

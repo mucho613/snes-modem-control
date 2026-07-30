@@ -36,16 +36,14 @@
   stz pppPapPendingAction
   stz pppPapTimerActive
   stz pppPapFailure
-  rep #$20
-  .a16
+  m16
   stz pppPapPacketLength
   stz pppPapRestartDeadline
   stz pppPapReceiveCount
   stz pppPapReceiveCount + 2
   stz pppPapTransmitCount
   stz pppPapTransmitCount + 2
-  sep #$20
-  .a8
+  m8
   plb
   rts
 .endproc
@@ -96,12 +94,10 @@
   stz pppPapPendingAction
   stz pppPapTimerActive
   stz pppPapFailure
-  rep #$20
-  .a16
+  m16
   stz pppPapPacketLength
   stz pppPapRestartDeadline
-  sep #$20
-  .a8
+  m8
   jsr pppSnapshotEnd
   plb
   rts
@@ -183,12 +179,10 @@
   lda #'t'
   sta pppTransmitBuffer + 24
 
-  rep #$20
-  .a16
+  m16
   lda #PPP_PAP_TRANSMIT_FRAME_LENGTH
   jsr pppTransmitBegin
-  sep #$20
-  .a8
+  m8
   bcs busyReturn
 
   jsr pppSnapshotBegin
@@ -200,14 +194,12 @@
   lda #PPP_PAP_STATE_WAITING_FOR_REPLY
   sta pppPapState
   pppIncrement32 pppPapTransmitCount
-  rep #$20
-  .a16
+  m16
   lda frameCounter
   clc
   adc #PPP_PAP_RESTART_INTERVAL_FRAMES
   sta pppPapRestartDeadline
-  sep #$20
-  .a8
+  m8
   lda #$01
   sta pppPapTimerActive
   jsr pppSnapshotEnd
@@ -241,14 +233,12 @@ busyReturn:
   pppIncrement32 pppPapReceiveCount
   stz pppPapLastCode
   stz pppPapLastIdentifier
-  rep #$20
-  .a16
+  m16
   stz pppPapPacketLength
   lda pppLastProtocol
   cmp #PPP_PROTOCOL_PAP
   beq @checkHeader
-  sep #$20
-  .a8
+  m8
   pppPapReturnError PPP_PAP_ERROR_WRONG_PROTOCOL
 
 @checkHeader:
@@ -256,13 +246,11 @@ busyReturn:
   lda pppLastFrameLength
   cmp #PPP_PAP_MINIMUM_FRAME_LENGTH
   bcs @readHeader
-  sep #$20
-  .a8
+  m8
   pppPapReturnError PPP_PAP_ERROR_TRUNCATED_HEADER
 
 @readHeader:
-  sep #$20
-  .a8
+  m8
   lda pppFrameBuffer + PPP_PAP_FRAME_OFFSET
   sta pppPapLastCode
   lda pppFrameBuffer + PPP_PAP_FRAME_OFFSET + 1
@@ -271,13 +259,11 @@ busyReturn:
   sta pppPapPacketLength
   lda pppFrameBuffer + PPP_PAP_FRAME_OFFSET + 2
   sta pppPapPacketLength + 1
-  rep #$20
-  .a16
+  m16
   lda pppPapPacketLength
   cmp #PPP_PAP_HEADER_LENGTH
   bcs @checkAvailable
-  sep #$20
-  .a8
+  m8
   pppPapReturnError PPP_PAP_ERROR_INVALID_PACKET_LENGTH
 
 @checkAvailable:
@@ -287,13 +273,11 @@ busyReturn:
   cmp pppLastFrameLength
   bcc @checkState
   beq @checkState
-  sep #$20
-  .a8
+  m8
   pppPapReturnError PPP_PAP_ERROR_TRUNCATED_PACKET
 
 @checkState:
-  sep #$20
-  .a8
+  m8
   lda pppPapState
   cmp #PPP_PAP_STATE_WAITING_FOR_REPLY
   beq @checkCode
@@ -314,39 +298,32 @@ busyReturn:
   pppPapReturnError PPP_PAP_ERROR_IDENTIFIER_MISMATCH
 
 @checkMessage:
-  rep #$20
-  .a16
+  m16
   lda pppPapPacketLength
   cmp #PPP_PAP_HEADER_LENGTH + 1
   bcs @messagePresent
-  sep #$20
-  .a8
+  m8
   pppPapReturnError PPP_PAP_ERROR_MESSAGE_LENGTH_MISSING
 
 @messagePresent:
-  sep #$20
-  .a8
+  m8
   lda pppFrameBuffer + PPP_PAP_FRAME_OFFSET + PPP_PAP_HEADER_LENGTH
-  rep #$20
-  .a16
+  m16
   and #$00ff
   clc
   adc #PPP_PAP_HEADER_LENGTH + 1
   cmp pppPapPacketLength
   beq @accepted
   bcc @trailing
-  sep #$20
-  .a8
+  m8
   pppPapReturnError PPP_PAP_ERROR_MESSAGE_TRUNCATED
 
 @trailing:
-  sep #$20
-  .a8
+  m8
   pppPapReturnError PPP_PAP_ERROR_TRAILING_DATA
 
 @accepted:
-  sep #$20
-  .a8
+  m8
   stz pppPapLastError
   stz pppPapTimerActive
   lda pppPapLastCode
@@ -382,14 +359,12 @@ busyReturn:
   rts
 
 @checkDeadline:
-  rep #$20
-  .a16
+  m16
   lda frameCounter
   sec
   sbc pppPapRestartDeadline
   bmi @unchanged
-  sep #$20
-  .a8
+  m8
   jsr pppSnapshotBegin
   stz pppPapTimerActive
   lda pppPapState
@@ -414,8 +389,7 @@ busyReturn:
   rts
 
 @unchanged:
-  sep #$20
-  .a8
+  m8
   plb
   clc
   rts
@@ -564,13 +538,11 @@ busyReturn:
   lda #PPP_PAP_HEADER_LENGTH + 1
   sta pppFrameBuffer + 7
   stz pppFrameBuffer + 8
-  rep #$20
-  .a16
+  m16
   lda #PPP_PROTOCOL_PAP
   sta pppLastProtocol
   lda #PPP_PAP_MINIMUM_FRAME_LENGTH + 1
   sta pppLastFrameLength
-  sep #$20
-  .a8
+  m8
   rts
 .endproc

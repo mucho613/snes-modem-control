@@ -57,25 +57,20 @@
   txs
   setDP $0000
 
-  rep #$20
-  .a16
+  m16
   clearRamAll
   jsr initializeRegisters
 
-  rep #$20
-  .a16
+  m16
   jsr clearBG1Tile
   jsr copyPalette
   jsr copyPattern
   jsr terminalInitialize
   jsr clockInitialize
 
-  sep #$30
-  .a8
-  .i8
+  mi8
   jsr modemInitializeDiagnostics
-  rep #$10
-  .i16
+  i16
   jsr pppDiagnosticInitialize
   jsr pppReceiveInitialize
   jsr pppTransmitInitialize
@@ -88,13 +83,9 @@
   jsr pppNtpInitialize
   jsr pppDnsInitialize
 
-  rep #$30
-  .a16
-  .i16
+  mi16
   jsl statusInitialize
-  sep #$10
-  .i8
-
+  i8
   ; The status screen is the default; the font specimen intentionally starts
   ; on the raw terminal tilemap.
   .ifdef MODEM_FONT_TEST
@@ -109,17 +100,12 @@
   lda #$0f
   sta INIDISP
 
-  rep #$30
-  .a16
-  .i16
+  mi16
   .ifdef MODEM_SMOKE_TEST
     jsr modemInitialize
   .endif
 
-  sep #$30
-  .a8
-  .i8
-
+  mi8
   ; NMI enabled, automatic joypad reading disabled.
   lda #$80
   phb
@@ -135,9 +121,7 @@
     ; NDM24 activity disabled while NMI continues rendering the display queue.
     wai
   .else
-    rep #$30
-    .a16
-    .i16
+    mi16
     jsr readController1
     jsr modemMailboxPoll
     jsr modemPoll

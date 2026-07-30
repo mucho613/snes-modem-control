@@ -58,8 +58,7 @@
   stz pppDnsAnswerAddress + 3
   stz pppDnsQueryNameLength
   stz pppDnsLabelLength
-  rep #$20
-  .a16
+  m16
   lda #PPP_DNS_INITIAL_TRANSACTION_ID
   sta pppDnsTransactionId
   stz pppDnsAnswerCount
@@ -81,8 +80,7 @@
   stz pppDnsDataLength
   stz pppDnsQueryCursor
   stz pppDnsLabelPosition
-  sep #$20
-  .a8
+  m8
   plb
   rts
 .endproc
@@ -116,8 +114,7 @@
   stz pppDnsAnswerAddress + 1
   stz pppDnsAnswerAddress + 2
   stz pppDnsAnswerAddress + 3
-  rep #$20
-  .a16
+  m16
   inc pppDnsTransactionId
   bne transactionReady
   inc pppDnsTransactionId
@@ -126,8 +123,7 @@ transactionReady:
   stz pppDnsDeadline
   stz pppDnsSentFrame
   stz pppDnsRttFrames
-  sep #$20
-  .a8
+  m8
   jsr pppSnapshotEnd
   plx
   plb
@@ -240,8 +236,7 @@ nameInvalid:
   phx
   phy
   setDBR $7e
-  sep #$20
-  .a8
+  m8
   lda pppDnsState
   cmp #PPP_DNS_STATE_REQUESTED
   beq requested
@@ -269,23 +264,19 @@ copyDestination:
   cpx #$0004
   bne copyDestination
 
-  rep #$20
-  .a16
+  m16
   lda #PPP_DNS_CLIENT_PORT
   sta pppUdpTransmitSourcePort
   lda #PPP_DNS_SERVER_PORT
   sta pppUdpTransmitDestinationPort
-  sep #$20
-  .a8
-
+  m8
   ldx #$0000
 clearHeader:
   stz pppTransmitBuffer + PPP_UDP_TRANSMIT_PAYLOAD_OFFSET, x
   inx
   cpx #PPP_DNS_HEADER_LENGTH
   bne clearHeader
-  rep #$20
-  .a16
+  m16
   lda pppDnsTransactionId
   xba
   sta pppTransmitBuffer + PPP_UDP_TRANSMIT_PAYLOAD_OFFSET + 0
@@ -298,16 +289,13 @@ clearHeader:
   sta pppDnsLabelPosition
   tax
   inx
-  sep #$20
-  .a8
+  m8
   stz pppDnsLabelLength
 
 encodeName:
-  rep #$20
-  .a16
+  m16
   ldy pppDnsQueryCursor
-  sep #$20
-  .a8
+  m8
   lda pppDnsQueryName, y
   cmp #'.'
   beq encodeDot
@@ -317,46 +305,35 @@ encodeName:
   bra encodeNext
 
 encodeDot:
-  rep #$20
-  .a16
+  m16
   stx pppDnsCursor
   ldy pppDnsLabelPosition
-  sep #$20
-  .a8
+  m8
   lda pppDnsLabelLength
   sta pppTransmitBuffer + PPP_UDP_TRANSMIT_PAYLOAD_OFFSET, y
   stz pppDnsLabelLength
-  rep #$20
-  .a16
+  m16
   ldx pppDnsCursor
   stx pppDnsLabelPosition
   inx
-  sep #$20
-  .a8
-
+  m8
 encodeNext:
-  rep #$20
-  .a16
+  m16
   inc pppDnsQueryCursor
   lda pppDnsQueryCursor
-  sep #$20
-  .a8
+  m8
   cmp pppDnsQueryNameLength
   bcc encodeName
 
-  rep #$20
-  .a16
+  m16
   stx pppDnsCursor
   ldy pppDnsLabelPosition
-  sep #$20
-  .a8
+  m8
   lda pppDnsLabelLength
   sta pppTransmitBuffer + PPP_UDP_TRANSMIT_PAYLOAD_OFFSET, y
-  rep #$20
-  .a16
+  m16
   ldx pppDnsCursor
-  sep #$20
-  .a8
+  m8
   stz pppTransmitBuffer + PPP_UDP_TRANSMIT_PAYLOAD_OFFSET, x
   inx
   stz pppTransmitBuffer + PPP_UDP_TRANSMIT_PAYLOAD_OFFSET, x
@@ -379,15 +356,13 @@ encodeNext:
   stz pppDnsLastError
   stz pppDnsFlags
   pppIncrement32 pppDnsQueryCount
-  rep #$20
-  .a16
+  m16
   lda frameCounter
   sta pppDnsSentFrame
   clc
   adc #PPP_DNS_RESPONSE_TIMEOUT_FRAMES
   sta pppDnsDeadline
-  sep #$20
-  .a8
+  m8
   jsr pppSnapshotEnd
   jmp pollDone
 
@@ -400,14 +375,12 @@ transmitFailed:
 waiting:
   jsr pppDnsLinkIsOpen
   bcs linkClosed
-  rep #$20
-  .a16
+  m16
   lda frameCounter
   sec
   sbc pppDnsDeadline
   bmi pollDone16
-  sep #$20
-  .a8
+  m8
   jsr pppSnapshotBegin
   pppDnsFail PPP_DNS_ERROR_TIMEOUT
   pppIncrement32 pppDnsTimeoutCount
@@ -421,12 +394,9 @@ linkClosed:
   bra pollDone
 
 pollDone16:
-  sep #$20
-  .a8
+  m8
 pollDone:
-  rep #$30
-  .a16
-  .i16
+  mi16
   ply
   plx
   plb
@@ -467,8 +437,7 @@ closed:
 
 receiveCandidate:
   jsr pppSnapshotBegin
-  rep #$20
-  .a16
+  m16
   lda pppUdpSourcePort
   cmp #PPP_DNS_SERVER_PORT
   beq :+
@@ -479,9 +448,7 @@ receiveCandidate:
   beq :+
   jmp wrongPort16
 :
-  sep #$20
-  .a8
-
+  m8
   ldx #$0000
 compareSource:
   lda pppIpv4SourceAddress, x
@@ -493,8 +460,7 @@ compareSource:
   cpx #$0004
   bne compareSource
 
-  rep #$20
-  .a16
+  m16
   lda pppUdpPayloadLength
   cmp #PPP_DNS_HEADER_LENGTH
   bcs :+
@@ -515,9 +481,7 @@ compareSource:
   beq :+
   jmp identifierMismatch16
 :
-  sep #$20
-  .a8
-
+  m8
   lda pppFrameBuffer + 2, x
   bmi responseBitSet
   lda #PPP_DNS_ERROR_NOT_RESPONSE
@@ -542,8 +506,7 @@ notTruncated:
   jmp correlatedFailure
 responseCodeValid:
 
-  rep #$20
-  .a16
+  m16
   lda pppFrameBuffer + 4, x
   xba
   bne :+
@@ -590,11 +553,9 @@ answerLoop:
   bcc :+
   jmp truncated16
 :
-  sep #$20
-  .a8
+  m8
   stz pppDnsLabelLength
-  rep #$20
-  .a16
+  m16
   lda pppFrameBuffer + 0, x
   xba
   cmp #PPP_DNS_TYPE_A
@@ -603,11 +564,9 @@ answerLoop:
   xba
   cmp #PPP_DNS_CLASS_IN
   bne readDataLength
-  sep #$20
-  .a8
+  m8
   inc pppDnsLabelLength
-  rep #$20
-  .a16
+  m16
 readDataLength:
   lda pppFrameBuffer + 8, x
   xba
@@ -621,17 +580,14 @@ readDataLength:
   bcc :+
   jmp truncated16
 :
-  sep #$20
-  .a8
+  m8
   lda pppDnsLabelLength
   beq skipRecord
-  rep #$20
-  .a16
+  m16
   lda pppDnsDataLength
   cmp #$0004
   bne skipRecord16
-  sep #$20
-  .a8
+  m8
   ldy #$0000
 copyAnswer:
   lda pppFrameBuffer, x
@@ -647,23 +603,19 @@ copyAnswer:
   lda #PPP_DNS_FLAG_RESPONSE_VALID
   sta pppDnsFlags
   pppIncrement32 pppDnsResponseCount
-  rep #$20
-  .a16
+  m16
   lda frameCounter
   sec
   sbc pppDnsSentFrame
   sta pppDnsRttFrames
-  sep #$20
-  .a8
+  m8
   jsr pppSnapshotEnd
   bra receiveDone
 
 skipRecord16:
-  sep #$20
-  .a8
+  m8
 skipRecord:
-  rep #$20
-  .a16
+  m16
   txa
   clc
   adc pppDnsDataLength
@@ -672,22 +624,19 @@ skipRecord:
   beq :+
   jmp answerLoop
 :
-  sep #$20
-  .a8
+  m8
   lda #PPP_DNS_ERROR_NO_IPV4_ANSWER
   bra correlatedFailure
 
 wrongPort16:
-  sep #$20
-  .a8
+  m8
   lda #PPP_DNS_ERROR_WRONG_PORT
   bra candidateRejected
 sourceMismatch:
   lda #PPP_DNS_ERROR_SOURCE_MISMATCH
   bra candidateRejected
 identifierMismatch16:
-  sep #$20
-  .a8
+  m8
   lda #PPP_DNS_ERROR_IDENTIFIER_MISMATCH
 candidateRejected:
   sta pppDnsLastError
@@ -696,23 +645,19 @@ candidateRejected:
   bra receiveDone
 
 truncated16:
-  sep #$20
-  .a8
+  m8
   lda #PPP_DNS_ERROR_TRUNCATED
   bra correlatedFailure
 noQuestion16:
-  sep #$20
-  .a8
+  m8
   lda #PPP_DNS_ERROR_NO_QUESTION
   bra correlatedFailure
 noAnswer16:
-  sep #$20
-  .a8
+  m8
   lda #PPP_DNS_ERROR_NO_ANSWER
   bra correlatedFailure
 malformedName16:
-  sep #$20
-  .a8
+  m8
   lda #PPP_DNS_ERROR_MALFORMED_NAME
 correlatedFailure:
   sta pppDnsLastError
@@ -737,8 +682,7 @@ nameOctet:
   lda #$0001
   jsr requireBytes
   bcs nameError
-  sep #$20
-  .a8
+  m8
   lda pppFrameBuffer, x
   beq nameEnd
   pha
@@ -747,14 +691,12 @@ nameOctet:
   cmp #$c0
   beq compressedName
   pla
-  rep #$20
-  .a16
+  m16
   sec
   rts
 compressedName:
   pla
-  rep #$20
-  .a16
+  m16
   lda #$0002
   jsr requireBytes
   bcs nameError
@@ -769,8 +711,7 @@ compressedName:
   rts
 plainLabel:
   pla
-  rep #$20
-  .a16
+  m16
   and #$00ff
   inc
   jsr requireBytes
@@ -785,8 +726,7 @@ nameError:
   rts
 nameEnd:
   inx
-  rep #$20
-  .a16
+  m16
   clc
   rts
 
@@ -825,15 +765,12 @@ available:
   phx
   phy
   setDBR $7e
-  rep #$20
-  .a16
+  m16
   lda frameCounter
   sta pppDnsTestSavedFrameCounter
   lda frameCounter + 2
   sta pppDnsTestSavedFrameCounter + 2
-  sep #$20
-  .a8
-
+  m8
   jsr prepareLinkAndQuery
   jsr pppDnsRequest
   bcc :+
@@ -842,33 +779,26 @@ available:
   lda pppDnsState
   cmp #PPP_DNS_STATE_REQUESTED
   pppDnsRequireEqual faila8
-  rep #$20
-  .a16
+  m16
   lda pppDnsTransactionId
   cmp #$4e44
   pppDnsRequireEqual faila8_16
-  sep #$20
-  .a8
-
+  m8
   lda #$01
   sta pppTransmitActive
-  rep #$20
-  .a16
+  m16
   jsr pppDnsPoll
-  sep #$20
-  .a8
+  m8
   lda pppDnsState
   cmp #PPP_DNS_STATE_REQUESTED
   pppDnsRequireEqual faila9
 
   jsr pppTransmitInitialize
-  rep #$20
-  .a16
+  m16
   lda #$0200
   sta frameCounter
   jsr pppDnsPoll
-  sep #$20
-  .a8
+  m8
   lda pppDnsState
   cmp #PPP_DNS_STATE_WAITING
   pppDnsRequireEqual failaa
@@ -886,12 +816,10 @@ available:
   pppDnsRequireEqual failaa
 
   jsr prepareResponse
-  rep #$20
-  .a16
+  m16
   lda #$0209
   sta frameCounter
-  sep #$20
-  .a8
+  m8
   jsr pppDnsReceive
   lda pppDnsState
   cmp #PPP_DNS_STATE_RECEIVED
@@ -902,24 +830,19 @@ available:
   lda pppDnsAnswerAddress + 3
   cmp #34
   pppDnsRequireEqual failab
-  rep #$20
-  .a16
+  m16
   lda pppDnsRttFrames
   cmp #$0009
   pppDnsRequireEqual failab_16
-  sep #$20
-  .a8
-
+  m8
   jsr pppTransmitInitialize
   jsr pppDnsRequest
   bcc :+
   jmp failac
 :
-  rep #$20
-  .a16
+  m16
   jsr pppDnsPoll
-  sep #$20
-  .a8
+  m8
   jsr prepareResponse
   inc pppFrameBuffer + PPP_IPV4_FRAME_OFFSET + PPP_IPV4_MINIMUM_HEADER_LENGTH + PPP_UDP_HEADER_LENGTH + 1
   jsr pppDnsReceive
@@ -948,14 +871,12 @@ available:
   jsr prepareLinkAndQuery
   jsr pppDnsRequest
   bcs failae
-  rep #$20
-  .a16
+  m16
   jsr pppDnsPoll
   lda pppDnsDeadline
   sta frameCounter
   jsr pppDnsPoll
-  sep #$20
-  .a8
+  m8
   lda pppDnsState
   cmp #PPP_DNS_STATE_FAILED
   pppDnsRequireEqual failae
@@ -978,18 +899,15 @@ available:
   cmp #PPP_DNS_ERROR_LINK_NOT_OPEN
   pppDnsRequireEqual failaf
 
-  rep #$20
-  .a16
+  m16
   jsr cleanup
-  sep #$20
-  .a8
+  m8
   lda #$00
   clc
   bra selfTestReturn
 
 faila8_16:
-  sep #$20
-  .a8
+  m8
 faila8:
   lda #$a8
   bra selfTestFail
@@ -1000,8 +918,7 @@ failaa:
   lda #$aa
   bra selfTestFail
 failab_16:
-  sep #$20
-  .a8
+  m8
 failab:
   lda #$ab
   bra selfTestFail
@@ -1018,11 +935,9 @@ failaf:
   lda #$af
 selfTestFail:
   pha
-  rep #$20
-  .a16
+  m16
   jsr cleanup
-  sep #$20
-  .a8
+  m8
   pla
   sec
 selfTestReturn:
@@ -1084,8 +999,7 @@ copyResponseSource:
   inx
   cpx #$0004
   bne copyResponseSource
-  rep #$20
-  .a16
+  m16
   lda #PPP_DNS_SERVER_PORT
   sta pppUdpSourcePort
   lda #PPP_DNS_CLIENT_PORT
@@ -1094,8 +1008,7 @@ copyResponseSource:
   sta pppUdpPacketOffset
   lda #(exampleResponseEnd - exampleResponse)
   sta pppUdpPayloadLength
-  sep #$20
-  .a8
+  m8
   rts
 
 cleanup:
@@ -1103,15 +1016,13 @@ cleanup:
   sta frameCounter
   lda pppDnsTestSavedFrameCounter + 2
   sta frameCounter + 2
-  sep #$20
-  .a8
+  m8
   jsr pppTransmitInitialize
   jsr pppIpcpInitialize
   jsr pppIpv4Initialize
   jsr pppUdpInitialize
   jsr pppDnsInitialize
-  rep #$20
-  .a16
+  m16
   rts
 .endproc
 

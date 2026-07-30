@@ -105,14 +105,12 @@
   bra @return
 
 @append:
-  rep #$20
-  .a16
+  m16
   lda pppDecoderLength
   cmp #PPP_MAX_UNESCAPED_FRAME_LENGTH
   bcc @hasSpace
 
-  sep #$20
-  .a8
+  m8
   lda pppDecoderFlags
   ora #PPP_DECODER_FLAG_OVERFLOWED
   sta pppDecoderFlags
@@ -122,17 +120,13 @@
 
 @hasSpace:
   tax
-  sep #$20
-  .a8
+  m8
   lda pppDecoderScratchByte
   sta pppFrameBuffer, x
   jsr pppUpdateFcs
-  rep #$20
-  .a16
+  m16
   inc pppDecoderLength
-  sep #$20
-  .a8
-
+  m8
 @return:
   lda pppLastEvent
   ply
@@ -148,8 +142,7 @@
   .i16
 
   lda pppDecoderScratchByte
-  rep #$20
-  .a16
+  m16
   and #$00ff
   eor pppDecoderFcs
   sta pppDecoderFcs
@@ -165,8 +158,7 @@
   dex
   bne @bit
 
-  sep #$20
-  .a8
+  m8
   rts
 .endproc
 
@@ -208,14 +200,12 @@
   rts
 
 @checkLength:
-  rep #$20
-  .a16
+  m16
   lda pppDecoderLength
   cmp #PPP_MINIMUM_FRAME_WITH_FCS_LENGTH
   bcs @checkFcs
 
-  sep #$20
-  .a8
+  m8
   lda #PPP_INVALID_TOO_SHORT
   sta pppLastInvalidReason
   lda #PPP_EVENT_INVALID
@@ -229,8 +219,7 @@
   cmp #PPP_GOOD_FCS16
   beq @frameComplete
 
-  sep #$20
-  .a8
+  m8
   lda #PPP_EVENT_FCS_ERROR
   sta pppLastEvent
   jsr pppPrepareNextFrame
@@ -246,8 +235,7 @@
   ; Protocol extraction currently describes the uncompressed header form.
   ; A compressed header remains available in the frame buffer but reports
   ; protocol $0000 until compression support is implemented.
-  sep #$20
-  .a8
+  m8
   stz pppLastProtocol
   stz pppLastProtocol + 1
   lda pppFrameBuffer
@@ -279,11 +267,9 @@
   sta pppDecoderFlags
   stz pppDecoderLength
   stz pppDecoderLength + 1
-  rep #$20
-  .a16
+  m16
   lda #PPP_INITIAL_FCS16
   sta pppDecoderFcs
-  sep #$20
-  .a8
+  m8
   rts
 .endproc

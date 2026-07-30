@@ -45,8 +45,7 @@
   phb
   phx
   phy
-  rep #$10
-  .i16
+  i16
   setDBR $7e
   jsr pppSnapshotBegin
 
@@ -75,13 +74,11 @@
 :
 
   setDBR $7e
-  rep #$20
-  .a16
+  m16
   lda pppLastFrameLength
   cmp #$0008
   beq :+
-  sep #$20
-  .a8
+  m8
   lda #$03
   jmp @fail
 :
@@ -89,15 +86,12 @@
   lda pppLastProtocol
   cmp #$c021
   beq :+
-  sep #$20
-  .a8
+  m8
   lda #$04
   jmp @fail
 :
   .a16
-  sep #$20
-  .a8
-
+  m8
   lda pppFrameBuffer + 0
   cmp #$ff
   beq :+
@@ -265,21 +259,18 @@
   lda #$0f
   jmp @fail
 :
-  rep #$20
-  .a16
+  m16
   lda pppReceiveByteCount
   cmp #(pppSelfTestEncodedEnd - pppSelfTestEncoded)
   beq :+
-  sep #$20
-  .a8
+  m8
   lda #$10
   jmp @fail
 :
   .a16
   lda pppReceiveByteCount + 2
   beq :+
-  sep #$20
-  .a8
+  m8
   lda #$10
   jmp @fail
 :
@@ -287,23 +278,19 @@
   lda pppReceiveFrameCount
   cmp #$0001
   beq :+
-  sep #$20
-  .a8
+  m8
   lda #$11
   jmp @fail
 :
   .a16
   lda pppReceiveFrameCount + 2
   beq :+
-  sep #$20
-  .a8
+  m8
   lda #$11
   jmp @fail
 :
   .a16
-  sep #$20
-  .a8
-
+  m8
   ; Encode the same frame, including a repeated peek before the opening Flag
   ; is accepted to model TX-ring backpressure.
   setDBR $7e
@@ -322,12 +309,10 @@
   stz pppTransmitBuffer + 6
   lda #$04
   sta pppTransmitBuffer + 7
-  rep #$20
-  .a16
+  m16
   lda #$0008
   jsr pppTransmitBegin
-  sep #$20
-  .a8
+  m8
   bcc :+
   lda #$12
   jmp @fail
@@ -385,8 +370,7 @@
   lda #$16
   jmp @fail
 :
-  rep #$20
-  .a16
+  m16
   lda pppTransmitWireByteCount
   cmp #(pppSelfTestEncodedEnd - pppSelfTestEncoded)
   beq :+
@@ -405,9 +389,7 @@
   beq :+
   jmp @fail17_16
 :
-  sep #$20
-  .a8
-
+  m8
   jsr pppLcpRunSelfTest
   bcc :+
   jmp @fail
@@ -480,8 +462,7 @@
   bra @return
 
 @fail17_16:
-  sep #$20
-  .a8
+  m8
   lda #$17
   bra @fail
 @fail05:
@@ -501,8 +482,7 @@
   jsr pppSnapshotEnd
   pla
   plp
-  sep #$10
-  .i8
+  i8
   ply
   plx
   plb

@@ -71,8 +71,7 @@ CLOCK_MINUTE_SECONDS = $0000003c
   lda frameCounter
   sta clockLastFrame
 
-  sep #$20
-  .a8
+  m8
   stz clockValid
   stz clockMonth
   stz clockDay
@@ -118,8 +117,7 @@ CLOCK_MINUTE_SECONDS = $0000003c
   lda #'T'
   sta clockDisplayText + 22
 
-  rep #$20
-  .a16
+  m16
   plx
   plb
   pla
@@ -142,12 +140,10 @@ CLOCK_MINUTE_SECONDS = $0000003c
   lda frameCounter
   sta clockLastFrame
 
-  sep #$20
-  .a8
+  m8
   lda #$01
   sta clockValid
-  rep #$20
-  .a16
+  m16
   jsr @decomposeJst
   jsr clockFormatDisplay
   rts
@@ -177,15 +173,12 @@ CLOCK_MINUTE_SECONDS = $0000003c
   bra @yearLoop
 @yearsDone:
 
-  sep #$20
-  .a8
+  m8
   lda #$01
   sta clockMonth
-  rep #$20
-  .a16
+  m16
 @monthLoop:
-  sep #$20
-  .a8
+  m8
   lda clockMonth
   cmp #$02
   beq @february
@@ -197,18 +190,15 @@ CLOCK_MINUTE_SECONDS = $0000003c
   beq @thirtyDayMonth
   cmp #$0b
   beq @thirtyDayMonth
-  rep #$20
-  .a16
+  m16
   clockSubtractIfAtLeast CLOCK_31_DAY_MONTH_SECONDS, @monthsDone
   jmp @advanceMonth
 @thirtyDayMonth:
-  rep #$20
-  .a16
+  m16
   clockSubtractIfAtLeast CLOCK_30_DAY_MONTH_SECONDS, @monthsDone
   jmp @advanceMonth
 @february:
-  rep #$20
-  .a16
+  m16
   jsr clockIsLeapYear
   bcc @commonFebruary
   clockSubtractIfAtLeast CLOCK_29_DAY_MONTH_SECONDS, @monthsDone
@@ -216,65 +206,49 @@ CLOCK_MINUTE_SECONDS = $0000003c
 @commonFebruary:
   clockSubtractIfAtLeast CLOCK_28_DAY_MONTH_SECONDS, @monthsDone
 @advanceMonth:
-  sep #$20
-  .a8
+  m8
   inc clockMonth
-  rep #$20
-  .a16
+  m16
   jmp @monthLoop
 @monthsDone:
 
-  sep #$20
-  .a8
+  m8
   lda #$01
   sta clockDay
-  rep #$20
-  .a16
+  m16
 @dayLoop:
   clockSubtractIfAtLeast CLOCK_DAY_SECONDS, @daysDone
-  sep #$20
-  .a8
+  m8
   inc clockDay
-  rep #$20
-  .a16
+  m16
   bra @dayLoop
 @daysDone:
 
-  sep #$20
-  .a8
+  m8
   stz clockHour
-  rep #$20
-  .a16
+  m16
 @hourLoop:
   clockSubtractIfAtLeast CLOCK_HOUR_SECONDS, @hoursDone
-  sep #$20
-  .a8
+  m8
   inc clockHour
-  rep #$20
-  .a16
+  m16
   bra @hourLoop
 @hoursDone:
 
-  sep #$20
-  .a8
+  m8
   stz clockMinute
-  rep #$20
-  .a16
+  m16
 @minuteLoop:
   clockSubtractIfAtLeast CLOCK_MINUTE_SECONDS, @minutesDone
-  sep #$20
-  .a8
+  m8
   inc clockMinute
-  rep #$20
-  .a16
+  m16
   bra @minuteLoop
 @minutesDone:
-  sep #$20
-  .a8
+  m8
   lda clockConversionRemaining
   sta clockSecond
-  rep #$20
-  .a16
+  m16
   rts
 
 ; Carry set for leap years. The 32-bit Unix range ends in 2106, so only 2000
@@ -300,8 +274,7 @@ clockFormatDisplay:
   lda clockYear
   jsr @writeYear
 
-  sep #$20
-  .a8
+  m8
   lda #'-'
   sta clockDisplayText + 4
   sta clockDisplayText + 7
@@ -333,8 +306,7 @@ clockFormatDisplay:
   ldx #$0011
   lda clockSecond
   jsr @writeTwoDigits
-  rep #$20
-  .a16
+  m16
   plx
   rts
 
@@ -350,13 +322,11 @@ clockFormatDisplay:
   bra @thousands
 @thousandsDone:
   pha
-  sep #$20
-  .a8
+  m8
   tya
   sta clockDisplayText, x
   inx
-  rep #$20
-  .a16
+  m16
   pla
   ldy #'0'
 @hundreds:
@@ -368,13 +338,11 @@ clockFormatDisplay:
   bra @hundreds
 @hundredsDone:
   pha
-  sep #$20
-  .a8
+  m8
   tya
   sta clockDisplayText, x
   inx
-  rep #$20
-  .a16
+  m16
   pla
   ldy #'0'
 @tens:
@@ -386,21 +354,17 @@ clockFormatDisplay:
   bra @tens
 @tensDone:
   pha
-  sep #$20
-  .a8
+  m8
   tya
   sta clockDisplayText, x
   inx
-  rep #$20
-  .a16
+  m16
   pla
-  sep #$20
-  .a8
+  m8
   clc
   adc #'0'
   sta clockDisplayText, x
-  rep #$20
-  .a16
+  m16
   rts
 
 @writeTwoDigits:
@@ -447,18 +411,15 @@ clockFormatDisplay:
   lda frameCounter
   sta clockLastFrame
 
-  sep #$20
-  .a8
+  m8
   lda clockValid
   beq @done16
-  rep #$20
-  .a16
+  m16
   jsr clockAdvanceFrames
   bra @done
 
 @done16:
-  rep #$20
-  .a16
+  m16
 @done:
   ply
   plx
@@ -499,8 +460,7 @@ clockFormatDisplay:
 .proc clockIncrementCalendar
   .a16
   .i16
-  sep #$20
-  .a8
+  m8
   inc clockSecond
   lda clockSecond
   cmp #60
@@ -528,14 +488,11 @@ clockFormatDisplay:
   bcc @calendarDone
   lda #$01
   sta clockMonth
-  rep #$20
-  .a16
+  m16
   inc clockYear
-  sep #$20
-  .a8
+  m8
 @calendarDone:
-  rep #$20
-  .a16
+  m16
   rts
 .endproc
 
@@ -559,11 +516,9 @@ clockFormatDisplay:
   lda #30
   rts
 @calendarFebruary:
-  rep #$20
-  .a16
+  m16
   jsr clockSetUnixTime::clockIsLeapYear
-  sep #$20
-  .a8
+  m8
   bcc @calendarFebruaryCommon
   lda #29
   rts

@@ -50,8 +50,7 @@
 
   phb
   setDBR $7e
-  rep #$20
-  .a16
+  m16
   lda frameCounter
   jsr pppLcpArmRestartTimerAt
   .a8
@@ -67,8 +66,7 @@
   clc
   adc #PPP_LCP_RESTART_INTERVAL_FRAMES
   sta pppLcpRestartDeadline
-  sep #$20
-  .a8
+  m8
   lda #$01
   sta pppLcpTimerActive
   rts
@@ -84,8 +82,7 @@
 
   phb
   setDBR $7e
-  rep #$20
-  .a16
+  m16
   lda frameCounter
   jsr pppLcpPollTimeoutAt
   .a8
@@ -101,24 +98,20 @@
   phb
   setDBR $7e
   pha
-  sep #$20
-  .a8
+  m8
   lda pppLcpTimerActive
   bne :+
-  rep #$20
-  .a16
+  m16
   pla
   jmp @unchanged
 :
-  rep #$20
-  .a16
+  m16
   pla
   sec
   sbc pppLcpRestartDeadline
   bmi @unchanged
 
-  sep #$20
-  .a8
+  m8
   lda pppLcpState
   cmp #PPP_LCP_STATE_REQUEST_SENT
   beq @configuring
@@ -168,8 +161,7 @@
 
 @unchanged:
   .a16
-  sep #$20
-  .a8
+  m8
   plb
   clc
   rts
@@ -190,8 +182,7 @@
   stz pppLcpTimerActive
   stz pppLcpDeferredRequest
   stz pppLcpPeerFlags
-  rep #$20
-  .a16
+  m16
   lda #PPP_DEFAULT_MRU
   sta pppLcpPeerMru
   lda #$ffff
@@ -199,8 +190,7 @@
   sta pppLcpPeerAccm + 2
   stz pppLcpPeerMagic
   stz pppLcpPeerMagic + 2
-  sep #$20
-  .a8
+  m8
   jsr pppSnapshotEnd
   plb
   rts
@@ -223,8 +213,7 @@
   stz pppLcpTimerActive
   stz pppLcpDeferredRequest
   stz pppLcpPeerFlags
-  rep #$20
-  .a16
+  m16
   lda #PPP_DEFAULT_MRU
   sta pppLcpPeerMru
   lda #$ffff
@@ -232,8 +221,7 @@
   sta pppLcpPeerAccm + 2
   stz pppLcpPeerMagic
   stz pppLcpPeerMagic + 2
-  sep #$20
-  .a8
+  m8
   jsr pppSnapshotEnd
   plb
   rts
@@ -269,15 +257,13 @@
   jsr pppTransmitInitialize
 
   ; Arm just before 16-bit wrap and verify the exact wrapped deadline.
-  rep #$20
-  .a16
+  m16
   lda #$fff0
   jsr pppLcpArmRestartTimerAt
   .a8
   lda pppLcpTimerActive
   pppLcpTimerRequireNonzero @fail50
-  rep #$20
-  .a16
+  m16
   lda pppLcpRestartDeadline
   cmp #$00a4
   pppLcpTimerRequireEqual @fail50_16
@@ -291,8 +277,7 @@
   pppLcpTimerRequireEqual @fail51
 
   ; Expire the already-sent request at the exact deadline.
-  rep #$20
-  .a16
+  m16
   lda #$00a4
   jsr pppLcpPollTimeoutAt
   .a8
@@ -311,13 +296,11 @@
   ; Exhaustion enters Stopped without allocating a new Identifier.
   stz pppLcpPendingAction
   stz pppLcpRestartRemaining
-  rep #$20
-  .a16
+  m16
   lda #$0100
   jsr pppLcpArmRestartTimerAt
   .a8
-  rep #$20
-  .a16
+  m16
   lda pppLcpRestartDeadline
   jsr pppLcpPollTimeoutAt
   .a8
@@ -337,13 +320,11 @@
   sta pppLcpState
   lda #$01
   sta pppLcpRestartRemaining
-  rep #$20
-  .a16
+  m16
   lda #$0200
   jsr pppLcpArmRestartTimerAt
   .a8
-  rep #$20
-  .a16
+  m16
   lda pppLcpRestartDeadline
   jsr pppLcpPollTimeoutAt
   .a8
@@ -368,8 +349,7 @@
   ora pppLcpTimerActive
   ora pppLcpPendingAction
   pppLcpTimerRequireEqual @fail55
-  rep #$20
-  .a16
+  m16
   lda pppLcpPeerMru
   cmp #PPP_DEFAULT_MRU
   pppLcpTimerRequireEqual @fail55_16
@@ -378,8 +358,7 @@
   cmp #$ffff
   pppLcpTimerRequireEqual @fail55_16
 
-  sep #$20
-  .a8
+  m8
   jsr pppLcpInitialize
   jsr pppTransmitInitialize
   lda #$00
@@ -388,8 +367,7 @@
 
 @fail50_16:
   .a16
-  sep #$20
-  .a8
+  m8
 @fail50:
   lda #$50
   bra @fail
@@ -411,8 +389,7 @@
   bra @fail
 @fail55_16:
   .a16
-  sep #$20
-  .a8
+  m8
 @fail55:
   lda #$55
 

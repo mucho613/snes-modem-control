@@ -90,9 +90,7 @@
   phy
   setDBR $7e
 
-  sep #$30
-  .a8
-  .i8
+  mi8
   lda pppReceiveEnabled
   bne @checkConnected
   lda pppReceiveActive
@@ -124,11 +122,9 @@ connected:
   lda #$01
   sta pppReceiveActive
   stz pppFrameReady
-  rep #$10
-  .i16
+  i16
   jsr pppDecoderReset
-  sep #$10
-  .i8
+  i8
   jsr pppSnapshotEnd
 
 checkFrameOwnership:
@@ -143,12 +139,9 @@ checkFrameOwnership:
 drain:
   jsr modemReadByte
   bcs done
-  rep #$10
-  .i16
+  i16
   jsr pppReceivePushConnectedByte
-  sep #$10
-  .i8
-
+  i8
   cmp #PPP_EVENT_CARRIER_LOST
   beq carrierTail
   lda pppFrameReady
@@ -175,9 +168,7 @@ carrierTailDone:
   jsr pppSnapshotEnd
 
 done:
-  rep #$30
-  .a16
-  .i16
+  mi16
   ply
   plx
   plb
@@ -310,12 +301,9 @@ done:
   sta modemSessionLastResult
   stz modemSessionLineLength
   lda #MODEM_STATE_READY
-  sep #$10
-  .i8
+  i8
   jsr modemSetState
-  rep #$10
-  .i16
-
+  i16
   lda #PPP_EVENT_CARRIER_LOST
   ply
   plb
@@ -417,24 +405,20 @@ done:
   cmp #PPP_EVENT_CARRIER_LOST
   bne @fail68
 
-  rep #$20
-  .a16
+  m16
   lda pppCarrierLossCount
   cmp #$0001
   bne @fail69_16
   lda pppCarrierLossCount + 2
   bne @fail69_16
-  sep #$20
-  .a8
-
+  m8
   jsr @cleanup
   lda #$00
   clc
   bra @return
 
 @fail69_16:
-  sep #$20
-  .a8
+  m8
   lda #$69
   bra @fail
 @fail68:

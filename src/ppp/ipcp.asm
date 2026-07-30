@@ -63,16 +63,14 @@
   stz pppIpcpLocalAddress + 3
   jsr @clearDns
   jsr @setDefaultPeer
-  rep #$20
-  .a16
+  m16
   stz pppIpcpPacketLength
   stz pppIpcpRestartDeadline
   stz pppIpcpReceiveCount
   stz pppIpcpReceiveCount + 2
   stz pppIpcpTransmitCount
   stz pppIpcpTransmitCount + 2
-  sep #$20
-  .a8
+  m8
   plb
   rts
 
@@ -215,13 +213,11 @@
   stz pppIpcpPacketLength
   stz pppIpcpPacketLength + 1
 
-  rep #$20
-  .a16
+  m16
   lda pppLastProtocol
   cmp #PPP_PROTOCOL_IPCP
   beq @checkHeader
-  sep #$20
-  .a8
+  m8
   pppIpcpReturnError PPP_IPCP_ERROR_WRONG_PROTOCOL
 
 @checkHeader:
@@ -229,13 +225,11 @@
   lda pppLastFrameLength
   cmp #PPP_IPCP_MINIMUM_FRAME_LENGTH
   bcs @readHeader
-  sep #$20
-  .a8
+  m8
   pppIpcpReturnError PPP_IPCP_ERROR_TRUNCATED_HEADER
 
 @readHeader:
-  sep #$20
-  .a8
+  m8
   lda pppFrameBuffer + PPP_IPCP_FRAME_OFFSET
   sta pppIpcpLastCode
   lda pppFrameBuffer + PPP_IPCP_FRAME_OFFSET + 1
@@ -244,13 +238,11 @@
   sta pppIpcpPacketLength
   lda pppFrameBuffer + PPP_IPCP_FRAME_OFFSET + 2
   sta pppIpcpPacketLength + 1
-  rep #$20
-  .a16
+  m16
   lda pppIpcpPacketLength
   cmp #PPP_IPCP_HEADER_LENGTH
   bcs @checkAvailable
-  sep #$20
-  .a8
+  m8
   pppIpcpReturnError PPP_IPCP_ERROR_INVALID_PACKET_LENGTH
 
 @checkAvailable:
@@ -261,14 +253,12 @@
   cmp pppLastFrameLength
   bcc @validateOptions
   beq @validateOptions
-  sep #$20
-  .a8
+  m8
   pppIpcpReturnError PPP_IPCP_ERROR_TRUNCATED_PACKET
 
 @validateOptions:
   .a16
-  sep #$20
-  .a8
+  m8
   lda pppIpcpLastCode
   cmp #PPP_IPCP_CODE_CONFIGURE_REQUEST
   beq @optionStart
@@ -278,8 +268,7 @@
 
 @optionStart:
   .a8
-  rep #$20
-  .a16
+  m16
   ldx #PPP_IPCP_FRAME_OFFSET + PPP_IPCP_HEADER_LENGTH
 @optionLoop:
   .a16
@@ -295,8 +284,7 @@
 
 @readOptionLength:
   .a16
-  sep #$20
-  .a8
+  m8
   lda pppFrameBuffer + 1, x
   cmp #$02
   bcs @optionLength
@@ -306,37 +294,31 @@
   .a8
   sta pppIpcpOptionLength
   stz pppIpcpOptionLength + 1
-  rep #$20
-  .a16
+  m16
   txa
   clc
   adc pppIpcpOptionLength
   cmp pppIpcpPacketEnd
   bcc @optionAdvance
   beq @optionAdvance
-  sep #$20
-  .a8
+  m8
   pppIpcpReturnError PPP_IPCP_ERROR_OPTION_OVERRUN
 
 @optionAdvance:
   .a16
   tax
-  sep #$20
-  .a8
-  rep #$20
-  .a16
+  m8
+  m16
   bra @optionLoop
 
 @truncatedOption16:
   .a16
-  sep #$20
-  .a8
+  m8
   pppIpcpReturnError PPP_IPCP_ERROR_TRUNCATED_OPTION
 
 @dispatch:
   .a16
-  sep #$20
-  .a8
+  m8
   lda pppIpcpState
   cmp #PPP_IPCP_STATE_CLOSED
   beq @notConfiguring
@@ -552,14 +534,12 @@
   lda pppFrameBuffer + 5, y
   cmp a:$0003, x
   bne @ackInvalid
-  rep #$20
-  .a16
+  m16
   tya
   clc
   adc #PPP_IPCP_IP_ADDRESS_OPTION_LENGTH
   tay
-  sep #$20
-  .a8
+  m8
   clc
   rts
 @ackInvalid:
@@ -641,14 +621,12 @@
   ora pppFrameBuffer + 5, y
   beq @nakValidationInvalid
 @nakAdvance:
-  rep #$20
-  .a16
+  m16
   tya
   clc
   adc #PPP_IPCP_IP_ADDRESS_OPTION_LENGTH
   tay
-  sep #$20
-  .a8
+  m8
   bra @nakLoop
 @nakValidationInvalid:
   jmp @nakInvalid
@@ -693,14 +671,12 @@
   ora #(PPP_IPCP_FLAG_REQUEST_ADDRESS | PPP_IPCP_FLAG_LOCAL_VALID)
   sta pppIpcpFlags
 @applyNakAdvance:
-  rep #$20
-  .a16
+  m16
   tya
   clc
   adc #PPP_IPCP_IP_ADDRESS_OPTION_LENGTH
   tay
-  sep #$20
-  .a8
+  m8
   bra @applyNakLoop
 @nakValid:
   clc
@@ -920,14 +896,12 @@
   lda pppFrameBuffer + 1, y
   sta pppIpcpOptionLength
   stz pppIpcpOptionLength + 1
-  rep #$20
-  .a16
+  m16
   tya
   clc
   adc pppIpcpOptionLength
   tay
-  sep #$20
-  .a8
+  m8
   rts
 .endproc
 
@@ -984,8 +958,7 @@
   sta pppTransmitBuffer + 4
   lda pppIpcpLastIdentifier
   sta pppTransmitBuffer + 5
-  rep #$20
-  .a16
+  m16
   lda #PPP_IPCP_FRAME_OFFSET + PPP_IPCP_HEADER_LENGTH
   sta pppIpcpOutputCursor
   ldy #PPP_IPCP_FRAME_OFFSET + PPP_IPCP_HEADER_LENGTH
@@ -996,8 +969,7 @@
   bne :+
   jmp @finish
 :
-  sep #$20
-  .a8
+  m8
   jsr pppIpcpClassifyPeerOption
   pha
   lda pppIpcpPendingAction
@@ -1027,14 +999,12 @@
   sta pppTransmitBuffer + 4, x
   lda #PPP_IPCP_PEER_ADDRESS_3
   sta pppTransmitBuffer + 5, x
-  rep #$20
-  .a16
+  m16
   lda pppIpcpOutputCursor
   clc
   adc #PPP_IPCP_IP_ADDRESS_OPTION_LENGTH
   sta pppIpcpOutputCursor
-  sep #$20
-  .a8
+  m8
   bra @advance
 
 @copyOption:
@@ -1047,15 +1017,13 @@
   ldx pppIpcpOutputCursor
   lda pppFrameBuffer, y
   sta pppTransmitBuffer, x
-  rep #$20
-  .a16
+  m16
   inc pppIpcpOptionOffset
   inc pppIpcpOutputCursor
   dec pppIpcpOptionLength
   lda pppIpcpOptionLength
   beq @copyDone
-  sep #$20
-  .a8
+  m8
   bra @copyByte
 @copyDone:
   .a16
@@ -1067,8 +1035,7 @@
   lda pppFrameBuffer + 1, y
   sta pppIpcpOptionLength
   stz pppIpcpOptionLength + 1
-  rep #$20
-  .a16
+  m16
   tya
   clc
   adc pppIpcpOptionLength
@@ -1081,13 +1048,11 @@
   sec
   sbc #PPP_IPCP_FRAME_OFFSET
   xba
-  sep #$20
-  .a8
+  m8
   sta pppTransmitBuffer + 6
   xba
   sta pppTransmitBuffer + 7
-  rep #$20
-  .a16
+  m16
   lda pppIpcpOutputCursor
   ply
   plx
@@ -1158,14 +1123,12 @@
   sta pppTransmitBuffer + 4, x
   lda pppIpcpLocalAddress + 3
   sta pppTransmitBuffer + 5, x
-  rep #$20
-  .a16
+  m16
   txa
   clc
   adc #PPP_IPCP_IP_ADDRESS_OPTION_LENGTH
   tax
-  sep #$20
-  .a8
+  m8
 @requestPrimary:
   lda pppIpcpFlags
   and #PPP_IPCP_FLAG_REQUEST_PRIMARY_DNS
@@ -1181,19 +1144,16 @@
   ldy #.loword(pppIpcpSecondaryDnsAddress)
   jsr @writeRequestAddressOption
 @finishRequest:
-  rep #$20
-  .a16
+  m16
   txa
   sec
   sbc #PPP_IPCP_FRAME_OFFSET
   xba
-  sep #$20
-  .a8
+  m8
   sta pppTransmitBuffer + 6
   xba
   sta pppTransmitBuffer + 7
-  rep #$20
-  .a16
+  m16
   txa
   bra @begin
 
@@ -1210,66 +1170,55 @@
   sta pppTransmitBuffer + 4, x
   lda a:$0003, y
   sta pppTransmitBuffer + 5, x
-  rep #$20
-  .a16
+  m16
   txa
   clc
   adc #PPP_IPCP_IP_ADDRESS_OPTION_LENGTH
   tax
-  sep #$20
-  .a8
+  m8
   rts
 
 @ack:
-  rep #$20
-  .a16
+  m16
   ldx #$0000
 @ackCopy:
   cpx pppIpcpPacketLength
   beq @ackCode
-  sep #$20
-  .a8
+  m8
   lda pppFrameBuffer + PPP_IPCP_FRAME_OFFSET, x
   sta pppTransmitBuffer + PPP_IPCP_FRAME_OFFSET, x
-  rep #$20
-  .a16
+  m16
   inx
   bra @ackCopy
 @ackCode:
-  sep #$20
-  .a8
+  m8
   lda #PPP_IPCP_CODE_CONFIGURE_ACK
   sta pppTransmitBuffer + 4
-  rep #$20
-  .a16
+  m16
   lda pppIpcpPacketLength
   clc
   adc #PPP_IPCP_FRAME_OFFSET
   bra @begin
 
 @selective:
-  sep #$20
-  .a8
+  m8
   jsr pppIpcpBuildPeerResponse
 
 @begin:
   .a16
   jsr pppTransmitBegin
   bcs busy16Return
-  sep #$20
-  .a8
+  m8
   jsr pppSnapshotBegin
   lda pppIpcpPendingAction
   cmp #PPP_IPCP_ACTION_CONFIGURE_REQUEST
   bne @accepted
-  rep #$20
-  .a16
+  m16
   lda frameCounter
   clc
   adc #PPP_IPCP_RESTART_INTERVAL_FRAMES
   sta pppIpcpRestartDeadline
-  sep #$20
-  .a8
+  m8
   lda #$01
   sta pppIpcpTimerActive
 @accepted:
@@ -1282,8 +1231,7 @@
   clc
   rts
 busy16Return:
-  sep #$20
-  .a8
+  m8
 busyReturn:
   ply
   plx
@@ -1300,14 +1248,12 @@ busyReturn:
   setDBR $7e
   lda pppIpcpTimerActive
   beq @unchanged
-  rep #$20
-  .a16
+  m16
   lda frameCounter
   sec
   sbc pppIpcpRestartDeadline
   bmi @unchanged16
-  sep #$20
-  .a8
+  m8
   jsr pppSnapshotBegin
   stz pppIpcpTimerActive
   stz pppIpcpDeferredRequest
@@ -1342,8 +1288,7 @@ busyReturn:
   sec
   rts
 @unchanged16:
-  sep #$20
-  .a8
+  m8
 @unchanged:
   plb
   clc
@@ -1609,14 +1554,12 @@ busyReturn:
   sta pppFrameBuffer + 8
   lda #PPP_IPCP_IP_ADDRESS_OPTION_LENGTH
   sta pppFrameBuffer + 9
-  rep #$20
-  .a16
+  m16
   lda #PPP_PROTOCOL_IPCP
   sta pppLastProtocol
   lda #PPP_IPCP_ADDRESS_CONFIGURE_FRAME_LENGTH
   sta pppLastFrameLength
-  sep #$20
-  .a8
+  m8
   rts
 
 ; Input A=Code, X low byte=Identifier. Uses the current local/DNS proposal.
@@ -1650,14 +1593,12 @@ busyReturn:
   inx
   cpx #$0004
   bne @copyFullAddresses
-  rep #$20
-  .a16
+  m16
   lda #PPP_PROTOCOL_IPCP
   sta pppLastProtocol
   lda #PPP_IPCP_FULL_CONFIGURE_FRAME_LENGTH
   sta pppLastFrameLength
-  sep #$20
-  .a8
+  m8
   rts
 
 @writeCompressionPacket:
@@ -1673,13 +1614,11 @@ busyReturn:
   sta pppFrameBuffer + 9
   stz pppFrameBuffer + 10
   stz pppFrameBuffer + 11
-  rep #$20
-  .a16
+  m16
   lda #PPP_PROTOCOL_IPCP
   sta pppLastProtocol
   lda #$000c
   sta pppLastFrameLength
-  sep #$20
-  .a8
+  m8
   rts
 .endproc

@@ -45,10 +45,8 @@
 ; self-test exposed a stale accumulator-width path at these parser boundaries
 ; when only REP was repeated. Keep both instructions at each A16 parse block.
 .macro pppIpv4EnterA16
-  sep #$20
-  .a8
-  rep #$20
-  .a16
+  m8
+  m16
 .endmacro
 
 .proc pppIpv4Initialize
@@ -75,8 +73,7 @@
   stz pppIpv4TransmitDestination + 2
   stz pppIpv4TransmitDestination + 3
   stz pppIpv4TransmitProtocol
-  rep #$20
-  .a16
+  m16
   stz pppIpv4TotalLength
   stz pppIpv4PayloadLength
   stz pppIpv4Identification
@@ -96,8 +93,7 @@
   stz pppIpv4ChecksumAccumulator
   stz pppIpv4AvailableLength
   stz pppIpv4TransmitPayloadLength
-  sep #$20
-  .a8
+  m8
   plb
   rts
 .endproc
@@ -122,8 +118,7 @@
   stz pppIpv4Protocol
   stz pppIpv4Ttl
   stz pppIpv4Flags
-  rep #$20
-  .a16
+  m16
   stz pppIpv4TotalLength
   stz pppIpv4PayloadLength
   stz pppIpv4Identification
@@ -134,8 +129,7 @@
   lda pppLastProtocol
   cmp #PPP_PROTOCOL_IP
   beq minimumFrame
-  sep #$20
-  .a8
+  m8
   pppIpv4ReceiveError PPP_IPV4_ERROR_WRONG_PROTOCOL
 
 minimumFrame:
@@ -143,8 +137,7 @@ minimumFrame:
   lda pppLastFrameLength
   cmp #PPP_IPV4_MINIMUM_FRAME_LENGTH
   bcs available
-  sep #$20
-  .a8
+  m8
   pppIpv4ReceiveError PPP_IPV4_ERROR_TRUNCATED_MINIMUM_HEADER
 
 available:
@@ -155,9 +148,7 @@ available:
   sec
   sbc #PPP_IPV4_FRAME_OFFSET
   sta pppIpv4AvailableLength
-  sep #$20
-  .a8
-
+  m8
   lda pppFrameBuffer + PPP_IPV4_FRAME_OFFSET
   and #$f0
   cmp #(PPP_IPV4_VERSION << 4)
@@ -177,14 +168,12 @@ ihl:
   sta pppIpv4PayloadLength
   stz pppIpv4PayloadLength + 1
 
-  rep #$20
-  .a16
+  m16
   and #$00ff
   cmp pppIpv4AvailableLength
   bcc readTotal
   beq readTotal
-  sep #$20
-  .a8
+  m8
   pppIpv4ReceiveError PPP_IPV4_ERROR_TRUNCATED_HEADER
 
 readTotal:
@@ -193,16 +182,14 @@ readTotal:
   sta pppIpv4TotalLength
   cmp pppIpv4PayloadLength
   bcs totalAvailable
-  sep #$20
-  .a8
+  m8
   pppIpv4ReceiveError PPP_IPV4_ERROR_INVALID_TOTAL_LENGTH
 
 totalAvailable:
   cmp pppIpv4AvailableLength
   bcc readFields
   beq readFields
-  sep #$20
-  .a8
+  m8
   pppIpv4ReceiveError PPP_IPV4_ERROR_TRUNCATED_PACKET
 
 readFields:
@@ -220,9 +207,7 @@ readFields:
   sec
   sbc pppIpv4PayloadLength
   sta pppIpv4PayloadLength
-  sep #$20
-  .a8
-
+  m8
   lda pppFrameBuffer + PPP_IPV4_FRAME_OFFSET + 8
   sta pppIpv4Ttl
   lda pppFrameBuffer + PPP_IPV4_FRAME_OFFSET + 9
@@ -239,18 +224,15 @@ copyAddresses:
 
   ldx #PPP_IPV4_FRAME_OFFSET
   jsr checksumReceiveHeader
-  rep #$20
-  .a16
+  m16
   cmp #$ffff
   beq valid
-  sep #$20
-  .a8
+  m8
   pppIncrement32 pppIpv4ChecksumErrorCount
   pppIpv4ReceiveError PPP_IPV4_ERROR_INVALID_HEADER_CHECKSUM
 
 valid:
-  sep #$20
-  .a8
+  m8
   lda #PPP_IPV4_FLAG_HEADER_VALID
   sta pppIpv4Flags
   jsr pppSnapshotEnd
@@ -264,15 +246,12 @@ valid:
 checksumReceiveHeader:
   .a8
   .i16
-  rep #$20
-  .a16
+  m16
   stz pppIpv4ChecksumAccumulator
-  sep #$20
-  .a8
+  m8
   lda pppIpv4HeaderLength
   lsr
-  rep #$20
-  .a16
+  m16
   and #$00ff
   tay
 checksumReceiveWord:
@@ -326,15 +305,13 @@ checksumReceiveWord:
 :
 
   stx pppIpv4TransmitPayloadLength
-  rep #$20
-  .a16
+  m16
   txa
   clc
   adc #PPP_IPV4_MINIMUM_HEADER_LENGTH
   sta pppIpv4AvailableLength
 
-  sep #$20
-  .a8
+  m8
   lda #$ff
   sta pppTransmitBuffer + 0
   lda #$03
@@ -346,8 +323,7 @@ checksumReceiveWord:
   sta pppTransmitBuffer + PPP_IPV4_FRAME_OFFSET + 0
   stz pppTransmitBuffer + PPP_IPV4_FRAME_OFFSET + 1
 
-  rep #$20
-  .a16
+  m16
   lda pppIpv4AvailableLength
   xba
   sta pppTransmitBuffer + PPP_IPV4_FRAME_OFFSET + 2
@@ -357,8 +333,7 @@ checksumReceiveWord:
   lda #PPP_IPV4_FLAG_DONT_FRAGMENT
   xba
   sta pppTransmitBuffer + PPP_IPV4_FRAME_OFFSET + 6
-  sep #$20
-  .a8
+  m8
   lda #PPP_IPV4_DEFAULT_TTL
   sta pppTransmitBuffer + PPP_IPV4_FRAME_OFFSET + 8
   lda pppIpv4TransmitProtocol
@@ -377,8 +352,7 @@ copyTransmitAddresses:
   bne copyTransmitAddresses
 
   jsr checksumTransmitHeader
-  rep #$20
-  .a16
+  m16
   eor #$ffff
   xba
   sta pppTransmitBuffer + PPP_IPV4_FRAME_OFFSET + 10
@@ -389,14 +363,11 @@ copyTransmitAddresses:
   jsr pppTransmitBegin
   bcs busy16
 
-  sep #$20
-  .a8
+  m8
   jsr pppSnapshotBegin
-  rep #$20
-  .a16
+  m16
   inc pppIpv4NextIdentification
-  sep #$20
-  .a8
+  m8
   pppIncrement32 pppIpv4TransmitCount
   stz pppIpv4LastError
   jsr pppSnapshotEnd
@@ -406,8 +377,7 @@ copyTransmitAddresses:
   rts
 
 busy16:
-  sep #$20
-  .a8
+  m8
 busy:
   lda #PPP_IPV4_ERROR_TRANSMIT_BUSY
   bra transmitError
@@ -430,8 +400,7 @@ transmitError:
 checksumTransmitHeader:
   .a8
   .i16
-  rep #$20
-  .a16
+  m16
   stz pppIpv4ChecksumAccumulator
   ldx #PPP_IPV4_FRAME_OFFSET
   ldy #(PPP_IPV4_MINIMUM_HEADER_LENGTH / 2)
@@ -487,15 +456,12 @@ checksumTransmitWord:
   inx
   cpx #$0077
   bne @clearPayload
-  rep #$20
-  .a16
+  m16
   lda #PPP_PROTOCOL_IP
   sta pppLastProtocol
   lda #$0077
   sta pppLastFrameLength
-  sep #$20
-  .a8
-
+  m8
   jsr pppIpv4ReceiveFrame
   bcc :+
   jmp @fail80
@@ -515,8 +481,7 @@ checksumTransmitWord:
   lda pppIpv4DestinationAddress + 3
   cmp #$c7
   pppIpv4RequireEqual @fail80
-  rep #$20
-  .a16
+  m16
   lda pppIpv4TotalLength
   cmp #$0073
   pppIpv4RequireEqual @fail80_16
@@ -526,9 +491,7 @@ checksumTransmitWord:
   lda pppIpv4HeaderChecksum
   cmp #$b861
   pppIpv4RequireEqual @fail80_16
-  sep #$20
-  .a8
-
+  m8
   ; Corrupt TTL without replacing the checksum.
   inc pppFrameBuffer + PPP_IPV4_FRAME_OFFSET + 8
   jsr pppIpv4ReceiveFrame
@@ -538,16 +501,14 @@ checksumTransmitWord:
   lda pppIpv4LastError
   cmp #PPP_IPV4_ERROR_INVALID_HEADER_CHECKSUM
   pppIpv4RequireEqual @fail81
-  rep #$20
-  .a16
+  m16
   lda pppIpv4ChecksumErrorCount
   cmp #$0001
   pppIpv4RequireEqual @fail81_16
   lda pppIpv4DropCount
   cmp #$0001
   pppIpv4RequireEqual @fail81_16
-  sep #$20
-  .a8
+  m8
   dec pppFrameBuffer + PPP_IPV4_FRAME_OFFSET + 8
 
   ; Rebuild the same known header through the shared transmit entry.
@@ -602,31 +563,26 @@ checksumTransmitWord:
   bne :+
   jmp @fail84
 :
-  rep #$20
-  .a16
+  m16
   lda pppIpv4NextIdentification
   cmp #$0001
   bne @fail84_16
   lda pppIpv4TransmitCount
   cmp #$0001
   bne @fail84_16
-  sep #$20
-  .a8
-
+  m8
   jsr @cleanup
   lda #$00
   clc
   bra @return
 
 @fail80_16:
-  sep #$20
-  .a8
+  m8
 @fail80:
   lda #$80
   bra @fail
 @fail81_16:
-  sep #$20
-  .a8
+  m8
 @fail81:
   lda #$81
   bra @fail
@@ -637,8 +593,7 @@ checksumTransmitWord:
   lda #$83
   bra @fail
 @fail84_16:
-  sep #$20
-  .a8
+  m8
 @fail84:
   lda #$84
 @fail:

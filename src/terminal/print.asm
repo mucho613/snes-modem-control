@@ -35,8 +35,7 @@
   phx
 
   setDBR $7e
-  sep #$20
-  .a8
+  m8
   stz terminalDisplayReadIndex
   stz terminalDisplayWriteIndex
   stz terminalCursor
@@ -50,9 +49,7 @@
   stz modemTerminalDroppedCount + 2
   stz modemTerminalDroppedCount + 3
 
-  rep #$30
-  .a16
-  .i16
+  mi16
   .ifdef MODEM_FONT_TEST
     setDBR .bankbyte(fontTestScreen)
     pea fontTestScreen
@@ -73,8 +70,7 @@
 
   php
   sei
-  rep #$10
-  .i16
+  i16
   phx
   phb
   setDBR $7e
@@ -92,12 +88,10 @@
 
 spaceAvailable:
   lda terminalDisplayWriteIndex
-  rep #$20
-  .a16
+  m16
   and #$00ff
   tax
-  sep #$20
-  .a8
+  m8
   lda terminalQueueScratchByte
   sta terminalDisplayBuffer, x
   inc terminalDisplayWriteIndex
@@ -127,8 +121,7 @@ spaceAvailable:
   phx
   phy
 
-  sep #$20
-  .a8
+  m8
   ldy #$0000
 
 @loop:
@@ -140,8 +133,7 @@ spaceAvailable:
   bne @loop
 
 @done:
-  rep #$20
-  .a16
+  m16
   ply
   plx
   plb
@@ -158,8 +150,7 @@ spaceAvailable:
   ; Save P before normalizing X/Y. This keeps the stack frame balanced even
   ; if a future caller enters while the index registers are 8-bit.
   php
-  rep #$10
-  .i16
+  i16
   pha
   phb
   phd
@@ -168,23 +159,18 @@ spaceAvailable:
 
   setDBR $7e
   setDP $2100
-  sep #$20
-  .a8
-  rep #$10
-  .i16
-
+  m8
+  i16
   ldx #TERMINAL_RENDER_BUDGET
 @nextByte:
   lda terminalDisplayReadIndex
   cmp terminalDisplayWriteIndex
   beq @updateScroll
 
-  rep #$20
-  .a16
+  m16
   and #$00ff
   tay
-  sep #$20
-  .a8
+  m8
   lda terminalDisplayBuffer, y
   sta terminalRenderScratchByte
   inc terminalDisplayReadIndex
@@ -193,8 +179,7 @@ spaceAvailable:
   bne @nextByte
 
 @updateScroll:
-  rep #$20
-  .a16
+  m16
   lda terminalCursor
   and #(TERMINAL_TILEMAP_MASK ^ (TERMINAL_COLUMNS - 1))
   lsr
@@ -205,10 +190,8 @@ spaceAvailable:
 
   ; A was 8-bit when saved above. Restore that width before popping it so
   ; this callee cannot unbalance the NMI stack.
-  sep #$20
-  .a8
-  rep #$10
-  .i16
+  m8
+  i16
   ply
   plx
   pld
@@ -230,60 +213,49 @@ spaceAvailable:
   cmp #$7f
   bcs @renderDone
 
-  rep #$20
-  .a16
+  m16
   lda terminalCursor
   clc
   adc #TERMINAL_TILEMAP_BASE
   sta .lobyte(VMADDL)
-  sep #$20
-  .a8
+  m8
   lda terminalRenderScratchByte
   sta .lobyte(VMDATAL)
   stz .lobyte(VMDATAH)
-  rep #$20
-  .a16
+  m16
   lda terminalCursor
   inc
   and #TERMINAL_TILEMAP_MASK
   sta terminalCursor
-  sep #$20
-  .a8
+  m8
   rts
 
 @carriageReturn:
-  rep #$20
-  .a16
+  m16
   lda terminalCursor
   and #(TERMINAL_TILEMAP_MASK ^ (TERMINAL_COLUMNS - 1))
   sta terminalCursor
-  sep #$20
-  .a8
+  m8
   rts
 
 @lineFeed:
-  rep #$20
-  .a16
+  m16
   lda terminalCursor
   and #(TERMINAL_TILEMAP_MASK ^ (TERMINAL_COLUMNS - 1))
   clc
   adc #TERMINAL_COLUMNS
   and #TERMINAL_TILEMAP_MASK
   sta terminalCursor
-  sep #$20
-  .a8
+  m8
   rts
 
 @backspace:
-  rep #$20
-  .a16
+  m16
   lda terminalCursor
   dec
   and #TERMINAL_TILEMAP_MASK
   sta terminalCursor
-  sep #$20
-  .a8
-
+  m8
 @renderDone:
   rts
 .endproc

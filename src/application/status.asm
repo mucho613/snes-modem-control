@@ -5,6 +5,7 @@
 ; another adapter does not create duplicate exports through xtask's recursive
 ; collection of every .asm source.
 
+.include "../macro/utility.asm"
 .include "../modem/generated.inc"
 .include "../ppp/constants.inc"
 

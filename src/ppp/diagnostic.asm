@@ -24,16 +24,14 @@
   lda #PPP_DIAGNOSTIC_MAGIC_3
   sta pppDiagnosticMagic + 3
 
-  rep #$20
-  .a16
+  m16
   lda #PPP_DIAGNOSTIC_VERSION
   sta pppDiagnosticVersion
   lda #PPP_DIAGNOSTIC_SIZE
   sta pppDiagnosticSize
   stz pppSnapshotSequence
   stz pppSnapshotSequence + 2
-  sep #$20
-  .a8
+  m8
   stz pppSnapshotDepth
   plb
   rts

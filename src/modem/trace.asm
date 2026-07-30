@@ -43,10 +43,7 @@ traceEnabled:
   modemIncrement32 modemTraceOverwrittenCount
 
 notOverwriting:
-  rep #$30
-  .a16
-  .i16
-
+  mi16
   lda modemTraceNextSequence
   and #$00ff
   asl
@@ -64,8 +61,7 @@ notOverwriting:
   lda frameCounter + 2
   sta modemTrace + MODEM_TRACE_RECORD_FRAME + 2, y
 
-  sep #$20
-  .a8
+  m8
   lda modemTraceScratchKind
   sta modemTrace + MODEM_TRACE_RECORD_KIND, y
   lda modemDriverState
@@ -75,16 +71,13 @@ notOverwriting:
   lda modemFlags
   sta modemTrace + MODEM_TRACE_RECORD_FLAGS, y
 
-  rep #$20
-  .a16
+  m16
   lda modemLastDataReport
   sta modemTrace + MODEM_TRACE_RECORD_DATA, y
   lda modemLastStatusReport
   sta modemTrace + MODEM_TRACE_RECORD_STATUS, y
 
-  sep #$30
-  .a8
-  .i8
+  mi8
   modemIncrement32 modemTraceNextSequence
 
   lda modemTraceScratchKind
@@ -94,9 +87,7 @@ notOverwriting:
   sta modemTraceFrozen
 
 done:
-  sep #$30
-  .a8
-  .i8
+  mi8
   ply
   plx
   plb

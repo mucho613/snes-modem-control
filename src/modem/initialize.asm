@@ -25,10 +25,7 @@
   plb
   plb
 
-  sep #$30
-  .a8
-  .i8
-
+  mi8
   lda #$01
   stz JOYOUT
   sta JOYOUT
@@ -72,9 +69,7 @@
   sta JOYOUT
   stz JOYOUT
 
-  rep #$30
-  .a16
-  .i16
+  mi16
   plb
   rts
 .endproc
@@ -94,10 +89,7 @@
   setDBR $7e
   setDP $4000
 
-  sep #$30
-  .a8
-  .i8
-
+  mi8
   jsr modemSnapshotBegin
   jsr modemResetQueues
   stz modemSessionProbeSent
@@ -106,33 +98,23 @@
 
   ; Use the hardware-verified raw "R" waveform verbatim.
   suspendNmi nmitimenShadow
-  rep #$30
-  .a16
-  .i16
+  mi16
   jsr modemSendRawInitialize
-  sep #$30
-  .a8
-  .i8
+  mi8
   restoreNmi nmitimenShadow
 
-  rep #$20
-  .a16
+  m16
   lda frameCounter
   sta modemResetStartFrame
   lda frameCounter + 2
   sta modemResetStartFrame + 2
-  sep #$20
-  .a8
-
+  m8
   modemIncrement32 modemReinitializeCount
   lda #MODEM_STATE_RESETTING
   jsr modemSetState
   jsr modemSnapshotEnd
 
-  rep #$30
-  .a16
-  .i16
-
+  mi16
   ply
   plx
   pld

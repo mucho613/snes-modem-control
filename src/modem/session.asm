@@ -25,9 +25,7 @@
   phy
   setDBR $7e
 
-  sep #$30
-  .a8
-  .i8
+  mi8
   lda #$10
   sta modemSessionStage
 
@@ -58,15 +56,12 @@ probeQueued:
   stz modemSessionLastResult
   lda #$22
   sta modemSessionStage
-  rep #$20
-  .a16
+  m16
   lda frameCounter
   sta modemSessionProbeStartFrame
   lda frameCounter + 2
   sta modemSessionProbeStartFrame + 2
-  sep #$20
-  .a8
-
+  m8
 readResponse:
   lda #$30
   sta modemSessionStage
@@ -111,14 +106,12 @@ probeRejectedFinal:
 checkTimeout:
   lda #$40
   sta modemSessionStage
-  rep #$20
-  .a16
+  m16
   lda frameCounter
   sec
   sbc modemSessionProbeStartFrame
   cmp #MODEM_PROBE_TIMEOUT_FRAMES
-  sep #$20
-  .a8
+  m8
   bcs @probeTimeoutExpired
   jmp done
 
@@ -193,14 +186,12 @@ atRejected:
   jmp done
 
 atCheckTimeout:
-  rep #$20
-  .a16
+  m16
   lda frameCounter
   sec
   sbc modemAtStartFrame
   cmp modemAtTimeoutFrames
-  sep #$20
-  .a8
+  m8
   bcs @atTimeoutExpired
   jmp done
 
@@ -221,9 +212,7 @@ atCheckTimeout:
 done:
   lda #$90
   sta modemSessionStage
-  rep #$30
-  .a16
-  .i16
+  mi16
   ply
   plx
   plb
@@ -563,15 +552,12 @@ lineDone:
   stz modemSessionLastResult
   stz modemSessionLineLength
 
-  rep #$20
-  .a16
+  m16
   lda frameCounter
   sta modemAtStartFrame
   lda frameCounter + 2
   sta modemAtStartFrame + 2
-  sep #$20
-  .a8
-
+  m8
   lda #MODEM_AT_STATUS_RUNNING
   sta modemAtStatus
   lda modemAtExpectedResult

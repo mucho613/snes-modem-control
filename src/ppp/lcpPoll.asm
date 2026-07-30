@@ -34,9 +34,7 @@
   phx
   phy
   setDBR $7e
-  sep #$20
-  .a8
-
+  m8
   lda pppReceiveEnabled
   bne :+
   jmp @lowerUnavailable
@@ -61,8 +59,7 @@
 :
   lda pppFrameReady
   beq @timer
-  rep #$20
-  .a16
+  m16
   lda pppLastProtocol
   cmp #PPP_PROTOCOL_LCP
   beq @receiveLcp
@@ -72,8 +69,7 @@
   beq @knownUpperProtocol
   cmp #PPP_PROTOCOL_IP
   beq @knownUpperProtocol
-  sep #$20
-  .a8
+  m8
   lda pppLcpState
   cmp #PPP_LCP_STATE_OPENED
   bne :+
@@ -87,8 +83,7 @@
 
 @knownUpperProtocol:
   .a16
-  sep #$20
-  .a8
+  m8
   lda pppLcpState
   cmp #PPP_LCP_STATE_OPENED
   beq @timer
@@ -109,8 +104,7 @@
 
 @receiveLcp:
   .a16
-  sep #$20
-  .a8
+  m8
   jsr pppLcpReceiveFrame
   bcs @releaseThenTimer
 
@@ -160,9 +154,7 @@
 
 @done:
   .a8
-  rep #$30
-  .a16
-  .i16
+  mi16
   ply
   plx
   plb
@@ -265,11 +257,9 @@
   sta pppReceiveEnabled
 
   ; Closed + enabled + CONNECTED sends the initial local request.
-  rep #$20
-  .a16
+  m16
   jsr pppLcpPoll
-  sep #$20
-  .a8
+  m8
   lda pppLcpState
   cmp #PPP_LCP_STATE_REQUEST_SENT
   pppLcpPollRequireEqual @fail60
@@ -284,11 +274,9 @@
   lda #PPP_LCP_CODE_CONFIGURE_REQUEST
   ldx #$0007
   jsr @writeEmptyPacket
-  rep #$20
-  .a16
+  m16
   jsr pppLcpPoll
-  sep #$20
-  .a8
+  m8
   lda pppLcpState
   cmp #PPP_LCP_STATE_ACK_SENT
   pppLcpPollRequireEqual @fail61
@@ -300,11 +288,9 @@
 
   ; Once the encoder is idle, Ack is built and the frame is released.
   jsr pppTransmitInitialize
-  rep #$20
-  .a16
+  m16
   jsr pppLcpPoll
-  sep #$20
-  .a8
+  m8
   lda pppFrameReady
   pppLcpPollRequireEqual @fail62
   lda pppLcpPendingAction
@@ -321,11 +307,9 @@
   lda #PPP_LCP_CODE_CONFIGURE_ACK
   ldx #$0000
   jsr @writeEmptyPacket
-  rep #$20
-  .a16
+  m16
   jsr pppLcpPoll
-  sep #$20
-  .a8
+  m8
   lda pppLcpState
   cmp #PPP_LCP_STATE_OPENED
   pppLcpPollRequireEqual @fail63
@@ -350,33 +334,27 @@
   sta pppFrameBuffer + 5
   lda #$cc
   sta pppFrameBuffer + 6
-  rep #$20
-  .a16
+  m16
   lda #$8057
   sta pppLastProtocol
   lda #$0007
   sta pppLastFrameLength
-  sep #$20
-  .a8
+  m8
   lda #$01
   sta pppFrameReady
   sta pppTransmitActive
-  rep #$20
-  .a16
+  m16
   jsr pppLcpPoll
-  sep #$20
-  .a8
+  m8
   lda pppFrameReady
   pppLcpPollRequireNonzero @fail65
   lda pppLcpPendingAction
   cmp #PPP_LCP_ACTION_PROTOCOL_REJECT
   pppLcpPollRequireEqual @fail65
   jsr pppTransmitInitialize
-  rep #$20
-  .a16
+  m16
   jsr pppLcpPoll
-  sep #$20
-  .a8
+  m8
   lda pppFrameReady
   ora pppLcpPendingAction
   pppLcpPollRequireEqual @fail65
@@ -404,26 +382,21 @@
   lda pppLcpRejectIdentifier
   cmp #$01
   pppLcpPollRequireEqual @fail65
-  rep #$20
-  .a16
+  m16
   lda pppLcpLastRejectedProtocol
   cmp #$8057
   beq :+
-  sep #$20
-  .a8
+  m8
   jmp @fail65
 :
   .a16
   lda pppLcpProtocolRejectCount
   cmp #$0001
   beq :+
-  sep #$20
-  .a8
+  m8
   jmp @fail65
 :
-  sep #$20
-  .a8
-
+  m8
   ; An unknown LCP Code is rejected with exactly the packet declared by its
   ; Length field. PPP padding is excluded and a busy encoder retains the frame.
   lda #$7f
@@ -439,33 +412,27 @@
   sta pppFrameBuffer + 9
   lda #$cc
   sta pppFrameBuffer + 10
-  rep #$20
-  .a16
+  m16
   lda #PPP_PROTOCOL_LCP
   sta pppLastProtocol
   lda #$000b
   sta pppLastFrameLength
-  sep #$20
-  .a8
+  m8
   lda #$01
   sta pppFrameReady
   sta pppTransmitActive
-  rep #$20
-  .a16
+  m16
   jsr pppLcpPoll
-  sep #$20
-  .a8
+  m8
   lda pppFrameReady
   pppLcpPollRequireNonzero @fail66
   lda pppLcpPendingAction
   cmp #PPP_LCP_ACTION_CODE_REJECT
   pppLcpPollRequireEqual @fail66
   jsr pppTransmitInitialize
-  rep #$20
-  .a16
+  m16
   jsr pppLcpPoll
-  sep #$20
-  .a8
+  m8
   lda pppFrameReady
   ora pppLcpPendingAction
   pppLcpPollRequireEqual @fail66
@@ -501,28 +468,22 @@
   lda pppLcpRejectIdentifier
   cmp #$02
   pppLcpPollRequireEqual @fail66
-  rep #$20
-  .a16
+  m16
   lda pppLcpCodeRejectCount
   cmp #$0001
   beq :+
-  sep #$20
-  .a8
+  m8
   jmp @fail66
 :
-  sep #$20
-  .a8
-
+  m8
   ; A peer request in Opened serializes its Ack before a fresh local request.
   jsr pppTransmitInitialize
   lda #PPP_LCP_CODE_CONFIGURE_REQUEST
   ldx #$0008
   jsr @writeEmptyPacket
-  rep #$20
-  .a16
+  m16
   jsr pppLcpPoll
-  sep #$20
-  .a8
+  m8
   lda pppLcpState
   cmp #PPP_LCP_STATE_ACK_SENT
   pppLcpPollRequireEqual @fail64
@@ -536,11 +497,9 @@
   pppLcpPollRequireEqual @fail64
 
   jsr pppTransmitInitialize
-  rep #$20
-  .a16
+  m16
   jsr pppLcpPoll
-  sep #$20
-  .a8
+  m8
   lda pppTransmitBuffer + 4
   cmp #PPP_LCP_CODE_CONFIGURE_REQUEST
   pppLcpPollRequireEqual @fail64
@@ -557,11 +516,9 @@
   lda #PPP_LCP_CODE_TERMINATE_REQUEST
   ldx #$0042
   jsr @writeEmptyPacket
-  rep #$20
-  .a16
+  m16
   jsr pppLcpPoll
-  sep #$20
-  .a8
+  m8
   lda pppLcpState
   cmp #PPP_LCP_STATE_STOPPED
   pppLcpPollRequireEqual @fail65
@@ -581,11 +538,9 @@
   lda #$01
   sta pppFrameReady
   stz pppReceiveEnabled
-  rep #$20
-  .a16
+  m16
   jsr pppLcpPoll
-  sep #$20
-  .a8
+  m8
   lda pppLcpState
   cmp #PPP_LCP_STATE_CLOSED
   pppLcpPollRequireEqual @fail65
@@ -652,14 +607,12 @@
   stz pppFrameBuffer + 6
   lda #PPP_LCP_HEADER_LENGTH
   sta pppFrameBuffer + 7
-  rep #$20
-  .a16
+  m16
   lda #PPP_PROTOCOL_LCP
   sta pppLastProtocol
   lda #PPP_LCP_MINIMUM_FRAME_LENGTH
   sta pppLastFrameLength
-  sep #$20
-  .a8
+  m8
   lda #$01
   sta pppFrameReady
   rts

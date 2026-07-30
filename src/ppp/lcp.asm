@@ -43,8 +43,7 @@
   stz pppLcpTimerActive
   stz pppLcpDeferredRequest
   stz pppLcpPollAction
-  rep #$20
-  .a16
+  m16
   lda #PPP_DEFAULT_MRU
   sta pppLcpPeerMru
   lda #$ffff
@@ -63,8 +62,7 @@
   stz pppLcpCodeRejectCount
   stz pppLcpCodeRejectCount + 2
   stz pppLcpLastRejectedProtocol
-  sep #$20
-  .a8
+  m8
   stz pppLcpRejectIdentifier
   stz pppLcpLastRejectedCode
   plb
@@ -99,13 +97,11 @@
   stz pppLcpPacketLength
   stz pppLcpPacketLength + 1
 
-  rep #$20
-  .a16
+  m16
   lda pppLastProtocol
   cmp #PPP_PROTOCOL_LCP
   beq @checkHeader
-  sep #$20
-  .a8
+  m8
   lda #PPP_LCP_ERROR_WRONG_PROTOCOL
   jmp @fail
 
@@ -114,15 +110,13 @@
   lda pppLastFrameLength
   cmp #PPP_LCP_MINIMUM_FRAME_LENGTH
   bcs @readHeader
-  sep #$20
-  .a8
+  m8
   lda #PPP_LCP_ERROR_TRUNCATED_HEADER
   jmp @fail
 
 @readHeader:
   .a16
-  sep #$20
-  .a8
+  m8
   lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET
   sta pppLcpLastCode
   lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET + 1
@@ -132,13 +126,11 @@
   lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET + 2
   sta pppLcpPacketLength + 1
 
-  rep #$20
-  .a16
+  m16
   lda pppLcpPacketLength
   cmp #PPP_LCP_HEADER_LENGTH
   bcs @checkAvailable
-  sep #$20
-  .a8
+  m8
   lda #PPP_LCP_ERROR_INVALID_PACKET_LENGTH
   jmp @fail
 
@@ -150,15 +142,13 @@
   cmp pppLastFrameLength
   bcc @checkConfigure
   beq @checkConfigure
-  sep #$20
-  .a8
+  m8
   lda #PPP_LCP_ERROR_TRUNCATED_PACKET
   jmp @fail
 
 @checkConfigure:
   .a16
-  sep #$20
-  .a8
+  m8
   lda pppLcpLastCode
   cmp #PPP_LCP_CODE_CONFIGURE_REQUEST
   bcc @success
@@ -167,8 +157,7 @@
 
   ; X is an absolute pppFrameBuffer offset. pppLcpPacketEnd points one byte
   ; beyond the Length-delimited LCP packet and excludes any PPP padding.
-  rep #$20
-  .a16
+  m16
   ldx #PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH
 @optionLoop:
   .a16
@@ -180,15 +169,13 @@
   cmp pppLcpPacketEnd
   bcc @readOptionLength
   beq @readOptionLength
-  sep #$20
-  .a8
+  m8
   lda #PPP_LCP_ERROR_TRUNCATED_OPTION
   jmp @fail
 
 @readOptionLength:
   .a16
-  sep #$20
-  .a8
+  m8
   lda pppFrameBuffer + 1, x
   cmp #$02
   bcs @checkOptionEnd
@@ -197,8 +184,7 @@
 
 @checkOptionEnd:
   .a8
-  rep #$20
-  .a16
+  m16
   and #$00ff
   sta pppLcpOptionLength
   txa
@@ -207,8 +193,7 @@
   cmp pppLcpPacketEnd
   bcc @advanceOption
   beq @advanceOption
-  sep #$20
-  .a8
+  m8
   lda #PPP_LCP_ERROR_OPTION_OVERRUN
   jmp @fail
 
@@ -219,8 +204,7 @@
 
 @success16:
   .a16
-  sep #$20
-  .a8
+  m8
 @success:
   stz pppLcpLastError
   jsr pppSnapshotEnd
@@ -284,14 +268,12 @@
   sta pppFrameBuffer + 12
   lda #$55
   sta pppFrameBuffer + 13
-  rep #$20
-  .a16
+  m16
   lda #PPP_PROTOCOL_LCP
   sta pppLastProtocol
   lda #$000e
   sta pppLastFrameLength
-  sep #$20
-  .a8
+  m8
   jsr pppLcpParseFrame
   bcc :+
   lda #$20
@@ -307,16 +289,13 @@
   beq :+
   jmp @fail21
 :
-  rep #$20
-  .a16
+  m16
   lda pppLcpPacketLength
   cmp #$0008
   beq :+
   jmp @fail21_16
 :
-  sep #$20
-  .a8
-
+  m8
   ; Length below the four-byte LCP header.
   stz pppFrameBuffer + 6
   lda #$03
@@ -333,12 +312,10 @@
   lda #$01
   sta pppFrameBuffer + 8
   sta pppFrameBuffer + 9
-  rep #$20
-  .a16
+  m16
   lda #$000a
   sta pppLastFrameLength
-  sep #$20
-  .a8
+  m8
   jsr pppLcpParseFrame
   bcc @fail23
   cmp #PPP_LCP_ERROR_INVALID_OPTION_LENGTH
@@ -362,34 +339,29 @@
   bne @fail25
 
   ; A non-LCP frame is rejected before its packet header is inspected.
-  rep #$20
-  .a16
+  m16
   lda #$0021
   sta pppLastProtocol
-  sep #$20
-  .a8
+  m8
   jsr pppLcpParseFrame
   bcc @fail26
   cmp #PPP_LCP_ERROR_WRONG_PROTOCOL
   bne @fail26
 
-  rep #$20
-  .a16
+  m16
   lda pppLcpReceiveCount
   cmp #$0006
   bne @fail27_16
   lda pppLcpReceiveCount + 2
   bne @fail27_16
-  sep #$20
-  .a8
+  m8
   jsr pppLcpInitialize
   lda #$00
   clc
   bra @return
 
 @fail21_16:
-  sep #$20
-  .a8
+  m8
 @fail21:
   lda #$21
   bra @fail
@@ -409,8 +381,7 @@
   lda #$26
   bra @fail
 @fail27_16:
-  sep #$20
-  .a8
+  m8
   lda #$27
 
 @fail:

@@ -35,9 +35,7 @@
   phx
   phy
   setDBR $7e
-  sep #$20
-  .a8
-
+  m8
   lda pppReceiveEnabled
   bne :+
   jmp releaseIfOwned
@@ -67,16 +65,13 @@
   bne :+
   jmp done
 :
-  rep #$20
-  .a16
+  m16
   lda pppLastProtocol
   cmp #PPP_PROTOCOL_IP
   beq :+
   jmp done
 :
-  sep #$20
-  .a8
-
+  m8
   lda pppIcmpFlags
   and #PPP_ICMP_FLAG_REPLY_PENDING
   beq parse
@@ -105,13 +100,11 @@ compareDestination:
   ora #PPP_IPV4_FLAG_DESTINATION_LOCAL
   sta pppIpv4Flags
 
-  rep #$20
-  .a16
+  m16
   lda pppIpv4FlagsFragmentOffset
   and #(PPP_IPV4_FLAG_MORE_FRAGMENTS | PPP_IPV4_FRAGMENT_OFFSET_MASK)
   beq accepted
-  sep #$20
-  .a8
+  m8
   lda pppIpv4Flags
   ora #PPP_IPV4_FLAG_FRAGMENTED
   sta pppIpv4Flags
@@ -121,8 +114,7 @@ compareDestination:
   bra policyDone
 
 accepted:
-  sep #$20
-  .a8
+  m8
   stz pppIpv4LastError
   pppIncrement32 pppIpv4AcceptedCount
   lda pppIpv4Protocol
@@ -154,20 +146,16 @@ destinationMismatch:
 releaseIfOwned:
   lda pppFrameReady
   beq done
-  rep #$20
-  .a16
+  m16
   lda pppLastProtocol
   cmp #PPP_PROTOCOL_IP
   bne done
-  sep #$20
-  .a8
+  m8
   jsr pppIcmpCancelPending
   jsr pppReleaseFrame
 
 done:
-  rep #$30
-  .a16
-  .i16
+  mi16
   ply
   plx
   plb
@@ -224,88 +212,70 @@ done:
   sta pppIpcpLocalAddress + 3
   jsr @prepareFrame
 
-  rep #$20
-  .a16
+  m16
   jsr pppIpv4Poll
-  sep #$20
-  .a8
+  m8
   lda pppFrameReady
   pppIpv4PollRequireEqual @fail85
   lda pppIpv4Flags
   cmp #(PPP_IPV4_FLAG_HEADER_VALID | PPP_IPV4_FLAG_DESTINATION_LOCAL)
   pppIpv4PollRequireEqual @fail85
-  rep #$20
-  .a16
+  m16
   lda pppIpv4ReceiveCount
   cmp #$0001
   bne @fail85_16
   lda pppIpv4AcceptedCount
   cmp #$0001
   bne @fail85_16
-  sep #$20
-  .a8
-
+  m8
   ; Reuse the valid packet with a different negotiated local address.
   inc pppIpcpLocalAddress + 3
   lda #$01
   sta pppFrameReady
-  rep #$20
-  .a16
+  m16
   jsr pppIpv4Poll
-  sep #$20
-  .a8
+  m8
   lda pppFrameReady
   pppIpv4PollRequireEqual @fail86
   lda pppIpv4LastError
   cmp #PPP_IPV4_ERROR_DESTINATION_MISMATCH
   pppIpv4PollRequireEqual @fail86
-  rep #$20
-  .a16
+  m16
   lda pppIpv4DropCount
   cmp #$0001
   bne @fail86_16
-  sep #$20
-  .a8
-
+  m8
   ; A packet arriving below IPCP Opened is released without parsing.
   stz pppIpcpState
   lda #$01
   sta pppFrameReady
-  rep #$20
-  .a16
+  m16
   jsr pppIpv4Poll
-  sep #$20
-  .a8
+  m8
   lda pppFrameReady
   pppIpv4PollRequireEqual @fail87
-  rep #$20
-  .a16
+  m16
   lda pppIpv4ReceiveCount
   cmp #$0002
   bne @fail87_16
-  sep #$20
-  .a8
-
+  m8
   jsr @cleanup
   lda #$00
   clc
   bra @return
 
 @fail85_16:
-  sep #$20
-  .a8
+  m8
 @fail85:
   lda #$85
   bra @fail
 @fail86_16:
-  sep #$20
-  .a8
+  m8
 @fail86:
   lda #$86
   bra @fail
 @fail87_16:
-  sep #$20
-  .a8
+  m8
 @fail87:
   lda #$87
 @fail:
@@ -340,14 +310,12 @@ done:
   inx
   cpx #$0077
   bne @payload
-  rep #$20
-  .a16
+  m16
   lda #PPP_PROTOCOL_IP
   sta pppLastProtocol
   lda #$0077
   sta pppLastFrameLength
-  sep #$20
-  .a8
+  m8
   lda #$01
   sta pppFrameReady
   rts

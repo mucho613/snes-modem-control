@@ -31,9 +31,7 @@
   phb
   setDBR $7e
 
-  sep #$30
-  .a8
-  .i8
+  mi8
   lda #$10
   sta modemMailboxStage
 
@@ -92,8 +90,7 @@
 @checkNewCommand:
   lda #$20
   sta modemMailboxStage
-  rep #$20
-  .a16
+  m16
   lda modemMailboxProcessedSequence
   sta modemMailboxObservedProcessed
   lda modemMailboxHostSequence
@@ -109,9 +106,7 @@
   jmp @done16
 
 @newCommand:
-  sep #$30
-  .a8
-  .i8
+  mi8
   lda #$30
   sta modemMailboxStage
   lda #MODEM_MAILBOX_STATUS_RUNNING
@@ -179,25 +174,17 @@
   jmp @commitCommand
 
 @initialize:
-  rep #$30
-  .a16
-  .i16
+  mi16
   jsr modemInitialize
-  sep #$30
-  .a8
-  .i8
+  mi8
   lda #MODEM_MAILBOX_STATUS_PASSED
   sta modemMailboxStatus
   jmp @commitCommand
 
 @quickTest:
-  rep #$30
-  .a16
-  .i16
+  mi16
   jsr modemInitialize
-  sep #$30
-  .a8
-  .i8
+  mi8
   ; Completion is reported when modemSessionPoll reaches READY or ERROR.
   jmp @commitCommand
 
@@ -325,11 +312,9 @@
   jmp @commitCommand
 
 @ntpRequest:
-  rep #$10
-  .i16
+  i16
   jsr pppNtpRequest
-  sep #$10
-  .i8
+  i8
   bcs @ntpRequestFailed
   lda #MODEM_MAILBOX_STATUS_PASSED
   sta modemMailboxStatus
@@ -349,11 +334,9 @@
   inx
   cpx #$04
   bne @icmpEchoCopyDestination
-  rep #$10
-  .i16
+  i16
   jsr pppIcmpRequestBegin
-  sep #$10
-  .i8
+  i8
   bcs @icmpEchoRequestFailed
   lda #MODEM_MAILBOX_STATUS_PASSED
   sta modemMailboxStatus
@@ -385,11 +368,9 @@
   inx
   cpx pppDnsQueryNameLength
   bne @dnsCopyName
-  rep #$10
-  .i16
+  i16
   jsr pppDnsRequest
-  sep #$10
-  .i8
+  i8
   bcs @dnsQueryFailed
   lda #MODEM_MAILBOX_STATUS_PASSED
   sta modemMailboxStatus
@@ -430,24 +411,18 @@
 @commitCommand:
   lda #$40
   sta modemMailboxStage
-  rep #$20
-  .a16
+  m16
   lda modemMailboxHostSequence
   sta modemMailboxProcessedSequence
   lda modemMailboxHostSequence + 2
   sta modemMailboxProcessedSequence + 2
 
 @done16:
-  sep #$30
-  .a8
-  .i8
-
+  mi8
 @done:
   lda #$90
   sta modemMailboxStage
-  rep #$30
-  .a16
-  .i16
+  mi16
   plb
   pla
   rts

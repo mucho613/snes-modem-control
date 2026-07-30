@@ -21,10 +21,7 @@
   setDBR $7e
   setDP $4000
 
-  sep #$30
-  .a8
-  .i8
-
+  mi8
   lda controllerPollTick
   beq @done
   stz controllerPollTick
@@ -66,9 +63,7 @@
   sta controller1InputPulse + 1
 
 @done:
-  rep #$30
-  .a16
-  .i16
+  mi16
   plx
   pld
   plb

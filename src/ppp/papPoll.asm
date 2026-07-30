@@ -25,9 +25,7 @@
   phx
   phy
   setDBR $7e
-  sep #$20
-  .a8
-
+  m8
   lda pppReceiveEnabled
   beq @lowerDown
   lda modemDriverState
@@ -45,13 +43,11 @@
   jsr pppPapBuildPending
   lda pppFrameReady
   beq @timer
-  rep #$20
-  .a16
+  m16
   lda pppLastProtocol
   cmp #PPP_PROTOCOL_PAP
   beq @receivePap
-  sep #$20
-  .a8
+  m8
   ; Once PAP opens, leave non-PAP ownership to the following IPCP poll.
   lda pppPapState
   cmp #PPP_PAP_STATE_OPENED
@@ -60,8 +56,7 @@
   bra @timer
 
 @receivePap:
-  sep #$20
-  .a8
+  m8
   jsr pppPapReceiveFrame
   jsr pppReleaseFrame
 
@@ -76,9 +71,7 @@
   jsr pppPapLowerDown
 
 @done:
-  rep #$30
-  .a16
-  .i16
+  mi16
   ply
   plx
   plb

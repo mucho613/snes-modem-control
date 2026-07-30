@@ -70,41 +70,34 @@
   cmp #PPP_MAX_TRANSMIT_FRAME_LENGTH + 1
   bcs invalid
   pha
-  sep #$20
-  .a8
+  m8
   lda pppTransmitActive
   bne busy
-  rep #$20
-  .a16
+  m16
   pla
   pha
-  sep #$20
-  .a8
+  m8
   jsr pppSnapshotBegin
-  rep #$20
-  .a16
+  m16
   pla
   sta pppTransmitLength
   stz pppTransmitPosition
   lda #PPP_INITIAL_FCS16
   sta pppTransmitFcs
-  sep #$20
-  .a8
+  m8
   stz pppTransmitEscapeSecond
   lda #PPP_TRANSMIT_STAGE_OPENING_FLAG
   sta pppTransmitStage
   lda #$01
   sta pppTransmitActive
   jsr pppSnapshotEnd
-  rep #$20
-  .a16
+  m16
   plb
   clc
   rts
 
 busy:
-  rep #$20
-  .a16
+  m16
   pla
 invalid:
   plb
@@ -146,9 +139,7 @@ abortDone:
   phy
   setDBR $7e
 
-  sep #$30
-  .a8
-  .i8
+  mi8
   lda modemDriverState
   cmp #MODEM_STATE_CONNECTED
   beq connected
@@ -170,11 +161,9 @@ connected:
   sta pppTransmitFillRemaining
 
 fill:
-  rep #$10
-  .i16
+  i16
   jsr pppTransmitPeek
-  sep #$10
-  .i8
+  i8
   bcs done
   jsr modemQueueByte
   bcc accepted
@@ -184,20 +173,16 @@ fill:
   bra done
 
 accepted:
-  rep #$10
-  .i16
+  i16
   jsr pppTransmitAdvance
-  sep #$10
-  .i8
+  i8
   lda pppTransmitActive
   beq done
   dec pppTransmitFillRemaining
   bne fill
 
 done:
-  rep #$30
-  .a16
-  .i16
+  mi16
   ply
   plx
   plb
@@ -235,11 +220,9 @@ flag:
   bra ready
 
 frame:
-  rep #$20
-  .a16
+  m16
   ldx pppTransmitPosition
-  sep #$20
-  .a8
+  m8
   lda pppTransmitBuffer, x
   bra escape
 
@@ -329,11 +312,9 @@ finishLogical:
   bra return
 
 finishOpening:
-  rep #$20
-  .a16
+  m16
   lda pppTransmitLength
-  sep #$20
-  .a8
+  m8
   beq openingEmpty
   lda #PPP_TRANSMIT_STAGE_FRAME
   sta pppTransmitStage
@@ -345,13 +326,11 @@ openingEmpty:
 
 finishFrame:
   jsr pppTransmitUpdateFcs
-  rep #$20
-  .a16
+  m16
   inc pppTransmitPosition
   lda pppTransmitPosition
   cmp pppTransmitLength
-  sep #$20
-  .a8
+  m8
   bne return
   lda #PPP_TRANSMIT_STAGE_FCS_LOW
   sta pppTransmitStage
@@ -381,8 +360,7 @@ inactiveReturn:
   .i16
 
   lda pppTransmitLogicalByte
-  rep #$20
-  .a16
+  m16
   and #$00ff
   eor pppTransmitFcs
   sta pppTransmitFcs
@@ -396,7 +374,6 @@ store:
   sta pppTransmitFcs
   dex
   bne bitLoop
-  sep #$20
-  .a8
+  m8
   rts
 .endproc

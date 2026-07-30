@@ -32,9 +32,7 @@
   setDBR $7e
   setDP $4000
 
-  sep #$30
-  .a8
-  .i8
+  mi8
   lda #$10
   sta modemPollStage
 
@@ -71,14 +69,12 @@
   cmp #MODEM_STATE_RESETTING
   bne @readCompleteReport
 
-  rep #$20
-  .a16
+  m16
   lda frameCounter
   sec
   sbc modemResetStartFrame
   cmp #MODEM_RESET_GUARD_FRAMES
-  sep #$20
-  .a8
+  m8
   bcc @readCompleteReport
 
   lda #MODEM_STATE_PROBING
@@ -201,9 +197,7 @@
 @return:
   lda #$30
   sta modemPollStage
-  rep #$30
-  .a16
-  .i16
+  mi16
   ply
   plx
   pld

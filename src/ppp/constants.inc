@@ -390,12 +390,10 @@ PPP_DNS_FLAG_RESPONSE_VALID = $01
 
 .macro pppIncrement32 address
   .local done
-  rep #$20
-  .a16
+  m16
   inc address
   bne done
   inc address + 2
 done:
-  sep #$20
-  .a8
+  m8
 .endmacro
