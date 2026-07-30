@@ -289,8 +289,8 @@ description = "Frame at which the current generic AT transaction started"
 
 [ppp_diagnostic]
 magic = [0x50, 0x50, 0x50, 0x31]
-version = 5
-size = 134
+version = 6
+size = 164
 
 [[ppp_diagnostic.fields]]
 name = "magic"
@@ -732,6 +732,118 @@ offset = 130
 size = 4
 type = "u32"
 description = "PAP Authenticate-Requests accepted by the shared encoder"
+
+[[ppp_diagnostic.fields]]
+name = "ipcp_state"
+offset = 134
+size = 1
+type = "u8"
+description = "Current RFC 1332 IPCP state"
+
+[[ppp_diagnostic.fields]]
+name = "ipcp_last_code"
+offset = 135
+size = 1
+type = "u8"
+description = "Code of the most recently parsed IPCP packet"
+
+[[ppp_diagnostic.fields]]
+name = "ipcp_last_identifier"
+offset = 136
+size = 1
+type = "u8"
+description = "Identifier of the most recently parsed IPCP packet"
+
+[[ppp_diagnostic.fields]]
+name = "ipcp_last_error"
+offset = 137
+size = 1
+type = "u8"
+description = "Most recent IPCP parser or negotiation error"
+
+[[ppp_diagnostic.fields]]
+name = "ipcp_request_identifier"
+offset = 138
+size = 1
+type = "u8"
+description = "Identifier of the outstanding local IPCP Configure-Request"
+
+[[ppp_diagnostic.fields]]
+name = "ipcp_restart_remaining"
+offset = 139
+size = 1
+type = "u8"
+description = "Remaining IPCP Configure retransmissions"
+
+[[ppp_diagnostic.fields]]
+name = "ipcp_pending_action"
+offset = 140
+size = 1
+type = "u8"
+description = "IPCP transmit action waiting for the shared PPP encoder"
+
+[[ppp_diagnostic.fields]]
+name = "ipcp_timer_active"
+offset = 141
+size = 1
+type = "u8"
+description = "Non-zero while the IPCP restart timer is armed"
+
+[[ppp_diagnostic.fields]]
+name = "ipcp_packet_length"
+offset = 142
+size = 2
+type = "u16"
+description = "Length field of the most recently parsed IPCP packet"
+
+[[ppp_diagnostic.fields]]
+name = "ipcp_restart_deadline"
+offset = 144
+size = 2
+type = "u16"
+description = "Low 16-bit VBlank frame deadline for IPCP restart"
+
+[[ppp_diagnostic.fields]]
+name = "ipcp_receive_count"
+offset = 146
+size = 4
+type = "u32"
+description = "IPCP packets presented to the packet parser"
+
+[[ppp_diagnostic.fields]]
+name = "ipcp_transmit_count"
+offset = 150
+size = 4
+type = "u32"
+description = "IPCP packets accepted by the shared encoder"
+
+[[ppp_diagnostic.fields]]
+name = "ipcp_local_address"
+offset = 154
+size = 4
+type = "ipv4"
+description = "Negotiated local IPv4 address in network byte order"
+
+[[ppp_diagnostic.fields]]
+name = "ipcp_peer_address"
+offset = 158
+size = 4
+type = "ipv4"
+description = "Negotiated peer IPv4 address in network byte order"
+
+[[ppp_diagnostic.fields]]
+name = "ipcp_flags"
+offset = 162
+size = 1
+type = "u8"
+description = "IPCP address-option and validity flags"
+
+[[ppp_diagnostic.fields]]
+name = "ipcp_deferred_request"
+offset = 163
+size = 1
+type = "u8"
+description = "Non-zero while Opened renegotiation owes a local Configure-Request"
 
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]

@@ -4,7 +4,7 @@
 
 スーパーファミコンと NTT DATA NDM24 をコントローラーポート経由で通信させるための、実験用ドライバと Windows 向け開発ツールです。JRA PAT の実通信をロジックアナライザで観測した結果を基準に、初期化、非同期送受信、状態管理、常設診断機能を整理しています。
 
-現時点の到達点は、NDM24 固有の `R` 初期化、`ATM0` による応答確認とスピーカー無効化、256 バイトの送受信リング、32文字幅ターミナル、QUsb2Snes 経由の監視・テスト・ROM 転送です。PPPはRFC 1662非同期フレーミングをRustと65816の両方へ実装し、NDM24のRX/TXリングへ中断・再開可能な形で接続済みです。Rust参照実装ではLCP packet codecとConfigure交渉状態機械まで、65816ではLCP packet parser、Configure交渉、peer option方針、restart timer、main-loopのframe所有権管理まで実装済みです。DFM-56Uを使うWSL2対向環境は構築済みですが、実対向とのLCP試験、認証、IPCP、IPv4、UDP、TCP、NTPはまだ実施・実装していません。
+現時点の到達点は、NDM24 固有の `R` 初期化、`ATM0` による応答確認とスピーカー無効化、256 バイトの送受信リング、32文字幅ターミナル、QUsb2Snes 経由の監視・テスト・ROM 転送です。PPPはRFC 1662非同期フレーミング、LCP、PAP client、IPCPをRust参照実装と65816の両方へ実装し、NDM24のRX/TXリングへ中断・再開可能な形で接続済みです。revision AとDFM-56Uを使うWSL2対向環境ではLCPとPAP認証まで合格しています。IPCPはSFC常設セルフテストまで合格し、実対向試験が次の段階です。IPv4、UDP、TCP、NTPはまだ実装していません。
 
 ## Windows での開始
 

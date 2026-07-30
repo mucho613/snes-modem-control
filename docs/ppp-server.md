@@ -3,10 +3,10 @@
 ## 目的
 
 疑似PSTNの相手側モデムとしてI/O DATA DFM-56Uを使い、WSL2上の
-`pppd`をNTT DATA NDM24の対向にします。LCP試験ではPAP要求optionまでを
-確認済みです。SFC側PAP clientの実装後は、閉じたfixture資格情報による
-Authenticate-Request/Ackと認証成功を次の合格条件にします。IPCPはその次の
-段階です。
+`pppd`をNTT DATA NDM24の対向にします。revision AではLCP `Opened`と、
+閉じたfixture資格情報によるPAP Authenticate-Request/Ackまで確認済みです。
+IPCPはSFC常設セルフテストまで合格しており、同じ対向環境でlocal
+`10.24.0.2`、peer `10.24.0.1`を確定することが次の合格条件です。
 
 ```mermaid
 flowchart LR
@@ -141,8 +141,10 @@ Ubuntuの`pppd`はpeer profileより前に`/etc/ppp/options`も読みます。�
 4. 双方のConfigure-Ack後にSFC診断状態が`Opened`になる。
 5. `pppd`がSFCのPAP Authenticate-Requestを受理し、Authenticate-Ackを返す。
 6. SFC側のPAP stateが`Opened`へ到達し、再送timerが停止する。
-7. 未実装のIPCPで停止しても、PAP payloadやpasswordが通常ログへ出ない。
-8. 切断後にSFC側LCPが`Closed`、PAPが`Inactive`へ戻り、timerとpending送信を残さない。
+7. IPCP双方のConfigure-Request/Ack/Nakを経て、SFC側IPCPが`Opened`になる。
+8. SFC診断でlocal `10.24.0.2`、peer `10.24.0.1`が確定し、timerが停止する。
+9. PAP payloadやpasswordが通常ログへ出ない。
+10. 切断後にSFC側LCPとIPCPが`Closed`、PAPが`Inactive`へ戻り、timerとpending送信を残さない。
 
 SFC側の発信と切断結果待ちは、期待するresult codeを明示します。
 
@@ -218,8 +220,9 @@ PAP client実装後、同じrevision AのNDM24とDFM-56UをV.22bis
   13、送受信数は各1、restart残数9、timer無効、failure 0だった。
 - この時点のPPP全体は受信6frame、送信3frame、FCS error、invalid、
   overflow、TX backpressureがすべて0だった。
-- 認証後、`pppd`はIPCP Configure-Requestで`10.24.0.1`を提案した。SFC側IPCPは
-  未実装なので、このpacketは現在のprotocol dispatcherが明示的に解放した。
+- 認証後、`pppd`はIPCP Configure-Requestで`10.24.0.1`を提案した。当時は
+  SFC側IPCPが未実装だったため、このpacketはprotocol dispatcherが解放した。
+  この記録はIPCP実装前のbaselineとして保持する。
 
 対向停止後はpeerのTerminate-Requestを受信し、raw `NO CARRIER`でModemが
 `Ready`へ戻りました。LCPは`Closed`、PAPは`Inactive`となり、双方のtimer、

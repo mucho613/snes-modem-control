@@ -52,7 +52,10 @@
   beq @receivePap
   sep #$20
   .a8
-  ; IPCP and other protocols are not implemented yet.
+  ; Once PAP opens, leave non-PAP ownership to the following IPCP poll.
+  lda pppPapState
+  cmp #PPP_PAP_STATE_OPENED
+  beq @timer
   jsr pppReleaseFrame
   bra @timer
 

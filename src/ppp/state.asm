@@ -32,6 +32,12 @@
 .export pppPapRestartRemaining, pppPapPendingAction
 .export pppPapTimerActive, pppPapFailure, pppPapPacketLength
 .export pppPapRestartDeadline, pppPapReceiveCount, pppPapTransmitCount
+.export pppIpcpState, pppIpcpLastCode, pppIpcpLastIdentifier
+.export pppIpcpLastError, pppIpcpRequestIdentifier, pppIpcpRestartRemaining
+.export pppIpcpPendingAction, pppIpcpTimerActive, pppIpcpPacketLength
+.export pppIpcpRestartDeadline, pppIpcpReceiveCount, pppIpcpTransmitCount
+.export pppIpcpLocalAddress, pppIpcpPeerAddress, pppIpcpFlags
+.export pppIpcpDeferredRequest
 
 pppDiagnosticState:
 pppDiagnosticMagic: .res $4
@@ -97,6 +103,22 @@ pppPapPacketLength: .res $2
 pppPapRestartDeadline: .res $2
 pppPapReceiveCount: .res $4
 pppPapTransmitCount: .res $4
+pppIpcpState: .res $1
+pppIpcpLastCode: .res $1
+pppIpcpLastIdentifier: .res $1
+pppIpcpLastError: .res $1
+pppIpcpRequestIdentifier: .res $1
+pppIpcpRestartRemaining: .res $1
+pppIpcpPendingAction: .res $1
+pppIpcpTimerActive: .res $1
+pppIpcpPacketLength: .res $2
+pppIpcpRestartDeadline: .res $2
+pppIpcpReceiveCount: .res $4
+pppIpcpTransmitCount: .res $4
+pppIpcpLocalAddress: .res $4
+pppIpcpPeerAddress: .res $4
+pppIpcpFlags: .res $1
+pppIpcpDeferredRequest: .res $1
 .res PPP_DIAGNOSTIC_SIZE - (* - pppDiagnosticState)
 pppDiagnosticStateEnd:
 
@@ -163,6 +185,22 @@ pppDiagnosticStateEnd:
 .assert pppPapRestartDeadline - pppDiagnosticState = PPP_DIAG_PAP_RESTART_DEADLINE, error, "PPP PAP deadline offset"
 .assert pppPapReceiveCount - pppDiagnosticState = PPP_DIAG_PAP_RECEIVE_COUNT, error, "PPP PAP receive count offset"
 .assert pppPapTransmitCount - pppDiagnosticState = PPP_DIAG_PAP_TRANSMIT_COUNT, error, "PPP PAP transmit count offset"
+.assert pppIpcpState - pppDiagnosticState = PPP_DIAG_IPCP_STATE, error, "PPP IPCP state offset"
+.assert pppIpcpLastCode - pppDiagnosticState = PPP_DIAG_IPCP_LAST_CODE, error, "PPP IPCP code offset"
+.assert pppIpcpLastIdentifier - pppDiagnosticState = PPP_DIAG_IPCP_LAST_IDENTIFIER, error, "PPP IPCP identifier offset"
+.assert pppIpcpLastError - pppDiagnosticState = PPP_DIAG_IPCP_LAST_ERROR, error, "PPP IPCP error offset"
+.assert pppIpcpRequestIdentifier - pppDiagnosticState = PPP_DIAG_IPCP_REQUEST_IDENTIFIER, error, "PPP IPCP request identifier offset"
+.assert pppIpcpRestartRemaining - pppDiagnosticState = PPP_DIAG_IPCP_RESTART_REMAINING, error, "PPP IPCP restart offset"
+.assert pppIpcpPendingAction - pppDiagnosticState = PPP_DIAG_IPCP_PENDING_ACTION, error, "PPP IPCP pending action offset"
+.assert pppIpcpTimerActive - pppDiagnosticState = PPP_DIAG_IPCP_TIMER_ACTIVE, error, "PPP IPCP timer offset"
+.assert pppIpcpPacketLength - pppDiagnosticState = PPP_DIAG_IPCP_PACKET_LENGTH, error, "PPP IPCP packet length offset"
+.assert pppIpcpRestartDeadline - pppDiagnosticState = PPP_DIAG_IPCP_RESTART_DEADLINE, error, "PPP IPCP deadline offset"
+.assert pppIpcpReceiveCount - pppDiagnosticState = PPP_DIAG_IPCP_RECEIVE_COUNT, error, "PPP IPCP receive count offset"
+.assert pppIpcpTransmitCount - pppDiagnosticState = PPP_DIAG_IPCP_TRANSMIT_COUNT, error, "PPP IPCP transmit count offset"
+.assert pppIpcpLocalAddress - pppDiagnosticState = PPP_DIAG_IPCP_LOCAL_ADDRESS, error, "PPP IPCP local address offset"
+.assert pppIpcpPeerAddress - pppDiagnosticState = PPP_DIAG_IPCP_PEER_ADDRESS, error, "PPP IPCP peer address offset"
+.assert pppIpcpFlags - pppDiagnosticState = PPP_DIAG_IPCP_FLAGS, error, "PPP IPCP flags offset"
+.assert pppIpcpDeferredRequest - pppDiagnosticState = PPP_DIAG_IPCP_DEFERRED_REQUEST, error, "PPP IPCP deferred request offset"
 .assert pppDiagnosticStateEnd - pppDiagnosticState = PPP_DIAGNOSTIC_SIZE, error, "PPP diagnostic ABI size"
 
 ; Decoder and pump scratch fields are private and intentionally excluded from
@@ -179,6 +217,10 @@ pppDiagnosticStateEnd:
 .export pppCarrierLineIndex, pppCarrierScratchByte
 .export pppCarrierTestSavedModemState, pppCarrierTestSavedSessionResult
 .export pppCarrierTestSavedLineLength
+.export pppIpcpPacketEnd, pppIpcpOptionLength, pppIpcpOptionOffset
+.export pppIpcpOutputCursor, pppIpcpHasReject, pppIpcpHasNak
+.export pppIpcpOptionSeen, pppIpcpOptionDuplicate, pppIpcpPollAction
+.export pppIpcpPollSavedModemState
 pppLastEvent: .res $1
 pppLastInvalidReason: .res $1
 pppDecoderScratchByte: .res $1
@@ -198,8 +240,18 @@ pppCarrierScratchByte: .res $1
 pppCarrierTestSavedModemState: .res $1
 pppCarrierTestSavedSessionResult: .res $1
 pppCarrierTestSavedLineLength: .res $1
+pppIpcpPacketEnd: .res $2
+pppIpcpOptionLength: .res $2
+pppIpcpOptionOffset: .res $2
+pppIpcpOutputCursor: .res $2
+pppIpcpHasReject: .res $1
+pppIpcpHasNak: .res $1
+pppIpcpPollAction: .res $1
+pppIpcpPollSavedModemState: .res $1
 pppLcpOptionSeen: .res $100
 pppLcpOptionDuplicate: .res $100
+pppIpcpOptionSeen: .res $100
+pppIpcpOptionDuplicate: .res $100
 
 ; A nesting count lets the permanent self-test wrap lower-level routines that
 ; also publish state without ever exposing an even sequence mid-operation.

@@ -44,7 +44,7 @@ ABI version: `2`. Block size: `128` bytes.
 
 ## PPP Diagnostic ABI
 
-ABI version: `5`. Block size: `134` bytes.
+ABI version: `6`. Block size: `164` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|
@@ -111,6 +111,22 @@ ABI version: `5`. Block size: `134` bytes.
 | `0x7C` | 2 | `u16` | `pap_restart_deadline` | Low 16-bit VBlank frame deadline for PAP restart |
 | `0x7E` | 4 | `u32` | `pap_receive_count` | PAP packets presented to the packet parser |
 | `0x82` | 4 | `u32` | `pap_transmit_count` | PAP Authenticate-Requests accepted by the shared encoder |
+| `0x86` | 1 | `u8` | `ipcp_state` | Current RFC 1332 IPCP state |
+| `0x87` | 1 | `u8` | `ipcp_last_code` | Code of the most recently parsed IPCP packet |
+| `0x88` | 1 | `u8` | `ipcp_last_identifier` | Identifier of the most recently parsed IPCP packet |
+| `0x89` | 1 | `u8` | `ipcp_last_error` | Most recent IPCP parser or negotiation error |
+| `0x8A` | 1 | `u8` | `ipcp_request_identifier` | Identifier of the outstanding local IPCP Configure-Request |
+| `0x8B` | 1 | `u8` | `ipcp_restart_remaining` | Remaining IPCP Configure retransmissions |
+| `0x8C` | 1 | `u8` | `ipcp_pending_action` | IPCP transmit action waiting for the shared PPP encoder |
+| `0x8D` | 1 | `u8` | `ipcp_timer_active` | Non-zero while the IPCP restart timer is armed |
+| `0x8E` | 2 | `u16` | `ipcp_packet_length` | Length field of the most recently parsed IPCP packet |
+| `0x90` | 2 | `u16` | `ipcp_restart_deadline` | Low 16-bit VBlank frame deadline for IPCP restart |
+| `0x92` | 4 | `u32` | `ipcp_receive_count` | IPCP packets presented to the packet parser |
+| `0x96` | 4 | `u32` | `ipcp_transmit_count` | IPCP packets accepted by the shared encoder |
+| `0x9A` | 4 | `ipv4` | `ipcp_local_address` | Negotiated local IPv4 address in network byte order |
+| `0x9E` | 4 | `ipv4` | `ipcp_peer_address` | Negotiated peer IPv4 address in network byte order |
+| `0xA2` | 1 | `u8` | `ipcp_flags` | IPCP address-option and validity flags |
+| `0xA3` | 1 | `u8` | `ipcp_deferred_request` | Non-zero while Opened renegotiation owes a local Configure-Request |
 
 ## Mailbox ABI
 

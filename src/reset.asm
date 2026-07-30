@@ -15,6 +15,7 @@
 .import pppLcpInitialize
 .import pppLcpPoll
 .import pppPapInitialize, pppPapPoll
+.import pppIpcpInitialize, pppIpcpPoll
 .import nmitimenShadow
 
 .include "./registers.inc"
@@ -71,6 +72,7 @@
   jsr pppTransmitInitialize
   jsr pppLcpInitialize
   jsr pppPapInitialize
+  jsr pppIpcpInitialize
   sep #$10
   .i8
 
@@ -119,6 +121,7 @@
     jsr pppReceivePoll
     jsr pppLcpPoll
     jsr pppPapPoll
+    jsr pppIpcpPoll
     jsr pppTransmitPoll
   .endif
   bra @mainLoop

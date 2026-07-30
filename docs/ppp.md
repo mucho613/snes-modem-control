@@ -4,7 +4,7 @@
 
 最初のPPPマイルストーンは、NDM24から受け取る任意位置で分割されたbyte列を、FCS検証済みのPPPフレームへ復元する層です。`crates/ndm24-ppp` を仕様の参照実装とし、同じ状態遷移と試験ベクトルを65816へ移植しています。
 
-現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP packet parser、Configure交渉、peer option方針、restart timer、main-loop pollとPAP clientまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ackまで確認しました。IPCPはRust参照実装まで完了し、65816への移植中です。IPv4、UDP、TCP、NTPはまだSFC上で動作しません。
+現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP、PAP client、IPCPまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ackまで確認しました。IPCPはRust参照実装、65816移植、SFC常設セルフテストまで完了し、実対向試験を残しています。IPv4、UDP、TCP、NTPはまだSFC上で動作しません。
 
 PPP接続は次の順序で進みます。
 
@@ -71,6 +71,8 @@ Rust参照実装は全入力分割位置、破損FCSからの再同期、Flag直
 - `src/ppp/lcpPoll.asm`: main-loop、frame所有権、送信直列化
 - `src/ppp/pap.asm`: PAP client、packet parser、restart timer
 - `src/ppp/papPoll.asm`: LCP/PAP frame振り分け、共有送信器との直列化
+- `src/ppp/ipcp.asm`: IPCP parser、address交渉、restart timer
+- `src/ppp/ipcpPoll.asm`: PAP/IPCP frame所有権、共有送信器との直列化
 - `src/ppp/selfTest.asm`: 固定fixtureによる常設セルフテスト
 
 `pppDecoderPush` はraw byteを1byteずつ受け取り、次のeventを返します。
@@ -134,7 +136,7 @@ Address 1 + Control 1 + Protocol 2 + Information 1500 + FCS 2
 
 ## 常設PPP診断
 
-`pppDiagnosticState` はmagic `PPP1`、ABI version 5、134byteの公開診断blockです。レイアウトの正本は `spec/ndm24.toml` で、AssemblyとRustのoffset定数および[生成済みABI表](generated/diagnostic-abi.md)を同時に生成します。
+`pppDiagnosticState` はmagic `PPP1`、ABI version 6、164byteの公開診断blockです。レイアウトの正本は `spec/ndm24.toml` で、AssemblyとRustのoffset定数および[生成済みABI表](generated/diagnostic-abi.md)を同時に生成します。
 
 PC側では次のコマンドでJSON Linesとして読み取れます。
 
@@ -162,6 +164,9 @@ cargo run -p ndm24-tools -- ppp-monitor
 - 受理したpeer MRU、ACCM、Magic-Number、option flags
 - PAP state、Code、Identifier、Length、error、failure、restart状態
 - PAP packet送受信回数
+- IPCP state、Code、Identifier、Length、error、pending/deferred送信
+- IPCP restart残数、timer有効状態と期限、packet送受信回数
+- local/peer IPv4 addressとIP-Address optionの有効状態
 
 認証frameには利用者IDやpasswordが含まれ得るため、常設traceへpayload全体は保存しません。protocol、code、identifier、length、エラー理由までを診断対象とし、credential byte列は記録対象外とします。
 
@@ -309,17 +314,49 @@ Nakだけが`Failed`を成立させます。Message本文と資格情報は公�
 
 `src/ppp/lcpPoll.asm`はLCPが`Opened`の間だけ非LCP frameを保持し、続く
 `src/ppp/papPoll.asm`がPAPへ振り分けます。LCP再交渉やlower-down中にLCPが
-保持しているframeをPAP側が解放することはありません。現時点でPAP以外の
-非LCP protocolは、IPCP未実装のため明示的に解放します。常設セルフテストの
+保持しているframeをPAP側が解放することはありません。PAPが`Opened`へ達した
+後の非PAP frameは、続くIPCP pollへ所有権を残します。常設セルフテストの
 step `$6A`～`$6F`は、Authenticate-Request構築、共有encoderへの受理、
 不一致Identifierの無視と状態維持、正常Ack、timer停止、lower-downを閉じた
 fixtureで検査します。
+
+## 65816 IPCP client
+
+`src/ppp/ipcp.asm`はProtocol `$8021`のConfigure packetを解析し、RFC 1332の
+IP-Address optionでlocal/peer addressを交渉します。最初はlocal `0.0.0.0`を
+要求し、peer Configure-Nakの非zero提案を受理して新しいIdentifierで再要求
+します。WSL2 fixtureの期待値はlocal `10.24.0.2`、peer `10.24.0.1`です。
+
+peerからの正しい非zero IP-AddressはAckします。zero addressは`10.24.0.1`へ
+Nakし、IP-Compression-Protocol、旧IP-Addresses、未知option、重複optionは
+Rejectします。Rejectは元のoption byte列を変更せず返し、RejectとNakが同じ
+Requestにある場合はRejectを優先します。Configure-AckはIdentifierと現在の
+local option列が完全一致した場合だけ状態へ反映します。
+
+`src/ppp/ipcpPoll.asm`はLCPとPAPがともに`Opened`の間だけIPCPを稼働させます。
+共有encoderがbusyならpeer応答と受信frame所有権を保持し、受理後に解放します。
+Opened中の再交渉ではpeer応答を先に送り、local Configure-Requestを1件だけ
+deferred slotへ保持します。lower-downでは交渉済みaddress、timer、pending
+送信を初期値へ戻します。
+
+restart intervalは180 frame、Max-Configureは初回を含む10回です。timeout再送は
+同じIdentifierとoption列を使い、送信器が受理した時点から次の期限を数えます。
+公開診断ABI version 6はIPCP state、最後のCode/Identifier/error、local/peer
+address、再送状態、送受信countを公開します。
+
+常設セルフテストのstep `$70`～`$76`は、`0.0.0.0`要求、peer `10.24.0.1`の
+Ack、local `10.24.0.2`のNak提案、再要求、双方Ackによる`Opened`、zero peer
+addressへのNak、IP圧縮のRejectをSFC上で検査します。step `$77`～`$79`は
+PAP `Opened`による起動、共有encoder backpressure中のframe保持、応答後の
+解放、PAP lower-downによるIPCP初期化をmain-loop順で検査します。
+2026-07-30にFXPAK PRO実機へnormal ROMを転送し、mailbox
+`ppp-self-test`の合格を確認しました。
 
 ## 次の実装
 
 オフラインで確定できるLCP処理と、実対向での`Opened`到達まで完了しました。
 raw `NO CARRIER`による自動lower-downも実対向で合格しました。PAP clientは
 Rust参照実装、65816常設セルフテスト、revision A実機とWSL2 `pppd`による
-Authenticate-Request/Ackまで合格しました。IPCPのRust参照codecとclient状態機械
-まで完了しました。次は同じ固定transcriptを65816へ移植し、IPCP Configure交渉と
-IPv4 address確定を実機で確認します。
+Authenticate-Request/Ackまで合格しました。IPCPはRust参照codec、65816 client、
+常設セルフテストまで完了しました。次はrevision AとWSL2 `pppd`の実対向で
+IPCP `Opened`とlocal `10.24.0.2`、peer `10.24.0.1`の確定を確認します。

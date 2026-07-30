@@ -214,6 +214,22 @@ pub struct PppDiagnosticSnapshot {
     pub pap_restart_deadline: u16,
     pub pap_receive_count: u32,
     pub pap_transmit_count: u32,
+    pub ipcp_state: u8,
+    pub ipcp_last_code: u8,
+    pub ipcp_last_identifier: u8,
+    pub ipcp_last_error: u8,
+    pub ipcp_request_identifier: u8,
+    pub ipcp_restart_remaining: u8,
+    pub ipcp_pending_action: u8,
+    pub ipcp_timer_active: bool,
+    pub ipcp_packet_length: u16,
+    pub ipcp_restart_deadline: u16,
+    pub ipcp_receive_count: u32,
+    pub ipcp_transmit_count: u32,
+    pub ipcp_local_address: [u8; 4],
+    pub ipcp_peer_address: [u8; 4],
+    pub ipcp_flags: u8,
+    pub ipcp_deferred_request: bool,
 }
 
 impl PppDiagnosticSnapshot {
@@ -307,6 +323,22 @@ impl PppDiagnosticSnapshot {
             pap_restart_deadline: read_u16(data, PPP_DIAG_PAP_RESTART_DEADLINE)?,
             pap_receive_count: read_u32(data, PPP_DIAG_PAP_RECEIVE_COUNT)?,
             pap_transmit_count: read_u32(data, PPP_DIAG_PAP_TRANSMIT_COUNT)?,
+            ipcp_state: data[PPP_DIAG_IPCP_STATE],
+            ipcp_last_code: data[PPP_DIAG_IPCP_LAST_CODE],
+            ipcp_last_identifier: data[PPP_DIAG_IPCP_LAST_IDENTIFIER],
+            ipcp_last_error: data[PPP_DIAG_IPCP_LAST_ERROR],
+            ipcp_request_identifier: data[PPP_DIAG_IPCP_REQUEST_IDENTIFIER],
+            ipcp_restart_remaining: data[PPP_DIAG_IPCP_RESTART_REMAINING],
+            ipcp_pending_action: data[PPP_DIAG_IPCP_PENDING_ACTION],
+            ipcp_timer_active: data[PPP_DIAG_IPCP_TIMER_ACTIVE] != 0,
+            ipcp_packet_length: read_u16(data, PPP_DIAG_IPCP_PACKET_LENGTH)?,
+            ipcp_restart_deadline: read_u16(data, PPP_DIAG_IPCP_RESTART_DEADLINE)?,
+            ipcp_receive_count: read_u32(data, PPP_DIAG_IPCP_RECEIVE_COUNT)?,
+            ipcp_transmit_count: read_u32(data, PPP_DIAG_IPCP_TRANSMIT_COUNT)?,
+            ipcp_local_address: read_array(data, PPP_DIAG_IPCP_LOCAL_ADDRESS)?,
+            ipcp_peer_address: read_array(data, PPP_DIAG_IPCP_PEER_ADDRESS)?,
+            ipcp_flags: data[PPP_DIAG_IPCP_FLAGS],
+            ipcp_deferred_request: data[PPP_DIAG_IPCP_DEFERRED_REQUEST] != 0,
         })
     }
 }
@@ -392,6 +424,13 @@ fn read_u32(data: &[u8], offset: usize) -> Result<u32> {
         .try_into()
         .expect("slice length was checked");
     Ok(u32::from_le_bytes(bytes))
+}
+
+fn read_array<const N: usize>(data: &[u8], offset: usize) -> Result<[u8; N]> {
+    data.get(offset..offset + N)
+        .context("byte array field is outside the input")?
+        .try_into()
+        .context("byte array field has the wrong length")
 }
 
 #[cfg(test)]
@@ -522,6 +561,24 @@ mod tests {
             .copy_from_slice(&2_u32.to_le_bytes());
         data[PPP_DIAG_PAP_TRANSMIT_COUNT..PPP_DIAG_PAP_TRANSMIT_COUNT + 4]
             .copy_from_slice(&1_u32.to_le_bytes());
+        data[PPP_DIAG_IPCP_STATE] = 9;
+        data[PPP_DIAG_IPCP_LAST_CODE] = 2;
+        data[PPP_DIAG_IPCP_LAST_IDENTIFIER] = 7;
+        data[PPP_DIAG_IPCP_REQUEST_IDENTIFIER] = 7;
+        data[PPP_DIAG_IPCP_RESTART_REMAINING] = 8;
+        data[PPP_DIAG_IPCP_TIMER_ACTIVE] = 1;
+        data[PPP_DIAG_IPCP_PACKET_LENGTH..PPP_DIAG_IPCP_PACKET_LENGTH + 2]
+            .copy_from_slice(&10_u16.to_le_bytes());
+        data[PPP_DIAG_IPCP_RECEIVE_COUNT..PPP_DIAG_IPCP_RECEIVE_COUNT + 4]
+            .copy_from_slice(&4_u32.to_le_bytes());
+        data[PPP_DIAG_IPCP_TRANSMIT_COUNT..PPP_DIAG_IPCP_TRANSMIT_COUNT + 4]
+            .copy_from_slice(&5_u32.to_le_bytes());
+        data[PPP_DIAG_IPCP_LOCAL_ADDRESS..PPP_DIAG_IPCP_LOCAL_ADDRESS + 4]
+            .copy_from_slice(&[10, 24, 0, 2]);
+        data[PPP_DIAG_IPCP_PEER_ADDRESS..PPP_DIAG_IPCP_PEER_ADDRESS + 4]
+            .copy_from_slice(&[10, 24, 0, 1]);
+        data[PPP_DIAG_IPCP_FLAGS] = 7;
+        data[PPP_DIAG_IPCP_DEFERRED_REQUEST] = 1;
 
         let snapshot = PppDiagnosticSnapshot::decode(&data).unwrap();
         assert_eq!(snapshot.snapshot_sequence, 8);
@@ -552,6 +609,19 @@ mod tests {
         assert_eq!(snapshot.pap_packet_length, 5);
         assert_eq!(snapshot.pap_receive_count, 2);
         assert_eq!(snapshot.pap_transmit_count, 1);
+        assert_eq!(snapshot.ipcp_state, 9);
+        assert_eq!(snapshot.ipcp_last_code, 2);
+        assert_eq!(snapshot.ipcp_last_identifier, 7);
+        assert_eq!(snapshot.ipcp_request_identifier, 7);
+        assert_eq!(snapshot.ipcp_restart_remaining, 8);
+        assert!(snapshot.ipcp_timer_active);
+        assert_eq!(snapshot.ipcp_packet_length, 10);
+        assert_eq!(snapshot.ipcp_receive_count, 4);
+        assert_eq!(snapshot.ipcp_transmit_count, 5);
+        assert_eq!(snapshot.ipcp_local_address, [10, 24, 0, 2]);
+        assert_eq!(snapshot.ipcp_peer_address, [10, 24, 0, 1]);
+        assert_eq!(snapshot.ipcp_flags, 7);
+        assert!(snapshot.ipcp_deferred_request);
     }
 
     #[test]
