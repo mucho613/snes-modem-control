@@ -35,6 +35,11 @@ cargo xtask check
 
 `bootstrap` は `spec/toolchain.toml` に URL と SHA-256 を固定した cc65 Windows snapshot を取得し、`.tools/cc65` に展開します。システム全体の PATH は変更しません。
 
+`check`はROMを組み立てる前に、全ビルドプロファイルの65816レジスタ幅、スタック、
+プロシージャABI、WRAMアクセス範囲を検査します。短時間でこの検査だけを実行する場合は
+`cargo xtask asm-lint`を使います。規約とReset/NMIの例外は
+[65816のレジスタ幅とメモリアクセス規約](assembly-width.md)を参照してください。
+
 ## 日常のコマンド
 
 ```powershell
@@ -137,6 +142,11 @@ sizeを照合してから命令を書き込みます。
 ```powershell
 cargo xtask mesen-test
 ```
+
+リポジトリの`.vscode/tasks.json`には、`check`（既定のビルドタスク）、
+Assembly width lint、通常ROM生成、MesenCEセルフテスト、smoke ROM実機転送を
+登録しています。Visual Studio Codeの「タスクの実行」からPowerShell用コマンドを
+手入力せずに呼び出せます。
 
 別の配置を明示する場合:
 

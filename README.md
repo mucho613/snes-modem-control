@@ -16,7 +16,7 @@ cargo xtask check
 cargo xtask mesen-test
 ```
 
-最初のコマンドは、ハッシュを固定した公式 cc65 Windows スナップショットを `.tools/cc65` へ配置します。二番目のコマンドは、仕様・フォント生成物、Rust テスト、通常 ROM、スモークテスト ROM、フォント確認 ROM をまとめて検証します。三番目はMesenCEのheadless test runnerで通常ROMの常設PPPセルフテストを実行し、NDM24やFXPAK PROを使わず終了コードで合否を返します。
+最初のコマンドは、ハッシュを固定した公式 cc65 Windows スナップショットを `.tools/cc65` へ配置します。二番目のコマンドは、仕様・フォント生成物、65816のレジスタ幅・スタック・WRAMアクセス、Rust テスト、通常 ROM、スモークテスト ROM、フォント確認 ROM をまとめて検証します。三番目はMesenCEのheadless test runnerで通常ROMの常設PPPセルフテストを実行し、NDM24やFXPAK PROを使わず終了コードで合否を返します。
 
 生成物:
 
@@ -71,6 +71,7 @@ cargo xtask check
 - [ステータス画面とアプリケーション・アダプター](docs/status-screen.md)
 - [font8x8の出所・生成・確認手順](docs/font.md)
 - [Windows 開発環境](docs/windows-development.md)
+- [65816のレジスタ幅とメモリアクセス規約](docs/assembly-width.md)
 - [WSL2 PPPサーバー](docs/ppp-server.md)
 - [生成済みモデム・PPP診断／メールボックス ABI](docs/generated/diagnostic-abi.md)
 - [JRA PAT モデム設定プロファイル](profiles/jra-pat.toml)

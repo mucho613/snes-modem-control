@@ -1,21 +1,80 @@
 {
-  // See https://go.microsoft.com/fwlink/?LinkId=733558
-  // for the documentation about the tasks.json format
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "make",
-      "type": "shell",
-      "command": "make clean && make",
+      "label": "NDM24: check",
+      "type": "process",
+      "command": "cargo",
+      "args": ["xtask", "check"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
       "presentation": {
         "panel": "dedicated",
         "clear": true
       },
-      "problemMatcher": [],
+      "problemMatcher": ["$rustc", "$gcc"],
       "group": {
         "kind": "build",
         "isDefault": true
       }
+    },
+    {
+      "label": "NDM24: assembly width lint",
+      "type": "process",
+      "command": "cargo",
+      "args": ["xtask", "asm-lint"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": "$gcc"
+    },
+    {
+      "label": "NDM24: build normal ROM",
+      "type": "process",
+      "command": "cargo",
+      "args": ["xtask", "rom"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "panel": "shared",
+        "clear": true
+      },
+      "problemMatcher": ["$rustc", "$gcc"]
+    },
+    {
+      "label": "NDM24: MesenCE self-test",
+      "type": "process",
+      "command": "cargo",
+      "args": ["xtask", "mesen-test"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": ["$rustc", "$gcc"],
+      "group": "test"
+    },
+    {
+      "label": "NDM24: deploy smoke ROM",
+      "type": "process",
+      "command": "cargo",
+      "args": ["xtask", "deploy", "--smoke"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": ["$rustc", "$gcc"]
     }
   ]
 }
