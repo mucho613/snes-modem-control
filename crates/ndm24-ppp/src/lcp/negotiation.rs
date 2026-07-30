@@ -12,6 +12,7 @@ pub const DEFAULT_MAX_TERMINATE: u8 = 2;
 pub const DEFAULT_MRU: u16 = 1_500;
 pub const DEFAULT_ACCM: u32 = u32::MAX;
 pub const PAP_PROTOCOL: u16 = 0xc023;
+const MAGIC_RETRY_INCREMENT: u32 = 0x9e37_79b9;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum State {
@@ -122,6 +123,7 @@ pub struct Machine {
     restart_remaining: u8,
     restart_deadline_ms: Option<u64>,
     peer_configuration: Option<PeerConfiguration>,
+    acknowledged_local_magic: Option<u32>,
 }
 
 impl Machine {
@@ -137,6 +139,7 @@ impl Machine {
             restart_remaining: 0,
             restart_deadline_ms: None,
             peer_configuration: None,
+            acknowledged_local_magic: None,
         })
     }
 
@@ -146,6 +149,10 @@ impl Machine {
 
     pub fn local_options(&self) -> &[u8] {
         &self.local_options
+    }
+
+    pub fn acknowledged_local_magic(&self) -> Option<u32> {
+        self.acknowledged_local_magic
     }
 
     pub fn request_identifier(&self) -> u8 {
@@ -166,6 +173,7 @@ impl Machine {
         }
         self.state = State::RequestSent;
         self.peer_configuration = None;
+        self.acknowledged_local_magic = None;
         let packet = self.send_new_request(now_ms, true)?;
         Ok(Transition {
             actions: vec![Action::SendPacket(packet)],
@@ -183,12 +191,14 @@ impl Machine {
             self.restart_deadline_ms = None;
             self.restart_remaining = 0;
             self.peer_configuration = None;
+            self.acknowledged_local_magic = None;
             return Ok(Transition::default());
         }
 
         let was_open = self.state == State::Opened;
         self.state = State::Closing;
         self.peer_configuration = None;
+        self.acknowledged_local_magic = None;
         self.terminate_identifier = self.allocate_identifier();
         self.restart_remaining = self.settings.max_terminate.saturating_sub(1);
         self.restart_deadline_ms = Some(now_ms.saturating_add(self.settings.restart_interval_ms));
@@ -210,6 +220,7 @@ impl Machine {
         self.restart_deadline_ms = None;
         self.restart_remaining = 0;
         self.peer_configuration = None;
+        self.acknowledged_local_magic = None;
         Transition {
             actions: if was_open {
                 vec![Action::ThisLayerDown]
@@ -406,13 +417,13 @@ impl Machine {
             });
         }
 
-        // This implementation does not request a local Magic-Number option, so
-        // RFC 1661 requires zero in transmitted Echo packets. Preserve as much
-        // uninterpreted Data as fits the peer's negotiated MRU.
+        // RFC 1661 uses our acknowledged local Magic-Number in transmitted
+        // Echo packets, or zero when that option was not negotiated. Preserve
+        // as much uninterpreted Data as fits the peer's negotiated MRU.
         let peer_mru = usize::from(peer_configuration.transmit_mru.max(8));
         let echo_data_length = packet.data[4..].len().min(peer_mru - 8);
         let mut response_data = Vec::with_capacity(4 + echo_data_length);
-        response_data.extend_from_slice(&0_u32.to_be_bytes());
+        response_data.extend_from_slice(&self.acknowledged_local_magic.unwrap_or(0).to_be_bytes());
         response_data.extend_from_slice(&packet.data[4..4 + echo_data_length]);
 
         Ok(Transition {
@@ -445,6 +456,7 @@ impl Machine {
         self.restart_deadline_ms = None;
         self.restart_remaining = 0;
         self.peer_configuration = None;
+        self.acknowledged_local_magic = None;
 
         let mut actions = vec![Action::SendPacket(encode_packet(
             Code::TerminateAck as u8,
@@ -475,6 +487,7 @@ impl Machine {
         self.restart_deadline_ms = None;
         self.restart_remaining = 0;
         self.peer_configuration = None;
+        self.acknowledged_local_magic = None;
         Ok(Transition {
             actions: vec![Action::ThisLayerFinished],
             ignored: None,
@@ -487,15 +500,16 @@ impl Machine {
         now_ms: u64,
         policy: SfcPolicy,
     ) -> Result<Transition, MachineError> {
-        let evaluation = match evaluate_peer_request(packet, policy) {
-            Ok(evaluation) => evaluation,
-            Err(error) => {
-                return Ok(Transition {
-                    actions: Vec::new(),
-                    ignored: Some(IgnoreReason::MalformedOptions(error)),
-                });
-            }
-        };
+        let evaluation =
+            match evaluate_peer_request(packet, policy, local_magic(&self.local_options)) {
+                Ok(evaluation) => evaluation,
+                Err(error) => {
+                    return Ok(Transition {
+                        actions: Vec::new(),
+                        ignored: Some(IgnoreReason::MalformedOptions(error)),
+                    });
+                }
+            };
         let response = encode_packet(evaluation.code as u8, packet.identifier, &evaluation.data)?;
         let acceptable = evaluation.code == Code::ConfigureAck;
         if acceptable {
@@ -551,6 +565,7 @@ impl Machine {
         if !packet.exactly_acknowledges(self.request_identifier, &self.local_options) {
             return Ok(invalid_response());
         }
+        self.acknowledged_local_magic = local_magic(&self.local_options);
 
         let mut actions = Vec::new();
         match self.state {
@@ -606,6 +621,7 @@ impl Machine {
             return Ok(invalid_response());
         }
         self.local_options = apply_nak(&self.local_options, &options);
+        self.acknowledged_local_magic = None;
         self.after_negative_response(now_ms)
     }
 
@@ -630,6 +646,7 @@ impl Machine {
             return Ok(invalid_response());
         };
         self.local_options = updated;
+        self.acknowledged_local_magic = None;
         self.after_negative_response(now_ms)
     }
 
@@ -686,6 +703,7 @@ impl Machine {
         now_ms: u64,
         reset_counter: bool,
     ) -> Result<Vec<u8>, MachineError> {
+        self.acknowledged_local_magic = None;
         self.request_identifier = self.allocate_identifier();
         if reset_counter {
             self.restart_remaining = self.settings.max_configure.saturating_sub(1);
@@ -731,6 +749,7 @@ enum OptionDisposition {
 fn evaluate_peer_request(
     packet: Packet<'_>,
     policy: SfcPolicy,
+    proposed_local_magic: Option<u32>,
 ) -> Result<PeerEvaluation, OptionParseError> {
     let options = collect_options(packet.data)?;
     let duplicates = duplicate_type_map(&options);
@@ -741,7 +760,7 @@ fn evaluate_peer_request(
         let disposition = if duplicates[usize::from(option.option_type)] {
             OptionDisposition::Reject
         } else {
-            evaluate_option(option, policy, &mut configuration)
+            evaluate_option(option, policy, proposed_local_magic, &mut configuration)
         };
         dispositions.push(disposition);
     }
@@ -792,6 +811,7 @@ fn evaluate_peer_request(
 fn evaluate_option(
     option: &ConfigurationOption<'_>,
     policy: SfcPolicy,
+    proposed_local_magic: Option<u32>,
     configuration: &mut PeerConfiguration,
 ) -> OptionDisposition {
     match option.known_type() {
@@ -833,8 +853,11 @@ fn evaluate_option(
                 option.data[2],
                 option.data[3],
             ]);
-            if value == 0 {
-                OptionDisposition::Reject
+            if value == 0 || Some(value) == proposed_local_magic {
+                let replacement = next_magic(proposed_local_magic.unwrap_or(value));
+                let mut encoded = vec![OptionType::MagicNumber as u8, 6];
+                encoded.extend_from_slice(&replacement.to_be_bytes());
+                OptionDisposition::Nak(encoded)
             } else {
                 configuration.magic_number = Some(value);
                 OptionDisposition::Ack
@@ -884,12 +907,45 @@ fn apply_nak(local: &[u8], suggestions: &[ConfigurationOption<'_>]) -> Vec<u8> {
             .iter()
             .find(|suggestion| suggestion.option_type == option.option_type)
         {
-            output.extend_from_slice(suggestion.encoded);
+            if option.known_type() == Some(OptionType::MagicNumber)
+                && option.data.len() == 4
+                && suggestion.data.len() == 4
+            {
+                let current = u32::from_be_bytes(option.data.try_into().unwrap());
+                let suggested = u32::from_be_bytes(suggestion.data.try_into().unwrap());
+                let replacement = if suggested == 0 || suggested == current {
+                    next_magic(current)
+                } else {
+                    suggested
+                };
+                output.extend_from_slice(&[OptionType::MagicNumber as u8, 6]);
+                output.extend_from_slice(&replacement.to_be_bytes());
+            } else {
+                output.extend_from_slice(suggestion.encoded);
+            }
         } else {
             output.extend_from_slice(option.encoded);
         }
     }
     output
+}
+
+fn local_magic(options: &[u8]) -> Option<u32> {
+    configuration_options(options)
+        .filter_map(Result::ok)
+        .find(|option| {
+            option.known_type() == Some(OptionType::MagicNumber) && option.data.len() == 4
+        })
+        .map(|option| u32::from_be_bytes(option.data.try_into().unwrap()))
+}
+
+fn next_magic(current: u32) -> u32 {
+    let candidate = current.wrapping_add(MAGIC_RETRY_INCREMENT);
+    if candidate == 0 {
+        MAGIC_RETRY_INCREMENT
+    } else {
+        candidate
+    }
 }
 
 fn apply_reject(local: &[u8], rejected: &[ConfigurationOption<'_>]) -> Option<Vec<u8>> {
@@ -1122,6 +1178,65 @@ mod tests {
     }
 
     #[test]
+    fn acknowledged_local_magic_is_used_in_echo_reply() {
+        let mut machine = machine(&[5, 6, 0x12, 0x34, 0x56, 0x78]);
+        let opened = machine.open(0).unwrap();
+        assert_eq!(
+            packet(&opened.actions[0]),
+            &[1, 1, 0, 10, 5, 6, 0x12, 0x34, 0x56, 0x78]
+        );
+        machine
+            .receive(&[1, 9, 0, 4], 1, SfcPolicy::default())
+            .unwrap();
+        machine
+            .receive(
+                &[2, 1, 0, 10, 5, 6, 0x12, 0x34, 0x56, 0x78],
+                2,
+                SfcPolicy::default(),
+            )
+            .unwrap();
+        assert_eq!(machine.acknowledged_local_magic(), Some(0x1234_5678));
+
+        let transition = machine
+            .receive(&[9, 0x5a, 0, 9, 0, 0, 0, 0, b'a'], 3, SfcPolicy::default())
+            .unwrap();
+        assert_eq!(
+            packet(&transition.actions[0]),
+            &[10, 0x5a, 0, 9, 0x12, 0x34, 0x56, 0x78, b'a']
+        );
+    }
+
+    #[test]
+    fn peer_magic_equal_to_local_proposal_is_naked_as_loopback() {
+        let mut machine = machine(&[5, 6, 0x12, 0x34, 0x56, 0x78]);
+        machine.open(0).unwrap();
+        let transition = machine
+            .receive(
+                &[1, 9, 0, 10, 5, 6, 0x12, 0x34, 0x56, 0x78],
+                1,
+                SfcPolicy::default(),
+            )
+            .unwrap();
+        let replacement = next_magic(0x1234_5678).to_be_bytes();
+        assert_eq!(
+            packet(&transition.actions[0]),
+            &[
+                3,
+                9,
+                0,
+                10,
+                5,
+                6,
+                replacement[0],
+                replacement[1],
+                replacement[2],
+                replacement[3]
+            ]
+        );
+        assert_eq!(machine.state(), State::RequestSent);
+    }
+
+    #[test]
     fn echo_request_validates_peer_magic_and_obeys_peer_mru() {
         let mut machine = opened_machine(&[
             1, 4, 0, 9, // peer MRU
@@ -1206,6 +1321,59 @@ mod tests {
         assert_eq!(
             packet(&transition.actions[0]),
             &[1, 2, 0, 10, 2, 6, 0, 0, 0, 0]
+        );
+    }
+
+    #[test]
+    fn magic_nak_reuses_distinct_suggestion_and_advances_collision() {
+        let mut machine = machine(&[5, 6, 0x12, 0x34, 0x56, 0x78]);
+        machine.open(0).unwrap();
+        let distinct = machine
+            .receive(
+                &[3, 1, 0, 10, 5, 6, 0x87, 0x65, 0x43, 0x21],
+                1,
+                SfcPolicy::default(),
+            )
+            .unwrap();
+        assert_eq!(machine.local_options(), &[5, 6, 0x87, 0x65, 0x43, 0x21]);
+        assert_eq!(
+            packet(&distinct.actions[0]),
+            &[1, 2, 0, 10, 5, 6, 0x87, 0x65, 0x43, 0x21]
+        );
+
+        let collision = machine
+            .receive(
+                &[3, 2, 0, 10, 5, 6, 0x87, 0x65, 0x43, 0x21],
+                2,
+                SfcPolicy::default(),
+            )
+            .unwrap();
+        let replacement = next_magic(0x8765_4321).to_be_bytes();
+        assert_eq!(
+            machine.local_options(),
+            &[
+                5,
+                6,
+                replacement[0],
+                replacement[1],
+                replacement[2],
+                replacement[3]
+            ]
+        );
+        assert_eq!(
+            packet(&collision.actions[0]),
+            &[
+                1,
+                3,
+                0,
+                10,
+                5,
+                6,
+                replacement[0],
+                replacement[1],
+                replacement[2],
+                replacement[3]
+            ]
         );
     }
 
