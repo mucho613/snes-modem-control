@@ -35,23 +35,22 @@
 
 .export EmptyInt
 .proc EmptyInt
+  interrupt_entry
 @infiniteLoop:
   jmp @infiniteLoop
 .endproc
 
 .export Reset
 .proc Reset
+  .a8
+  .i8
   jml ResetFast
 .endproc
 
 .proc ResetFast
-  clc
-  xce
-
-  rep #$ff
-  sep #$24
   .a8
-  .i16
+  .i8
+  enterNativeM8I16
 
   ldx #$1fff
   txs

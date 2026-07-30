@@ -78,6 +78,12 @@ struct Abi {
     i: Width,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProcedureKind {
+    Ordinary,
+    Interrupt,
+}
+
 #[derive(Debug, Clone)]
 struct Location {
     path: PathBuf,
@@ -100,6 +106,7 @@ struct Procedure {
     location: Location,
     statements: Vec<Statement>,
     abi: Option<Abi>,
+    kind: ProcedureKind,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -266,6 +273,7 @@ fn parse_procedures(
                 },
                 statements: Vec::new(),
                 abi: None,
+                kind: ProcedureKind::Ordinary,
             });
             asm_a = None;
             asm_i = None;
@@ -276,17 +284,19 @@ fn parse_procedures(
         }
         if code == ".endproc" {
             if let Some(mut procedure) = current.take() {
-                procedure.abi = match (entry_a, entry_i) {
-                    (Some(a), Some(i)) => Some(Abi { a, i }),
-                    _ => {
-                        diagnostics.insert(Diagnostic::new(
-                            &procedure.location,
-                            profile,
-                            "procedure must declare .a8/.a16 and .i8/.i16 at entry",
-                        ));
-                        None
-                    }
-                };
+                if procedure.kind == ProcedureKind::Ordinary {
+                    procedure.abi = match (entry_a, entry_i) {
+                        (Some(a), Some(i)) => Some(Abi { a, i }),
+                        _ => {
+                            diagnostics.insert(Diagnostic::new(
+                                &procedure.location,
+                                profile,
+                                "procedure must declare .a8/.a16 and .i8/.i16 at entry",
+                            ));
+                            None
+                        }
+                    };
+                }
                 procedures.push(procedure);
             }
             continue;
@@ -302,7 +312,16 @@ fn parse_procedures(
         let (mnemonic, operand) = split_statement(code);
         let lower = mnemonic.to_ascii_lowercase();
 
-        if let Some(width) = accumulator_directive(&lower) {
+        if lower == "interrupt_entry" {
+            if seen_body || entry_a.is_some() || entry_i.is_some() {
+                diagnostics.insert(Diagnostic::new(
+                    &location,
+                    profile,
+                    "interrupt_entry must be the first statement in a procedure",
+                ));
+            }
+            procedure.kind = ProcedureKind::Interrupt;
+        } else if let Some(width) = accumulator_directive(&lower) {
             asm_a = Some(width);
             if !seen_body && entry_a.is_none() {
                 entry_a = Some(width);
@@ -338,14 +357,6 @@ fn parse_procedures(
                 format!("bare {lower} is forbidden; use the width-safe macro"),
             ));
         }
-        if options.enforce_policy && lower == "rti" {
-            diagnostics.insert(Diagnostic::new(
-                &location,
-                profile,
-                "RTI is only permitted in a modeled interrupt procedure",
-            ));
-        }
-
         let statement = Statement {
             location,
             text: code.to_owned(),
@@ -368,6 +379,10 @@ fn parse_procedures(
             }
             "mi16" => {
                 asm_a = Some(Width::Sixteen);
+                asm_i = Some(Width::Sixteen);
+            }
+            "enternativem8i16" => {
+                asm_a = Some(Width::Eight);
                 asm_i = Some(Width::Sixteen);
             }
             "assert_m8_i8" => {
@@ -453,17 +468,36 @@ fn analyze_procedures(
         .filter_map(|procedure| procedure.abi.map(|abi| (procedure.name.as_str(), abi)))
         .collect();
     for procedure in procedures {
-        let Some(abi) = procedure.abi else {
-            continue;
-        };
-        analyze_procedure(profile, procedure, abi, &abis, diagnostics);
+        match procedure.kind {
+            ProcedureKind::Ordinary => {
+                let Some(abi) = procedure.abi else {
+                    continue;
+                };
+                analyze_procedure(profile, procedure, Some(abi), abi, &abis, diagnostics);
+            }
+            ProcedureKind::Interrupt => {
+                for a in [Width::Eight, Width::Sixteen] {
+                    for i in [Width::Eight, Width::Sixteen] {
+                        analyze_procedure(
+                            profile,
+                            procedure,
+                            None,
+                            Abi { a, i },
+                            &abis,
+                            diagnostics,
+                        );
+                    }
+                }
+            }
+        }
     }
 }
 
 fn analyze_procedure(
     profile: Profile,
     procedure: &Procedure,
-    abi: Abi,
+    return_abi: Option<Abi>,
+    entry: Abi,
     abis: &BTreeMap<&str, Abi>,
     diagnostics: &mut BTreeSet<Diagnostic>,
 ) {
@@ -473,8 +507,8 @@ fn analyze_procedure(
     let labels = collect_labels(&procedure.statements);
     let anonymous = collect_anonymous_labels(&procedure.statements);
     let initial = RuntimeState {
-        a: abi.a,
-        i: abi.i,
+        a: entry.a,
+        i: entry.i,
         stack: Vec::new(),
         calls: Vec::new(),
     };
@@ -485,11 +519,15 @@ fn analyze_procedure(
     while let Some((index, input)) = queue.pop_front() {
         let statement = &procedure.statements[index];
         validate_statement_width(profile, statement, &input, abis, diagnostics);
+        if statement.mnemonic == "rti" {
+            handle_interrupt_return(profile, procedure, statement, input, diagnostics);
+            continue;
+        }
         if matches!(statement.mnemonic.as_str(), "rts" | "rtl") {
             handle_return(
                 profile,
                 procedure,
-                abi,
+                return_abi,
                 statement,
                 input,
                 &mut states,
@@ -538,7 +576,7 @@ fn analyze_procedure(
 fn handle_return(
     profile: Profile,
     procedure: &Procedure,
-    abi: Abi,
+    return_abi: Option<Abi>,
     statement: &Statement,
     mut state: RuntimeState,
     states: &mut [Vec<RuntimeState>],
@@ -569,6 +607,15 @@ fn handle_return(
         return;
     }
 
+    if return_abi.is_none() {
+        diagnostics.insert(Diagnostic::new(
+            &statement.location,
+            profile,
+            "interrupt procedure must not return with RTS/RTL",
+        ));
+        return;
+    }
+    let abi = return_abi.expect("ordinary procedure has a return ABI");
     if !state.stack.is_empty() {
         diagnostics.insert(Diagnostic::new(
             &statement.location,
@@ -586,6 +633,40 @@ fn handle_return(
                 abi.i.bits(),
                 state.a.bits(),
                 state.i.bits()
+            ),
+        ));
+    }
+}
+
+fn handle_interrupt_return(
+    profile: Profile,
+    procedure: &Procedure,
+    statement: &Statement,
+    state: RuntimeState,
+    diagnostics: &mut BTreeSet<Diagnostic>,
+) {
+    if procedure.kind != ProcedureKind::Interrupt {
+        diagnostics.insert(Diagnostic::new(
+            &statement.location,
+            profile,
+            "RTI is only permitted in a modeled interrupt procedure",
+        ));
+        return;
+    }
+    if !state.calls.is_empty() {
+        diagnostics.insert(Diagnostic::new(
+            &statement.location,
+            profile,
+            "RTI reached from an active local subroutine",
+        ));
+    }
+    if !state.stack.is_empty() {
+        diagnostics.insert(Diagnostic::new(
+            &statement.location,
+            profile,
+            format!(
+                "interrupt return leaves software stack items behind: {:?}",
+                state.stack
             ),
         ));
     }
@@ -646,6 +727,10 @@ fn normalize_at_entry(mnemonic: &str, state: &mut RuntimeState) {
         }
         "mi16" => {
             state.a = Width::Sixteen;
+            state.i = Width::Sixteen;
+        }
+        "enternativem8i16" => {
+            state.a = Width::Eight;
             state.i = Width::Sixteen;
         }
         _ => {}
@@ -727,6 +812,10 @@ fn transfer(
             state.a = Width::Sixteen;
             state.i = Width::Sixteen;
         }
+        "enternativem8i16" => {
+            state.a = Width::Eight;
+            state.i = Width::Sixteen;
+        }
         "assert_m8_i8" => assert_state(
             profile,
             statement,
@@ -806,7 +895,7 @@ fn transfer(
         }
         "plb" => pop_bank(profile, statement, &mut state, diagnostics),
         "pld" => pop_direct_page(profile, statement, &mut state, diagnostics),
-        "plp" => match state.stack.pop() {
+        "plp" | "plp_interrupt" => match state.stack.pop() {
             Some(StackItem::Status { a, i }) => {
                 state.a = a;
                 state.i = i;
@@ -1524,6 +1613,61 @@ mod tests {
   pea $1234
   pla
   rts
+.endproc
+"#,
+        );
+        assert!(messages.is_empty(), "{messages:?}");
+    }
+
+    #[test]
+    fn accepts_interrupt_entry_for_every_incoming_width() {
+        let messages = messages(
+            r#"
+.proc interrupt
+  interrupt_entry
+  php
+  mi16
+  pha
+  phx
+  phy
+  ply
+  plx
+  pla
+  plp_interrupt
+  rti
+.endproc
+"#,
+        );
+        assert!(messages.is_empty(), "{messages:?}");
+    }
+
+    #[test]
+    fn rejects_rti_in_an_ordinary_procedure() {
+        let messages = messages(
+            r#"
+.proc ordinary
+  .a8
+  .i16
+  rti
+.endproc
+"#,
+        );
+        assert!(
+            messages
+                .iter()
+                .any(|message| message.contains("RTI is only permitted"))
+        );
+    }
+
+    #[test]
+    fn models_reset_native_mode_transition() {
+        let messages = messages(
+            r#"
+.proc reset
+  .a8
+  .i8
+  enterNativeM8I16
+  ldx #$1234
 .endproc
 "#,
         );

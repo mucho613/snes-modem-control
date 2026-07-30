@@ -12,16 +12,23 @@
 
 .export VBlank
 .proc VBlank
+  interrupt_entry
   jml VBlankFast
 .endproc
 
 .proc VBlankFast
+  interrupt_entry
+  php
+
+  ; An NMI can interrupt main-loop code with any A/X/Y widths. Save P first,
+  ; then use fixed 16-bit register pushes so the software stack has one shape
+  ; on every interrupt path.
+  mi16
   pha
   phb
   phd
   phx
   phy
-  php
 
   ; RDNMI is the actual NMI source latch. Merely leaving VBlank, as observed
   ; through HVBJOY, is not sufficient when NMITIMEN is gated around manual
@@ -32,8 +39,7 @@
   lda RDNMI
   setDBR $7e
 
-  ; An NMI can interrupt main-loop code while X/Y are 8-bit. Normalize both
-  ; widths after saving P so every VBlank callee gets its declared ABI.
+  ; Every VBlank callee receives its declared ABI.
   mi16
   inc32 frameCounter
 
@@ -48,11 +54,12 @@
   sta controllerPollTick
   sta modemPollTick
 
-  plp
+  mi16
   ply
   plx
   pld
   plb
   pla
+  plp_interrupt
   rti
 .endproc

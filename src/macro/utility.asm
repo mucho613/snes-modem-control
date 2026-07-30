@@ -30,6 +30,28 @@
   .i8
 .endmacro
 
+; Reset begins in emulation mode. Enter native mode and establish the fixed
+; A8/I16 ABI used by the reset path.
+.macro enterNativeM8I16
+  clc
+  xce
+  rep #$ff
+  sep #$24
+  .a8
+  .i16
+.endmacro
+
+; Declaration-only marker for an interrupt entry whose incoming M/X flags can
+; have any values. The Rust width lint checks every A/I combination.
+.macro interrupt_entry
+.endmacro
+
+; Restore the dynamically saved interrupt status. No fixed-width declaration
+; follows because RTI is the only permitted next width-sensitive boundary.
+.macro plp_interrupt
+  plp
+.endmacro
+
 ; Declaration-only synchronization at a control-flow merge. The Rust width
 ; lint proves that every incoming runtime state matches the asserted widths.
 .macro assert_m8_i8
