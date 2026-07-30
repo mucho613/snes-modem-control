@@ -64,6 +64,15 @@ pub struct FrameRateReport {
     pub clock_elapsed_seconds: f64,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct PppCloseReport {
+    #[serde(flatten)]
+    pub snapshot: PppDiagnosticSnapshot,
+    pub local_terminate_request_delta: u32,
+    pub local_terminate_ack_delta: u32,
+    pub local_terminate_timeout_delta: u32,
+}
+
 impl Client {
     async fn connect(websocket: &str) -> Result<Self> {
         let (mut socket, _) = connect_async(websocket)
@@ -322,8 +331,9 @@ pub async fn ppp_close(
     websocket: &str,
     label_path: &Path,
     timeout: Duration,
-) -> Result<PppDiagnosticSnapshot> {
+) -> Result<PppCloseReport> {
     const LCP_STATE_CLOSED: u8 = 0;
+    const LCP_STATE_OPENED: u8 = 9;
 
     let labels = read_labels(label_path)?;
     let state = labels
@@ -331,6 +341,10 @@ pub async fn ppp_close(
         .copied()
         .context("label file does not contain pppDiagnosticState")?;
     let offset = wram_to_usb2snes(state)?;
+    let mut client = Client::connect(websocket).await?;
+    eprintln!("attached to {}", client.device);
+    let before = read_stable_ppp_snapshot(&mut client, offset).await?;
+    drop(client);
 
     mailbox_command_with_arguments(
         websocket,
@@ -347,7 +361,23 @@ pub async fn ppp_close(
     loop {
         let snapshot = read_stable_ppp_snapshot(&mut client, offset).await?;
         if snapshot.lcp_state == LCP_STATE_CLOSED && !snapshot.lcp_administrative_open {
-            return Ok(snapshot);
+            let report = PppCloseReport {
+                local_terminate_request_delta: snapshot
+                    .lcp_local_terminate_request_count
+                    .wrapping_sub(before.lcp_local_terminate_request_count),
+                local_terminate_ack_delta: snapshot
+                    .lcp_local_terminate_ack_count
+                    .wrapping_sub(before.lcp_local_terminate_ack_count),
+                local_terminate_timeout_delta: snapshot
+                    .lcp_local_terminate_timeout_count
+                    .wrapping_sub(before.lcp_local_terminate_timeout_count),
+                snapshot,
+            };
+            ensure!(
+                before.lcp_state != LCP_STATE_OPENED || report.local_terminate_request_delta != 0,
+                "LCP reached Closed from Opened without accepting a local Terminate-Request"
+            );
+            return Ok(report);
         }
         ensure!(
             started.elapsed() < timeout,

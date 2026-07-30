@@ -377,15 +377,15 @@ async fn main() -> Result<()> {
             labels,
             timeout_seconds,
         } => {
-            let snapshot =
+            let report =
                 qusb2snes::ppp_close(&websocket, &labels, Duration::from_secs(timeout_seconds))
                     .await?;
-            println!("{}", serde_json::to_string(&snapshot)?);
+            println!("{}", serde_json::to_string(&report)?);
             println!(
-                "LCP closed: local_term_requests={}, matching_acks={}, timeouts={}",
-                snapshot.lcp_local_terminate_request_count,
-                snapshot.lcp_local_terminate_ack_count,
-                snapshot.lcp_local_terminate_timeout_count
+                "LCP closed: request_delta={}, matching_ack_delta={}, timeout_delta={}",
+                report.local_terminate_request_delta,
+                report.local_terminate_ack_delta,
+                report.local_terminate_timeout_delta
             );
             Ok(())
         }

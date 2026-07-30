@@ -339,7 +339,9 @@ mailbox ABI version 8のcommand 16/17は、PCからlocal `Close`/`Open` eventを
 `Opened`まで待ちます。`ppp-close`はLCPの論理終了だけを要求し、NDM24へ
 hang-up用AT commandを直接送らないため、Terminate交換と物理carrier喪失を
 別々に観測できます。`ppp-dial`は再接続時の操作漏れを避けるため、発信前に
-command 17を自動発行してadministrative-openを有効にします。
+command 17を自動発行してadministrative-openを有効にします。`ppp-close`の
+JSONと要約は、累積countに加えて、そのcommand開始前からのRequest、Ack、
+timeout各deltaを表示します。
 
 ```powershell
 cargo run -p ndm24-tools -- ppp-close
@@ -350,7 +352,21 @@ cargo run -p ndm24-tools -- ppp-open
 command 10の常設セルフテストとcommand 16の`ppp-close`が合格しました。
 未接続の`Closed`状態に対する`ppp-close`ではTerminate-Requestを生成せず、
 administrative-openだけを0へ変更して即時完了することを診断ABI v19で確認
-しています。`Opened`実対向でのTerminate-Request/Ack交換は別途行います。
+しています。この時点では`Opened`実対向のTerminate交換は未実施でした。
+
+2026-07-31にrevision A、DFM-56U、疑似PSTNのV.22bis 2400 bit/s実対向で、
+mailbox v8の`ppp-dial`による再Openを確認しました。LCP、PAP、IPCPはOpenedへ
+到達し、SFC診断ではEcho Request/Replyが`5/5`、drop 0でした。続けて
+`ppp-close`を実行した結果、pppdはIdentifier 1のTerminate-Requestを受信し、
+同じIdentifierのTerminate-Ackを返しました。SFCはAck受信後にClosedへ遷移し、
+local終了診断はRequest送信受理2、matching Ack 1、timeout 0でした。
+
+2回目のRequestは2400 bit/s回線で最初のAckが戻る前に3秒restart timerが満了して
+共有encoderへ受理された再送です。pppd側には最初のRequestだけが到達し、Ack後の
+lower-downで再送が中止されたため、SFCの`transmit_abort_count`は1でした。その後
+`NO CARRIER`を1回検出し、LCP/IPCPはClosed、PAPはInactive、交渉済みIP/DNSは
+初期値へ戻りました。受信FCS/invalid/overflowはすべて0で、試験後にserverを停止し
+DFM-56UがWindowsのCOM5へ戻ったことも確認しています。
 
 16bit counterの比較は期限までの差が半周未満であることを利用した減算で行うため、`$FFFF` から `$0000` をまたぐ場合も同じです。常設セルフテストのstep `$50`～`$55` は、共有encoder受理時のtimer開始、wrap-around直前、期限ちょうど、同一Identifier再送、回数超過、`Ack-Received` fallback、lower-downによる初期化を実時間待ちなしで検査します。
 
