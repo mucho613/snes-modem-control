@@ -10,7 +10,7 @@
 .import modemSessionProbeSent, modemSessionRetryCount, modemSessionLineLength
 .import modemResetQueues, modemSnapshotBegin, modemSnapshotEnd
 .import modemSnapshotBeginI8, modemSnapshotEndI8
-.import modemSetState, modemSetStateI8
+.import modemSetState
 
 .export modemInitialize
 
@@ -112,7 +112,7 @@
   m8
   modemIncrement32 modemReinitializeCount
   lda #MODEM_STATE_RESETTING
-  jsr modemSetStateI8
+  jsr modemSetState
   jsr modemSnapshotEndI8
 
   mi16

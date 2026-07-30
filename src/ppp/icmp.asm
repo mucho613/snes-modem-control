@@ -468,8 +468,8 @@ transmitFailed:
   .a8
   .i16
 
-  sep #$20
-  rep #$10
+  m8
+  i16
   phb
   phx
   phy

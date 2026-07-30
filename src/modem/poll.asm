@@ -15,7 +15,7 @@
 .import modemSnapshotBegin, modemSnapshotEnd
 .import modemSnapshotBeginI8, modemSnapshotEndI8
 .import modemStoreReceivedByte, modemRecordPollBudgetYield
-.import modemTransfer9, modemRecordTrace, modemSetState, modemSetStateI8
+.import modemTransfer9, modemRecordTrace, modemSetState
 
 .export modemPoll
 .proc modemPoll
@@ -79,7 +79,7 @@
   bcc @readCompleteReport
 
   lda #MODEM_STATE_PROBING
-  jsr modemSetStateI8
+  jsr modemSetState
   lda #$22
   sta modemPollStage
 

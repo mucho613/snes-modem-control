@@ -12,7 +12,7 @@
 .import modemMailboxArguments
 .import modemTransmitReadIndex, modemTransmitWriteIndex
 .import modemQueueByte, modemReadByte
-.import modemSetState, modemSetStateI8, modemRecordTrace
+.import modemSetState, modemRecordTrace
 
 .export modemSessionPoll, modemAtBegin
 .proc modemSessionPoll
@@ -132,7 +132,7 @@ probeFailed:
   lda #MODEM_ERROR_PROBE_TIMEOUT
   sta modemLastError
   lda #MODEM_STATE_ERROR
-  jsr modemSetStateI8
+  jsr modemSetState
   lda #MODEM_TRACE_ERROR
   jsr modemRecordTrace
   jmp done
@@ -161,17 +161,17 @@ atPassed:
   cmp #MODEM_SESSION_RESULT_NO_CARRIER
   beq atReturnedReady
   lda #MODEM_STATE_READY
-  jsr modemSetStateI8
+  jsr modemSetState
   bra done
 
 atConnected:
   lda #MODEM_STATE_CONNECTED
-  jsr modemSetStateI8
+  jsr modemSetState
   jmp done
 
 atReturnedReady:
   lda #MODEM_STATE_READY
-  jsr modemSetStateI8
+  jsr modemSetState
   jmp done
 
 atRejected:
@@ -180,7 +180,7 @@ atRejected:
   lda #MODEM_AT_STATUS_FAILED
   sta modemAtStatus
   lda #MODEM_STATE_ERROR
-  jsr modemSetStateI8
+  jsr modemSetState
   lda #MODEM_TRACE_ERROR
   jsr modemRecordTrace
   jmp done
@@ -205,7 +205,7 @@ atCheckTimeout:
   lda #MODEM_AT_STATUS_FAILED
   sta modemAtStatus
   lda #MODEM_STATE_ERROR
-  jsr modemSetStateI8
+  jsr modemSetState
   lda #MODEM_TRACE_ERROR
   jsr modemRecordTrace
 
@@ -564,17 +564,17 @@ lineDone:
   cmp #MODEM_SESSION_RESULT_NO_CARRIER
   beq @setDisconnecting
   lda #MODEM_STATE_AT_COMMAND
-  jsr modemSetStateI8
+  jsr modemSetState
   bra @accepted
 
 @setDialing:
   lda #MODEM_STATE_DIALING
-  jsr modemSetStateI8
+  jsr modemSetState
   bra @accepted
 
 @setDisconnecting:
   lda #MODEM_STATE_DISCONNECTING
-  jsr modemSetStateI8
+  jsr modemSetState
 
 @accepted:
   ply

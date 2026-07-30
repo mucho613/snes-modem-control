@@ -5,7 +5,7 @@
 .code
 
 .import modemDriverState, modemSessionLastResult, modemSessionLineLength
-.import modemSetState, modemSetStateI8
+.import modemSetState
 .import modemReadByte
 .import pppDecoderReset, pppDecoderPush, pppDecoderDiscardPartial
 .import pppLastInvalidReason
@@ -303,7 +303,7 @@ done:
   stz modemSessionLineLength
   lda #MODEM_STATE_READY
   i8
-  jsr modemSetStateI8
+  jsr modemSetState
   i16
   lda #PPP_EVENT_CARRIER_LOST
   ply
@@ -511,13 +511,13 @@ pppCarrierLossSelfTestLineEnd:
 ; Release the completed frame buffer after the upper layer has consumed it.
 .proc pppReleaseFrame
   .a8
-  .i8
+  .i16
 
   phb
   setDBR $7e
-  jsr pppSnapshotBeginI8
+  jsr pppSnapshotBegin
   stz pppFrameReady
-  jsr pppSnapshotEndI8
+  jsr pppSnapshotEnd
   plb
   rts
 .endproc

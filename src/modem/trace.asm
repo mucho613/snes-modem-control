@@ -9,7 +9,7 @@
 .import modemTraceFrozen, modemTraceNextSequence, modemTraceOverwrittenCount
 .import modemTrace, modemTraceScratchKind
 
-.export modemRecordTrace, modemSetState, modemSetStateI8
+.export modemRecordTrace, modemSetState
 .export modemClearTrace, modemFreezeTrace, modemResumeTrace
 
 ; Input A = MODEM_TRACE_* event kind. Callers use 8-bit A and index registers.
@@ -98,17 +98,6 @@ done:
 
 ; Input A = MODEM_STATE_*.
 .proc modemSetState
-  .a8
-  .i16
-  sta modemDriverState
-  pha
-  lda #MODEM_TRACE_STATE
-  jsr modemRecordTrace
-  pla
-  rts
-.endproc
-
-.proc modemSetStateI8
   .a8
   .i8
   sta modemDriverState

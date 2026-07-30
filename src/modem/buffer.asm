@@ -312,7 +312,7 @@ done:
 
 .proc modemRecordPollBudgetYield
   .a8
-  .i16
+  .i8
   lda modemFlags
   ora #MODEM_FLAG_POLL_BUDGET_YIELD
   sta modemFlags
