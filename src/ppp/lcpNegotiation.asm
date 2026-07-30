@@ -11,6 +11,7 @@
 .import pppLcpPendingAction, pppLcpPacketLength
 .import pppLcpTimerActive, pppLcpDeferredRequest
 .import pppLcpAdministrativeOpen
+.import pppLcpLocalTerminateRequestCount, pppLcpLocalTerminateAckCount
 .import pppLcpTerminateRequestCount, pppLcpTerminateAckCount
 .import pppLcpProtocolRejectCount, pppLcpLastRejectedProtocol
 .import pppLcpRejectIdentifier, pppLcpPeerFlags, pppLcpPeerMru
@@ -230,6 +231,12 @@
   beq :+
   jmp @invalidResponse
 :
+  m16
+  inc pppLcpLocalTerminateAckCount
+  bne :+
+  inc pppLcpLocalTerminateAckCount + 2
+:
+  m8
   jsr pppLcpLocalTerminateComplete
   jmp @returnSuccess
 
@@ -900,6 +907,12 @@
   beq @armRequestTimer
   cmp #PPP_LCP_ACTION_TERMINATE_REQUEST
   bne @maybeTerminateAck
+  m16
+  inc pppLcpLocalTerminateRequestCount
+  bne :+
+  inc pppLcpLocalTerminateRequestCount + 2
+:
+  m8
 @armRequestTimer:
   assert_m8_i16
   jsr pppLcpArmRestartTimer
@@ -1230,6 +1243,11 @@
   pppLcpNegotiationRequireEqual @fail3c
   lda pppLcpTimerActive
   pppLcpNegotiationRequireNonzero @fail3c
+  m16
+  lda pppLcpLocalTerminateRequestCount
+  cmp #$0001
+  m8
+  pppLcpNegotiationRequireEqual @fail3c
 
   ; Matching Terminate-Ack completes Closed and keeps auto-Open disabled.
   jsr pppTransmitInitialize
@@ -1246,6 +1264,11 @@
   lda pppLcpRestartRemaining
   ora pppLcpPendingAction
   ora pppLcpTimerActive
+  pppLcpNegotiationRequireEqual @fail3f
+  m16
+  lda pppLcpLocalTerminateAckCount
+  cmp #$0001
+  m8
   pppLcpNegotiationRequireEqual @fail3f
 
   jsr pppLcpInitialize

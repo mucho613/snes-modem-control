@@ -292,8 +292,8 @@ description = "Frame at which the current generic AT transaction started"
 
 [ppp_diagnostic]
 magic = [0x50, 0x50, 0x50, 0x31]
-version = 18
-size = 468
+version = 19
+size = 481
 
 [[ppp_diagnostic.fields]]
 name = "magic"
@@ -1652,6 +1652,34 @@ offset = 464
 size = 4
 type = "u32"
 description = "Magic-Number of the most recent valid peer Echo-Request"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_administrative_open"
+offset = 468
+size = 1
+type = "u8"
+description = "Nonzero while local policy permits LCP establishment or re-establishment"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_local_terminate_request_count"
+offset = 469
+size = 4
+type = "u32"
+description = "Locally initiated Terminate-Requests accepted by the shared PPP transmitter, including retries"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_local_terminate_ack_count"
+offset = 473
+size = 4
+type = "u32"
+description = "Matching Terminate-Acks received for locally initiated closure"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_local_terminate_timeout_count"
+offset = 477
+size = 4
+type = "u32"
+description = "Locally initiated closures completed after Max-Terminate exhaustion"
 
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]

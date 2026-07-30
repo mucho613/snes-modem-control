@@ -44,7 +44,7 @@ ABI version: `2`. Block size: `128` bytes.
 
 ## PPP Diagnostic ABI
 
-ABI version: `18`. Block size: `468` bytes.
+ABI version: `19`. Block size: `481` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|
@@ -242,6 +242,10 @@ ABI version: `18`. Block size: `468` bytes.
 | `0x1CB` | 4 | `u32` | `lcp_echo_drop_count` | Echo-Requests discarded for phase, length, or Magic-Number validation |
 | `0x1CF` | 1 | `u8` | `lcp_last_echo_identifier` | Identifier of the most recent valid peer Echo-Request |
 | `0x1D0` | 4 | `u32` | `lcp_last_echo_magic` | Magic-Number of the most recent valid peer Echo-Request |
+| `0x1D4` | 1 | `u8` | `lcp_administrative_open` | Nonzero while local policy permits LCP establishment or re-establishment |
+| `0x1D5` | 4 | `u32` | `lcp_local_terminate_request_count` | Locally initiated Terminate-Requests accepted by the shared PPP transmitter, including retries |
+| `0x1D9` | 4 | `u32` | `lcp_local_terminate_ack_count` | Matching Terminate-Acks received for locally initiated closure |
+| `0x1DD` | 4 | `u32` | `lcp_local_terminate_timeout_count` | Locally initiated closures completed after Max-Terminate exhaustion |
 
 ## Mailbox ABI
 

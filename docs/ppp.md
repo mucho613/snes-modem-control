@@ -146,7 +146,7 @@ Address 1 + Control 1 + Protocol 2 + Information 1500 + FCS 2
 
 ## 常設PPP診断
 
-`pppDiagnosticState` はmagic `PPP1`、ABI version 18、468byteの公開診断blockです。レイアウトの正本は `spec/ndm24.toml` で、AssemblyとRustのoffset定数および[生成済みABI表](generated/diagnostic-abi.md)を同時に生成します。
+`pppDiagnosticState` はmagic `PPP1`、ABI version 19、481byteの公開診断blockです。レイアウトの正本は `spec/ndm24.toml` で、AssemblyとRustのoffset定数および[生成済みABI表](generated/diagnostic-abi.md)を同時に生成します。
 
 PC側では次のコマンドでJSON Linesとして読み取れます。
 
@@ -176,6 +176,8 @@ cargo run -p ndm24-tools -- ppp-monitor
 - Protocol-Reject送信受理数、最後にRejectしたProtocol、Reject Identifier
 - Code-Reject送信受理数、最後にRejectしたCode
 - LCP Echo-Request受理数、Echo-Reply送信受理数、破棄数、最後のIdentifierとMagic-Number
+- LCP administrative-open状態、local Terminate-Request送信受理数、
+  一致するTerminate-Ack受信数、Max-Terminate枯渇数
 - PAP state、Code、Identifier、Length、error、failure、restart状態
 - PAP packet送受信回数
 - IPCP state、Code、Identifier、Length、error、pending/deferred送信
@@ -444,13 +446,14 @@ deferred slotへ保持します。lower-downでは交渉済みIP/DNS address、t
 
 restart intervalは180 frame、Max-Configureは初回を含む10回です。timeout再送は
 同じIdentifierとoption列を使い、送信器が受理した時点から次の期限を数えます。
-公開診断ABI version 18はIPCP state、最後のCode/Identifier/error、local/peer
+公開診断ABI version 19はIPCP state、最後のCode/Identifier/error、local/peer
 address、Primary/Secondary DNS addressと各valid flag、再送状態、送受信count
 に加え、後段のIPv4・ICMP・UDP/NTP/DNS診断を公開します。DNS addressは既存
 fieldのoffsetを変えないよう追加し、version 15ではLCP終了カウンター、version 16では
 LCP Protocol-Rejectのcount、Protocol、Identifier、version 17ではLCP
 Code-RejectのcountとCode、version 18ではLCP Echoのcountと最後の
-Identifier/MagicをABI末尾へ追加しています。
+Identifier/Magic、version 19ではadministrative-openとlocal終了の送信・Ack・
+timeout countをABI末尾へ追加しています。
 
 常設セルフテストのstep `$70`～`$76`は、3つの`0.0.0.0`要求、peer
 `10.24.0.1`のAck、local `10.24.0.2`と2つのDNSのNak提案、再要求、
@@ -487,7 +490,7 @@ checksum error、同一headerの送信生成、共有encoder受理を検査し�
 `$85`～`$87`はlocal宛先の受理、宛先不一致の破棄、IPCP phase gateを検査します。
 2026-07-30にFXPAK PRO実機で起動完了後3回連続合格し、当時のABI version 7の
 snapshot取得も確認しました。この試験は電話回線へ発信せず、固定fixtureだけを
-使います。ICMPとUDP診断はABI version 9で末尾へ追加され、現行version 18でも
+使います。ICMPとUDP診断はABI version 9で末尾へ追加され、現行version 19でも
 同じoffsetを維持しています。
 
 ## 65816 ICMP Echo

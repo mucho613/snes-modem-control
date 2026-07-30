@@ -13,6 +13,7 @@
 .import pppLcpPeerMagic, pppLcpRestartDeadline, pppLcpTimerActive
 .import pppLcpDeferredRequest
 .import pppLcpAdministrativeOpen
+.import pppLcpLocalTerminateTimeoutCount
 
 .export pppLcpArmRestartTimer, pppLcpPollTimeout, pppLcpLowerDown
 .export pppLcpLocalTerminateComplete
@@ -151,6 +152,12 @@
 
 @closeFinished:
   assert_m8_i16
+  m16
+  inc pppLcpLocalTerminateTimeoutCount
+  bne :+
+  inc pppLcpLocalTerminateTimeoutCount + 2
+:
+  m8
   jsr pppLcpLocalTerminateComplete
   jsr pppSnapshotEnd
   m16
@@ -444,6 +451,11 @@
   lda pppLcpAdministrativeOpen
   ora pppLcpPendingAction
   ora pppLcpTimerActive
+  pppLcpTimerRequireEqual @fail56
+  m16
+  lda pppLcpLocalTerminateTimeoutCount
+  cmp #$0001
+  m8
   pppLcpTimerRequireEqual @fail56
 
   ; Lower-down cancels timing and restores peer defaults.

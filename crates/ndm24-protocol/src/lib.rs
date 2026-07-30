@@ -345,6 +345,10 @@ pub struct PppDiagnosticSnapshot {
     pub lcp_echo_drop_count: u32,
     pub lcp_last_echo_identifier: u8,
     pub lcp_last_echo_magic: u32,
+    pub lcp_administrative_open: bool,
+    pub lcp_local_terminate_request_count: u32,
+    pub lcp_local_terminate_ack_count: u32,
+    pub lcp_local_terminate_timeout_count: u32,
 }
 
 impl PppDiagnosticSnapshot {
@@ -569,6 +573,16 @@ impl PppDiagnosticSnapshot {
             lcp_echo_drop_count: read_u32(data, PPP_DIAG_LCP_ECHO_DROP_COUNT)?,
             lcp_last_echo_identifier: data[PPP_DIAG_LCP_LAST_ECHO_IDENTIFIER],
             lcp_last_echo_magic: read_u32(data, PPP_DIAG_LCP_LAST_ECHO_MAGIC)?,
+            lcp_administrative_open: data[PPP_DIAG_LCP_ADMINISTRATIVE_OPEN] != 0,
+            lcp_local_terminate_request_count: read_u32(
+                data,
+                PPP_DIAG_LCP_LOCAL_TERMINATE_REQUEST_COUNT,
+            )?,
+            lcp_local_terminate_ack_count: read_u32(data, PPP_DIAG_LCP_LOCAL_TERMINATE_ACK_COUNT)?,
+            lcp_local_terminate_timeout_count: read_u32(
+                data,
+                PPP_DIAG_LCP_LOCAL_TERMINATE_TIMEOUT_COUNT,
+            )?,
         })
     }
 }
@@ -1004,6 +1018,15 @@ mod tests {
         data[PPP_DIAG_LCP_LAST_ECHO_IDENTIFIER] = 0x5a;
         data[PPP_DIAG_LCP_LAST_ECHO_MAGIC..PPP_DIAG_LCP_LAST_ECHO_MAGIC + 4]
             .copy_from_slice(&0x1234_5678_u32.to_le_bytes());
+        data[PPP_DIAG_LCP_ADMINISTRATIVE_OPEN] = 1;
+        data[PPP_DIAG_LCP_LOCAL_TERMINATE_REQUEST_COUNT
+            ..PPP_DIAG_LCP_LOCAL_TERMINATE_REQUEST_COUNT + 4]
+            .copy_from_slice(&2_u32.to_le_bytes());
+        data[PPP_DIAG_LCP_LOCAL_TERMINATE_ACK_COUNT..PPP_DIAG_LCP_LOCAL_TERMINATE_ACK_COUNT + 4]
+            .copy_from_slice(&1_u32.to_le_bytes());
+        data[PPP_DIAG_LCP_LOCAL_TERMINATE_TIMEOUT_COUNT
+            ..PPP_DIAG_LCP_LOCAL_TERMINATE_TIMEOUT_COUNT + 4]
+            .copy_from_slice(&3_u32.to_le_bytes());
 
         let snapshot = PppDiagnosticSnapshot::decode(&data).unwrap();
         assert_eq!(snapshot.snapshot_sequence, 8);
@@ -1161,6 +1184,10 @@ mod tests {
         assert_eq!(snapshot.lcp_echo_drop_count, 1);
         assert_eq!(snapshot.lcp_last_echo_identifier, 0x5a);
         assert_eq!(snapshot.lcp_last_echo_magic, 0x1234_5678);
+        assert!(snapshot.lcp_administrative_open);
+        assert_eq!(snapshot.lcp_local_terminate_request_count, 2);
+        assert_eq!(snapshot.lcp_local_terminate_ack_count, 1);
+        assert_eq!(snapshot.lcp_local_terminate_timeout_count, 3);
     }
 
     #[test]

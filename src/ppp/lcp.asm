@@ -19,6 +19,8 @@
 .import pppLcpEchoRequestCount, pppLcpEchoReplyCount, pppLcpEchoDropCount
 .import pppLcpLastEchoIdentifier, pppLcpLastEchoMagic
 .import pppLcpAdministrativeOpen
+.import pppLcpLocalTerminateRequestCount, pppLcpLocalTerminateAckCount
+.import pppLcpLocalTerminateTimeoutCount
 
 .export pppLcpInitialize, pppLcpParseFrame, pppLcpRunSelfTest
 
@@ -72,6 +74,12 @@
   stz pppLcpEchoReplyCount + 2
   stz pppLcpEchoDropCount
   stz pppLcpEchoDropCount + 2
+  stz pppLcpLocalTerminateRequestCount
+  stz pppLcpLocalTerminateRequestCount + 2
+  stz pppLcpLocalTerminateAckCount
+  stz pppLcpLocalTerminateAckCount + 2
+  stz pppLcpLocalTerminateTimeoutCount
+  stz pppLcpLocalTerminateTimeoutCount + 2
   stz pppLcpLastEchoMagic
   stz pppLcpLastEchoMagic + 2
   stz pppLcpLastRejectedProtocol
