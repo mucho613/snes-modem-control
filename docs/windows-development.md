@@ -65,6 +65,9 @@ cargo run -p ndm24-tools -- ppp-monitor
 # frameCounterと同期後の内部時計を実時間と比較
 cargo run -p ndm24-tools -- frame-rate --seconds 15
 
+# 実機コントローラー入力、立ち上がりpulse、画面mode/pageを一定時間監視
+cargo run -p ndm24-tools -- input-monitor --seconds 15
+
 # IPCP Opened後、peerのUDP 123へNTP要求を送り、応答または失敗まで待つ
 cargo run -p ndm24-tools -- ntp-request
 

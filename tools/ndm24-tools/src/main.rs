@@ -119,6 +119,16 @@ enum Command {
         #[arg(long, default_value_t = 10)]
         seconds: u64,
     },
+    InputMonitor {
+        #[arg(long, default_value = "ws://localhost:23074")]
+        websocket: String,
+        #[arg(long, default_value = "build/normal/modem-control.lbl")]
+        labels: PathBuf,
+        #[arg(long, default_value_t = 50)]
+        interval_ms: u64,
+        #[arg(long, default_value_t = 15)]
+        seconds: u64,
+    },
     NtpRequest {
         #[arg(long, default_value = "ws://localhost:23074")]
         websocket: String,
@@ -366,6 +376,20 @@ async fn main() -> Result<()> {
                 &labels,
                 Duration::from_millis(interval_ms),
                 once,
+            )
+            .await
+        }
+        Command::InputMonitor {
+            websocket,
+            labels,
+            interval_ms,
+            seconds,
+        } => {
+            qusb2snes::input_monitor(
+                &websocket,
+                &labels,
+                Duration::from_millis(interval_ms),
+                Duration::from_secs(seconds),
             )
             .await
         }

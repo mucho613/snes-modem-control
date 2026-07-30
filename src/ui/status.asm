@@ -12,10 +12,10 @@ STATUS_PAGE_DNS = $02
 STATUS_PAGE_ICMP = $03
 STATUS_PAGE_COUNT = $04
 
-CONTROLLER_BUTTON_L = $20
-CONTROLLER_BUTTON_R = $10
-CONTROLLER_BUTTON_LEFT = $02
-CONTROLLER_BUTTON_RIGHT = $01
+CONTROLLER_BUTTON_L = $0020
+CONTROLLER_BUTTON_R = $0010
+CONTROLLER_BUTTON_LEFT = $0200
+CONTROLLER_BUTTON_RIGHT = $0100
 
 STATUS_VALUE_COLUMN = 7
 
@@ -48,12 +48,12 @@ STATUS_VALUE_COLUMN = 7
 .code
 
 .import frameCounter
-.import controller1InputPulse
+.import controller1Input, controller1InputPulse
 .import modemDriverState
 .import pppLcpState, pppPapState, pppIpcpState
 .import pppIpcpFlags, pppIpcpLocalAddress, pppIpcpPeerAddress
 .import terminalVerticalScroll
-.import screenMode, statusPage, statusRenderedPage
+.import screenMode, statusPage, statusRenderedPage, statusDirectionLatch
 .import statusTileBuffer, statusRenderRow, statusLastUpdateFrame
 .import applicationStatusInitialize, applicationStatusPoll
 
@@ -85,6 +85,7 @@ STATUS_VALUE_COLUMN = 7
   bne @clearTileBuffer
 
   stz statusPage
+  stz statusDirectionLatch
   lda #$ff
   sta statusRenderedPage
   stz statusRenderRow
@@ -427,24 +428,53 @@ STATUS_VALUE_COLUMN = 7
   cmp #SCREEN_MODE_RAW_LOG
   bne @statusInput
 
+  rep #$20
+  .a16
   lda controller1InputPulse
   and #CONTROLLER_BUTTON_L
   beq @update
+  sep #$20
+  .a8
   stz screenMode
   bra @update
 
 @statusInput:
+  rep #$20
+  .a16
   lda controller1InputPulse
   and #CONTROLLER_BUTTON_R
   beq @direction
+  sep #$20
+  .a8
   lda #SCREEN_MODE_RAW_LOG
   sta screenMode
   bra @update
 
 @direction:
-  lda controller1InputPulse + 1
+  rep #$20
+  .a16
+  lda controller1Input
+  and #(CONTROLLER_BUTTON_LEFT | CONTROLLER_BUTTON_RIGHT)
+  bne @directionPressed
+  sep #$20
+  .a8
+  stz statusDirectionLatch
+  bra @update
+
+@directionPressed:
+  sep #$20
+  .a8
+  lda statusDirectionLatch
+  bne @update
+  inc statusDirectionLatch
+
+  rep #$20
+  .a16
+  lda controller1Input
   and #CONTROLLER_BUTTON_LEFT
   beq @right
+  sep #$20
+  .a8
   lda statusPage
   bne :+
   lda #STATUS_PAGE_COUNT
@@ -454,9 +484,13 @@ STATUS_VALUE_COLUMN = 7
   bra @update
 
 @right:
-  lda controller1InputPulse + 1
+  rep #$20
+  .a16
+  lda controller1Input
   and #CONTROLLER_BUTTON_RIGHT
   beq @update
+  sep #$20
+  .a8
   inc statusPage
   lda statusPage
   cmp #STATUS_PAGE_COUNT
@@ -557,8 +591,11 @@ STATUS_VALUE_COLUMN = 7
 
   lda #TERMINAL_STATUS_BG1SC
   sta .lobyte(BG1SC)
-  stz .lobyte(BG1VOFS)
-  stz .lobyte(BG1VOFS)
+  ; A vertical offset of zero clips the top scanline on the SFC. Write -1
+  ; through the BG scroll latch so status row zero is visible in full.
+  lda #$ff
+  sta .lobyte(BG1VOFS)
+  sta .lobyte(BG1VOFS)
   bra @done
 
 @raw:

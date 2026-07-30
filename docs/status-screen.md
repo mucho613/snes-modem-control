@@ -100,7 +100,8 @@ NTP/DNS/ICMPページの静的labelと値の整形だけを所有し、PPU regis
 
 表示状態はlinker segment `DISPLAY_BSS`（`$7E3000`以降）に置きます。メイン
 ループは32×32文字bufferを組み立て、VBlankは1フレームに1行だけVRAMへ転送
-します。
+します。ステータス画面のBG1縦スクロールはSFC実機で最上段の1pixelが欠けない
+ように`-1`へ固定します。
 
 ## ソフトウェア時計
 
@@ -122,5 +123,6 @@ FXPAK PRO本体時計は使用しません。
 2026-07-30の旧3行NTP画面はrevision A、FXPAK PRO、QUsb2Snes、DFM-56U、
 疑似電話交換機で確認済みです。同日の4ページ版はFXPAK PROへ転送して起動し、
 COMMONをOBS Virtual Cameraのcaptureで確認しました。実機mailboxのPPP常設
-セルフテストもsequence 1で合格しています。十字キーによる4ページ巡回と
-L/Rによる生ログ往復の実機目視確認は次の確認項目です。
+セルフテストもsequence 1で合格しています。十字キーによる4ページ巡回、
+L/Rによる生ログ往復、BG1縦スクロール`-1`で最上段文字が欠けないことも
+実機とOBS Virtual Cameraで確認済みです。

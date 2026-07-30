@@ -171,12 +171,13 @@ terminalRenderScratchByte: .res $1
 ; the selected application dashboard owns the remaining protocol pages.
 .segment "DISPLAY_BSS"
 
-.export screenMode, statusPage, statusRenderedPage
+.export screenMode, statusPage, statusRenderedPage, statusDirectionLatch
 .export statusTileBuffer, statusRenderRow, statusLastUpdateFrame
 .export statusFormatValue, statusFormatStarted
 screenMode: .res $1
 statusPage: .res $1
 statusRenderedPage: .res $1
+statusDirectionLatch: .res $1
 statusRenderRow: .res $1
 statusLastUpdateFrame: .res $2
 statusTileBuffer: .res TERMINAL_COLUMNS * TERMINAL_STATUS_ROWS

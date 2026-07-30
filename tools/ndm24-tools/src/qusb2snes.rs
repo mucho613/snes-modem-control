@@ -112,6 +112,56 @@ impl Client {
 
 const FXPAK_EXECUTION_SCRATCH: usize = 0x3f_0000;
 
+pub async fn input_monitor(
+    websocket: &str,
+    label_path: &Path,
+    interval: Duration,
+    duration: Duration,
+) -> Result<()> {
+    let labels = read_labels(label_path)?;
+    let input = labels
+        .get("controller1Input")
+        .copied()
+        .context("label file does not contain controller1Input")?;
+    let screen_mode = labels
+        .get("screenMode")
+        .copied()
+        .context("label file does not contain screenMode")?;
+    let input_offset = wram_to_usb2snes(input)?;
+    let screen_offset = wram_to_usb2snes(screen_mode)?;
+    let mut client = Client::connect(websocket).await?;
+    eprintln!("attached to {}", client.device);
+    eprintln!(
+        "hold or press controller buttons during the next {:.1}s",
+        duration.as_secs_f64()
+    );
+
+    let deadline = Instant::now() + duration;
+    let mut previous = None;
+    while Instant::now() < deadline {
+        // input, previous input, and rising-edge pulse are adjacent 16-bit values.
+        let controller = client.read_address(input_offset, 6).await?;
+        // screenMode and statusPage are adjacent bytes.
+        let screen = client.read_address(screen_offset, 2).await?;
+        let sample = (
+            u16::from_le_bytes([controller[0], controller[1]]),
+            u16::from_le_bytes([controller[2], controller[3]]),
+            u16::from_le_bytes([controller[4], controller[5]]),
+            screen[0],
+            screen[1],
+        );
+        if previous != Some(sample) {
+            println!(
+                "input={:04X} prev={:04X} pulse={:04X} mode={} page={}",
+                sample.0, sample.1, sample.2, sample.3, sample.4
+            );
+            previous = Some(sample);
+        }
+        tokio::time::sleep(interval).await;
+    }
+    Ok(())
+}
+
 pub async fn monitor(
     websocket: &str,
     label_path: &Path,
