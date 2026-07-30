@@ -1,5 +1,5 @@
-//! RFC 1661 LCP establishment, peer-initiated termination, and opened-state
-//! maintenance reference implementation.
+//! RFC 1661 LCP establishment, termination, and opened-state maintenance
+//! reference implementation.
 
 use super::{
     Code, ConfigurationOption, EncodeError, OptionParseError, OptionType, Packet, ParseError,
@@ -8,6 +8,7 @@ use super::{
 
 pub const DEFAULT_RESTART_INTERVAL_MS: u64 = 3_000;
 pub const DEFAULT_MAX_CONFIGURE: u8 = 10;
+pub const DEFAULT_MAX_TERMINATE: u8 = 2;
 pub const DEFAULT_MRU: u16 = 1_500;
 pub const DEFAULT_ACCM: u32 = u32::MAX;
 pub const PAP_PROTOCOL: u16 = 0xc023;
@@ -19,6 +20,7 @@ pub enum State {
     AckReceived,
     AckSent,
     Opened,
+    Closing,
     Stopped,
 }
 
@@ -74,6 +76,7 @@ pub enum IgnoreReason {
     MalformedOptions(OptionParseError),
     MalformedEchoRequest,
     InvalidConfigureResponse,
+    InvalidTerminateResponse,
     UnexpectedMagicNumber { expected: u32, actual: u32 },
     UnsupportedCode(u8),
     NotConfiguring,
@@ -89,6 +92,7 @@ pub struct Transition {
 pub struct Settings {
     pub restart_interval_ms: u64,
     pub max_configure: u8,
+    pub max_terminate: u8,
 }
 
 impl Default for Settings {
@@ -96,6 +100,7 @@ impl Default for Settings {
         Self {
             restart_interval_ms: DEFAULT_RESTART_INTERVAL_MS,
             max_configure: DEFAULT_MAX_CONFIGURE,
+            max_terminate: DEFAULT_MAX_TERMINATE,
         }
     }
 }
@@ -112,6 +117,7 @@ pub struct Machine {
     settings: Settings,
     local_options: Vec<u8>,
     request_identifier: u8,
+    terminate_identifier: u8,
     next_identifier: u8,
     restart_remaining: u8,
     restart_deadline_ms: Option<u64>,
@@ -126,6 +132,7 @@ impl Machine {
             settings,
             local_options: local_options.to_vec(),
             request_identifier: 0,
+            terminate_identifier: 0,
             next_identifier: 0,
             restart_remaining: 0,
             restart_deadline_ms: None,
@@ -145,12 +152,16 @@ impl Machine {
         self.request_identifier
     }
 
+    pub fn terminate_identifier(&self) -> u8 {
+        self.terminate_identifier
+    }
+
     pub fn restart_deadline_ms(&self) -> Option<u64> {
         self.restart_deadline_ms
     }
 
     pub fn open(&mut self, now_ms: u64) -> Result<Transition, MachineError> {
-        if self.state == State::Opened {
+        if matches!(self.state, State::Opened | State::Closing) {
             return Ok(Transition::default());
         }
         self.state = State::RequestSent;
@@ -158,6 +169,37 @@ impl Machine {
         let packet = self.send_new_request(now_ms, true)?;
         Ok(Transition {
             actions: vec![Action::SendPacket(packet)],
+            ignored: None,
+        })
+    }
+
+    /// Administratively close LCP and start the RFC 1661 Terminate exchange.
+    pub fn close(&mut self, now_ms: u64) -> Result<Transition, MachineError> {
+        if self.state == State::Closing {
+            return Ok(Transition::default());
+        }
+        if matches!(self.state, State::Closed | State::Stopped) {
+            self.state = State::Closed;
+            self.restart_deadline_ms = None;
+            self.restart_remaining = 0;
+            self.peer_configuration = None;
+            return Ok(Transition::default());
+        }
+
+        let was_open = self.state == State::Opened;
+        self.state = State::Closing;
+        self.peer_configuration = None;
+        self.terminate_identifier = self.allocate_identifier();
+        self.restart_remaining = self.settings.max_terminate.saturating_sub(1);
+        self.restart_deadline_ms = Some(now_ms.saturating_add(self.settings.restart_interval_ms));
+
+        let mut actions = Vec::with_capacity(2);
+        if was_open {
+            actions.push(Action::ThisLayerDown);
+        }
+        actions.push(Action::SendPacket(self.encode_terminate_request()?));
+        Ok(Transition {
+            actions,
             ignored: None,
         })
     }
@@ -223,6 +265,25 @@ impl Machine {
         if now_ms < deadline {
             return Ok(Transition::default());
         }
+        if self.state == State::Closing {
+            if self.restart_remaining == 0 {
+                self.state = State::Closed;
+                self.restart_deadline_ms = None;
+                self.peer_configuration = None;
+                return Ok(Transition {
+                    actions: vec![Action::ThisLayerFinished],
+                    ignored: None,
+                });
+            }
+
+            self.restart_remaining -= 1;
+            self.restart_deadline_ms =
+                Some(now_ms.saturating_add(self.settings.restart_interval_ms));
+            return Ok(Transition {
+                actions: vec![Action::SendPacket(self.encode_terminate_request()?)],
+                ignored: None,
+            });
+        }
         if !matches!(
             self.state,
             State::RequestSent | State::AckReceived | State::AckSent
@@ -272,13 +333,33 @@ impl Machine {
             }
         };
 
+        if self.state == State::Closing
+            && matches!(
+                packet.known_code(),
+                Some(
+                    Code::ConfigureRequest
+                        | Code::ConfigureAck
+                        | Code::ConfigureNak
+                        | Code::ConfigureReject
+                        | Code::EchoRequest
+                        | Code::EchoReply
+                        | Code::DiscardRequest
+                )
+            )
+        {
+            return Ok(Transition {
+                actions: Vec::new(),
+                ignored: Some(IgnoreReason::NotConfiguring),
+            });
+        }
+
         match packet.known_code() {
             Some(Code::ConfigureRequest) => self.receive_configure_request(packet, now_ms, policy),
             Some(Code::ConfigureAck) => self.receive_configure_ack(packet, now_ms),
             Some(Code::ConfigureNak) => self.receive_configure_nak(packet, now_ms),
             Some(Code::ConfigureReject) => self.receive_configure_reject(packet, now_ms),
             Some(Code::TerminateRequest) => self.receive_terminate_request(packet),
-            Some(Code::TerminateAck) => Ok(Transition::default()),
+            Some(Code::TerminateAck) => self.receive_terminate_ack(packet),
             Some(Code::EchoRequest) => self.receive_echo_request(packet),
             Some(Code::EchoReply | Code::DiscardRequest) => {
                 if self.state == State::Opened {
@@ -348,6 +429,17 @@ impl Machine {
         &mut self,
         packet: Packet<'_>,
     ) -> Result<Transition, MachineError> {
+        if self.state == State::Closing {
+            return Ok(Transition {
+                actions: vec![Action::SendPacket(encode_packet(
+                    Code::TerminateAck as u8,
+                    packet.identifier,
+                    &[],
+                )?)],
+                ignored: None,
+            });
+        }
+
         let was_open = self.state == State::Opened;
         self.state = State::Stopped;
         self.restart_deadline_ms = None;
@@ -364,6 +456,27 @@ impl Machine {
         }
         Ok(Transition {
             actions,
+            ignored: None,
+        })
+    }
+
+    fn receive_terminate_ack(&mut self, packet: Packet<'_>) -> Result<Transition, MachineError> {
+        if self.state != State::Closing {
+            return Ok(Transition::default());
+        }
+        if packet.identifier != self.terminate_identifier {
+            return Ok(Transition {
+                actions: Vec::new(),
+                ignored: Some(IgnoreReason::InvalidTerminateResponse),
+            });
+        }
+
+        self.state = State::Closed;
+        self.restart_deadline_ms = None;
+        self.restart_remaining = 0;
+        self.peer_configuration = None;
+        Ok(Transition {
+            actions: vec![Action::ThisLayerFinished],
             ignored: None,
         })
     }
@@ -412,7 +525,9 @@ impl Machine {
                 actions.push(Action::SendPacket(self.send_new_request(now_ms, true)?));
                 self.state = State::RequestSent;
             }
-            (State::Closed | State::Stopped, _) => unreachable!("checked before parsing"),
+            (State::Closing | State::Closed | State::Stopped, _) => {
+                unreachable!("checked before parsing")
+            }
         }
 
         actions.push(Action::SendPacket(response));
@@ -460,7 +575,9 @@ impl Machine {
                 self.state = State::RequestSent;
                 actions.push(Action::SendPacket(self.send_new_request(now_ms, false)?));
             }
-            State::Closed | State::Stopped => unreachable!("checked before parsing"),
+            State::Closing | State::Closed | State::Stopped => {
+                unreachable!("checked before parsing")
+            }
         }
         Ok(Transition {
             actions,
@@ -526,7 +643,9 @@ impl Machine {
                 actions.push(Action::ThisLayerDown);
                 self.state = State::RequestSent;
             }
-            State::Closed | State::Stopped => unreachable!("checked before parsing"),
+            State::Closing | State::Closed | State::Stopped => {
+                unreachable!("checked before parsing")
+            }
         }
         actions.push(Action::SendPacket(
             self.send_new_request(now_ms, reset_counter)?,
@@ -583,6 +702,10 @@ impl Machine {
             self.request_identifier,
             &self.local_options,
         )
+    }
+
+    fn encode_terminate_request(&self) -> Result<Vec<u8>, MachineError> {
+        encode_packet(Code::TerminateRequest as u8, self.terminate_identifier, &[])
     }
 
     fn allocate_identifier(&mut self) -> u8 {
@@ -908,6 +1031,7 @@ mod tests {
             Settings {
                 restart_interval_ms: 100,
                 max_configure: 2,
+                ..Settings::default()
             },
         )
         .unwrap();
@@ -1208,6 +1332,110 @@ mod tests {
         assert_eq!(machine.restart_deadline_ms(), None);
         assert_eq!(packet(&transition.actions[0]), &[6, 0x42, 0, 4]);
         assert_eq!(transition.actions[1], Action::ThisLayerDown);
+    }
+
+    #[test]
+    fn local_close_from_opened_signals_down_and_sends_terminate_request() {
+        let mut machine = opened_machine(&[]);
+        let transition = machine.close(100).unwrap();
+
+        assert_eq!(machine.state(), State::Closing);
+        assert_eq!(machine.terminate_identifier(), 2);
+        assert_eq!(machine.restart_deadline_ms(), Some(3_100));
+        assert_eq!(transition.actions[0], Action::ThisLayerDown);
+        assert_eq!(packet(&transition.actions[1]), &[5, 2, 0, 4]);
+    }
+
+    #[test]
+    fn matching_terminate_ack_completes_local_close() {
+        let mut machine = opened_machine(&[]);
+        machine.close(100).unwrap();
+
+        let transition = machine
+            .receive(&[6, 2, 0, 4], 101, SfcPolicy::default())
+            .unwrap();
+
+        assert_eq!(machine.state(), State::Closed);
+        assert_eq!(machine.restart_deadline_ms(), None);
+        assert_eq!(transition.actions, [Action::ThisLayerFinished]);
+    }
+
+    #[test]
+    fn mismatched_terminate_ack_does_not_complete_local_close() {
+        let mut machine = opened_machine(&[]);
+        machine.close(100).unwrap();
+
+        let transition = machine
+            .receive(&[6, 3, 0, 4], 101, SfcPolicy::default())
+            .unwrap();
+
+        assert_eq!(machine.state(), State::Closing);
+        assert_eq!(machine.restart_deadline_ms(), Some(3_100));
+        assert_eq!(
+            transition.ignored,
+            Some(IgnoreReason::InvalidTerminateResponse)
+        );
+    }
+
+    #[test]
+    fn close_retransmits_same_identifier_then_finishes() {
+        let mut machine = Machine::new(
+            &[],
+            Settings {
+                restart_interval_ms: 100,
+                max_terminate: 2,
+                ..Settings::default()
+            },
+        )
+        .unwrap();
+        machine.open(0).unwrap();
+        machine.close(10).unwrap();
+        let identifier = machine.terminate_identifier();
+
+        assert!(machine.poll_timeout(109).unwrap().actions.is_empty());
+        let retry = machine.poll_timeout(110).unwrap();
+        assert_eq!(
+            packet(&retry.actions[0]),
+            &[Code::TerminateRequest as u8, identifier, 0, 4]
+        );
+        assert_eq!(machine.terminate_identifier(), identifier);
+
+        let finished = machine.poll_timeout(210).unwrap();
+        assert_eq!(finished.actions, [Action::ThisLayerFinished]);
+        assert_eq!(machine.state(), State::Closed);
+    }
+
+    #[test]
+    fn peer_terminate_request_during_local_close_is_acked_without_cancelling_close() {
+        let mut machine = opened_machine(&[]);
+        machine.close(100).unwrap();
+        let local_identifier = machine.terminate_identifier();
+
+        let peer_request = machine
+            .receive(&[5, 0x42, 0, 4], 101, SfcPolicy::default())
+            .unwrap();
+
+        assert_eq!(packet(&peer_request.actions[0]), &[6, 0x42, 0, 4]);
+        assert_eq!(machine.state(), State::Closing);
+        assert_eq!(machine.terminate_identifier(), local_identifier);
+        assert_eq!(machine.restart_deadline_ms(), Some(3_100));
+    }
+
+    #[test]
+    fn closing_discards_configuration_and_echo_packets() {
+        let mut machine = opened_machine(&[]);
+        machine.close(100).unwrap();
+
+        for input in [
+            &[1, 0x42, 0, 4][..],
+            &[2, 1, 0, 4][..],
+            &[9, 0x42, 0, 8, 0, 0, 0, 0][..],
+        ] {
+            let transition = machine.receive(input, 101, SfcPolicy::default()).unwrap();
+            assert!(transition.actions.is_empty());
+            assert_eq!(transition.ignored, Some(IgnoreReason::NotConfiguring));
+            assert_eq!(machine.state(), State::Closing);
+        }
     }
 
     #[test]
