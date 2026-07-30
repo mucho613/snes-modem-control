@@ -125,6 +125,8 @@ DFM-56Uは次の条件へ固定します。
 
 `pppd`はPAPを要求し、CHAP、MS-CHAP、EAP、PFC、ACFC、VJ、CCP、
 BSD-Compress、Deflate、IPv6を無効にします。LCP Echo-Requestも無効です。
+IPCPではRFC 1877のPrimary DNS Server Addressとして`1.1.1.1`、
+Secondary DNS Server Addressとして`1.0.0.1`をSFCへ提案します。
 SFC側のLCP診断と切断試験を行う時間を確保するため、PAP Authenticate-Request
 の待ち時間は120秒です。PAP実装後も、回線上の再試験や診断取得に余裕を持た
 せるためこの値を維持します。
@@ -135,8 +137,8 @@ Ubuntuの`pppd`はpeer profileより前に`/etc/ppp/options`も読みます。�
 3秒間隔の再送には影響しません。既存の用途を壊さないためglobal fileは変更
 せず、試験終了時に`Stop`を必ず実行します。globalの`crtscts`、`proxyarp`、
 30秒のLCP echoはpeer profileの`nocrtscts`、`noproxyarp`、
-`lcp-echo-interval 0`で上書きします。globalのDNS指定はIPCP段階へ進む前に
-別途整理します。
+`lcp-echo-interval 0`で上書きします。DNS指定はglobal設定に依存させず、
+peer profileの2つの`ms-dns`で固定します。
 
 初回試験ではSFC側が次を満たすことを確認します。
 
@@ -147,9 +149,11 @@ Ubuntuの`pppd`はpeer profileより前に`/etc/ppp/options`も読みます。�
 5. `pppd`がSFCのPAP Authenticate-Requestを受理し、Authenticate-Ackを返す。
 6. SFC側のPAP stateが`Opened`へ到達し、再送timerが停止する。
 7. IPCP双方のConfigure-Request/Ack/Nakを経て、SFC側IPCPが`Opened`になる。
-8. SFC診断でlocal `10.24.0.2`、peer `10.24.0.1`が確定し、timerが停止する。
-9. PAP payloadやpasswordが通常ログへ出ない。
-10. 切断後にSFC側LCPとIPCPが`Closed`、PAPが`Inactive`へ戻り、timerとpending送信を残さない。
+8. SFC診断でlocal `10.24.0.2`、peer `10.24.0.1`、Primary DNS `1.1.1.1`、
+   Secondary DNS `1.0.0.1`が確定し、timerが停止する。
+9. DNS画面と`ppp-monitor`が同じ2アドレスを表示する。
+10. PAP payloadやpasswordが通常ログへ出ない。
+11. 切断後にSFC側LCPとIPCPが`Closed`、PAPが`Inactive`へ戻り、timerとpending送信を残さない。
 
 PPP受信は発信前に有効化します。`CONNECT`後に有効化すると、対向が先に送った
 LCP frameの途中からdecoderへ渡され、FCS errorやRX ring overflowを生じる
@@ -403,6 +407,29 @@ DFM-56Uが`RING`を受けて`ATA`を送った後に`NO CARRIER`となりまし�
 `AT&F`、`ATM0`、`AT%B2400`、`ATS7=60`、`ATX3`の合格済み設定列を再適用すると
 約18秒で`CONNECT`しました。したがって発呼前設定列は電源状態に依存させず、
 毎回適用する試験前提とします。
+
+## 2026-07-30 revision A RFC 1877 DNS結果
+
+peer profileへ`ms-dns 1.1.1.1`と`ms-dns 1.0.0.1`を追加し、revision Aと
+DFM-56Uを再接続しました。回線上では次の交換を確認しています。
+
+```text
+rcvd [IPCP ConfReq id=0x1 <addr 0.0.0.0> <ms-dns1 0.0.0.0> <ms-dns2 0.0.0.0>]
+sent [IPCP ConfNak id=0x1 <addr 10.24.0.2> <ms-dns1 1.1.1.1> <ms-dns2 1.0.0.1>]
+rcvd [IPCP ConfReq id=0x2 <addr 10.24.0.2> <ms-dns1 1.1.1.1> <ms-dns2 1.0.0.1>]
+sent [IPCP ConfAck id=0x2 <addr 10.24.0.2> <ms-dns1 1.1.1.1> <ms-dns2 1.0.0.1>]
+```
+
+SFC診断はIPCP `Opened`、flags `$7F`、Primary `1.1.1.1`、Secondary
+`1.0.0.1`で、IPCP送受信数は各3でした。PPP FCS error、invalid、overflow、
+TX backpressure、TX abortは0です。既存の明示resolver経路を変えていないことを
+確認するため、`dns-query example.com --resolver 1.1.1.1`も実行し、66frameで
+回答を受理しました。DNSダッシュボードと`ppp-monitor`は同じ交渉済み2アドレスを
+表示しました。
+
+`Stop`からraw `NO CARRIER`検出後はLCP/IPCP `Closed`、PAP `Inactive`となり、
+Primary/Secondary DNS addressはともにzeroへ戻りました。DNS request bitは
+次回接続用に復元され、前回のvalid bitは残りません。`pending-rx`も空でした。
 
 試験終了時は必ず停止します。
 

@@ -123,6 +123,7 @@ LCP試験に続き、PAP Authenticate-Request/Ack、IPCP `Opened`、SFC側local
 | PPP PAP認証 | 合格 (2026-07-30) | 未実施 |
 | PPP IPCPセルフテスト | 合格 (2026-07-30) | 未実施 |
 | PPP IPCP実対向 | 合格 (2026-07-30) | 未実施 |
+| PPP IPCP RFC 1877 DNS交渉 | 合格 (2026-07-30) | 未実施 |
 | PPP IPv4セルフテスト | 合格 (2026-07-30) | 未実施 |
 | PPP ICMP Echoセルフテスト | 合格 (2026-07-30) | 未実施 |
 | PPP UDP datagramセルフテスト | 合格 (2026-07-30) | 未実施 |
@@ -258,5 +259,23 @@ drop、DNS timeoutはすべて0でした。対向のlegacy iptables counterは�
 MODEM/LCP/PAP/IPCP/LOCAL/PEERの6行が表示されました。公開診断ABIはversion 13、
 423byteで、最後に有効だった外向きICMP Echo Requestの専用snapshotを含みます。
 十字キーとL/Rボタンによる実機ページ巡回は未確認です。
+
+同日、RFC 1877対応smoke ROMをrevision AのFXPAK PROへ転送し、実機mailbox
+`ppp-self-test`（command 10、sequence 1）とMesenCE常設セルフテストの両方が
+合格しました。DFM-56Uと再接続すると、`pppd`はSFCのIP-Address、Primary DNS、
+Secondary DNS各`0.0.0.0`要求へ、`10.24.0.2`、`1.1.1.1`、`1.0.0.1`を1つの
+Configure-Nakで提案しました。SFCはIdentifier 2で3 optionを再要求し、
+完全一致Configure-Ackを受信してIPCP `Opened`となりました。
+
+診断ABI version 14、431byteの実機snapshotはlocal `10.24.0.2`、peer
+`10.24.0.1`、Primary DNS `1.1.1.1`、Secondary DNS `1.0.0.1`、
+`ipcp_flags=$7F`でした。IPCP送受信は各3、FCS error、invalid、overflow、
+backpressure、abortはいずれも0です。明示resolver `1.1.1.1`を使う
+`example.com` queryも回帰合格し、回答2件から`104.20.23.154`を66frameで
+取得しました。OBS Virtual Camera captureではDNSページの`RESOLVR 1.1.1.1`、
+`PRIMARY 1.1.1.1`、`SECOND 1.0.0.1`が同時に表示されることを確認しました。
+対向停止後はraw `NO CARRIER`を検出してLCP/IPCPが`Closed`、PAPが`Inactive`
+となり、Primary/Secondary DNSはともに`0.0.0.0`、flagsは次回要求用の
+`$2D`へ戻りました。`pending-rx`も空でした。
 
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。

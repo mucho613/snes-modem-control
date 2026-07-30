@@ -40,5 +40,7 @@ noccp
 noipv6
 
 10.24.0.1:10.24.0.2
+ms-dns 1.1.1.1
+ms-dns 1.0.0.1
 nodefaultroute
 noproxyarp
