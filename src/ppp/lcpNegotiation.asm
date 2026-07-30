@@ -10,6 +10,7 @@
 .import pppLcpRequestIdentifier, pppLcpRestartRemaining
 .import pppLcpPendingAction, pppLcpPacketLength
 .import pppLcpTimerActive, pppLcpDeferredRequest
+.import pppLcpAdministrativeOpen
 .import pppLcpTerminateRequestCount, pppLcpTerminateAckCount
 .import pppLcpProtocolRejectCount, pppLcpLastRejectedProtocol
 .import pppLcpRejectIdentifier, pppLcpPeerFlags, pppLcpPeerMru
@@ -20,13 +21,31 @@
 .import pppLcpPacketEnd, pppLcpOutputCursor
 .import pppFrameBuffer, pppTransmitBuffer, pppTransmitActive
 .import pppTransmitBegin, pppTransmitInitialize
-.import pppLcpArmRestartTimer
+.import pppLcpArmRestartTimer, pppLcpLocalTerminateComplete
 .import pppLastProtocol, pppLastFrameLength
 
-.export pppLcpOpen, pppLcpReceiveFrame, pppLcpRejectProtocol
+.export pppLcpOpen, pppLcpClose, pppLcpReceiveFrame, pppLcpRejectProtocol
 .export pppLcpRejectCode
 .export pppLcpBuildPending
 .export pppLcpNegotiationRunSelfTest
+
+.macro pppLcpNegotiationRequireEqual failure
+  beq :+
+  jmp failure
+:
+.endmacro
+
+.macro pppLcpNegotiationRequireNonzero failure
+  bne :+
+  jmp failure
+:
+.endmacro
+
+.macro pppLcpNegotiationRequireCarryClear failure
+  bcc :+
+  jmp failure
+:
+.endmacro
 
 ; Start LCP establishment with the conservative empty local option list.
 ; The pending request is built only after the shared PPP encoder is idle.
@@ -36,10 +55,14 @@
 
   phb
   setDBR $7e
+  jsr pppSnapshotBegin
+  lda #$01
+  sta pppLcpAdministrativeOpen
   lda pppLcpState
   cmp #PPP_LCP_STATE_OPENED
-  beq @return
-  jsr pppSnapshotBegin
+  beq @finish
+  cmp #PPP_LCP_STATE_CLOSING
+  beq @finish
   lda #PPP_LCP_STATE_REQUEST_SENT
   sta pppLcpState
   stz pppLcpRequestIdentifier
@@ -49,9 +72,54 @@
   lda #PPP_LCP_ACTION_CONFIGURE_REQUEST
   sta pppLcpPendingAction
   stz pppLcpLastError
+@finish:
   jsr pppSnapshotEnd
-@return:
   assert_m8_i16
+  plb
+  rts
+.endproc
+
+; Request an administrative LCP close. If a response packet already owns the
+; one-entry pending slot, pppLcpPoll starts Closing as soon as that packet has
+; entered the shared transmitter.
+.proc pppLcpClose
+  .a8
+  .i16
+
+  phb
+  setDBR $7e
+  jsr pppSnapshotBegin
+  stz pppLcpAdministrativeOpen
+
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_CLOSED
+  beq @alreadyClosed
+  cmp #PPP_LCP_STATE_STOPPED
+  beq @alreadyClosed
+  cmp #PPP_LCP_STATE_CLOSING
+  beq @finish
+  lda pppLcpPendingAction
+  bne @finish
+
+  lda #PPP_LCP_STATE_CLOSING
+  sta pppLcpState
+  inc pppLcpRequestIdentifier
+  lda #(PPP_LCP_DEFAULT_MAX_TERMINATE - 1)
+  sta pppLcpRestartRemaining
+  stz pppLcpTimerActive
+  stz pppLcpDeferredRequest
+  lda #PPP_LCP_ACTION_TERMINATE_REQUEST
+  sta pppLcpPendingAction
+  stz pppLcpLastError
+  bra @finish
+
+@alreadyClosed:
+  assert_m8_i16
+  jsr pppLcpLocalTerminateComplete
+
+@finish:
+  assert_m8_i16
+  jsr pppSnapshotEnd
   plb
   rts
 .endproc
@@ -111,7 +179,7 @@
 :
   cmp #PPP_LCP_CODE_TERMINATE_ACK
   bne :+
-  jmp @returnSuccess
+  jmp @terminateAck
 :
   cmp #PPP_LCP_CODE_ECHO_REQUEST
   bne :+
@@ -149,6 +217,21 @@
   lda #PPP_LCP_ERROR_NOT_CONFIGURING
   sta pppLcpLastError
   jmp @returnFailure
+
+@terminateAck:
+  assert_m8_i16
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_CLOSING
+  beq :+
+  jmp @returnSuccess
+:
+  lda pppLcpLastIdentifier
+  cmp pppLcpRequestIdentifier
+  beq :+
+  jmp @invalidResponse
+:
+  jsr pppLcpLocalTerminateComplete
+  jmp @returnSuccess
 
 @echoRequest:
   assert_m8_i16
@@ -248,9 +331,14 @@
   inc pppLcpTerminateRequestCount + 2
 :
   m8
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_CLOSING
+  beq @terminateRequestWhileClosing
   stz pppLcpRestartRemaining
   stz pppLcpTimerActive
   stz pppLcpDeferredRequest
+@terminateRequestWhileClosing:
+  assert_m8_i16
   lda #PPP_LCP_ACTION_TERMINATE_ACK
   sta pppLcpPendingAction
   jmp @returnSuccess
@@ -263,6 +351,11 @@
 
 @configureRequest:
   assert_m8_i16
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_CLOSING
+  bne :+
+  jmp @notConfiguring
+:
   jsr pppLcpEvaluatePeerRequest
   sta pppLcpPendingAction
   lda pppLcpState
@@ -318,6 +411,11 @@
 
 @configureAck:
   assert_m8_i16
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_CLOSING
+  bne :+
+  jmp @notConfiguring
+:
   lda pppLcpLastIdentifier
   cmp pppLcpRequestIdentifier
   bne @invalidResponse
@@ -363,6 +461,11 @@
 
 @configureNegative:
   assert_m8_i16
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_CLOSING
+  bne :+
+  jmp @notConfiguring
+:
   lda pppLcpLastIdentifier
   cmp pppLcpRequestIdentifier
   bne @invalidResponse
@@ -535,6 +638,10 @@
   bne :+
   jmp @buildEchoReply
 :
+  cmp #PPP_LCP_ACTION_TERMINATE_REQUEST
+  bne :+
+  jmp @buildTerminateRequest
+:
   jmp @busy
 
 @buildEchoReply:
@@ -593,6 +700,19 @@
 @buildRequest:
   assert_m8_i16
   lda #PPP_LCP_CODE_CONFIGURE_REQUEST
+  sta pppTransmitBuffer + 4
+  lda pppLcpRequestIdentifier
+  sta pppTransmitBuffer + 5
+  stz pppTransmitBuffer + 6
+  lda #PPP_LCP_HEADER_LENGTH
+  sta pppTransmitBuffer + 7
+  m16
+  lda #PPP_LCP_MINIMUM_FRAME_LENGTH
+  jmp @begin
+
+@buildTerminateRequest:
+  assert_m8_i16
+  lda #PPP_LCP_CODE_TERMINATE_REQUEST
   sta pppTransmitBuffer + 4
   lda pppLcpRequestIdentifier
   sta pppTransmitBuffer + 5
@@ -777,7 +897,11 @@
   jsr pppSnapshotBegin
   lda pppLcpPendingAction
   cmp #PPP_LCP_ACTION_CONFIGURE_REQUEST
+  beq @armRequestTimer
+  cmp #PPP_LCP_ACTION_TERMINATE_REQUEST
   bne @maybeTerminateAck
+@armRequestTimer:
+  assert_m8_i16
   jsr pppLcpArmRestartTimer
   bra :+
 @maybeTerminateAck:
@@ -1039,16 +1163,16 @@
 :
   lda pppTransmitBuffer + 4
   cmp #PPP_LCP_CODE_CONFIGURE_ACK
-  bne @fail3a
+  pppLcpNegotiationRequireEqual @fail3a
   lda pppTransmitBuffer + 5
   cmp #$0a
-  bne @fail3a
+  pppLcpNegotiationRequireEqual @fail3a
   lda pppTransmitBuffer + 8
   cmp #$01
-  bne @fail3a
+  pppLcpNegotiationRequireEqual @fail3a
   lda pppTransmitBuffer + 9
   cmp #$04
-  bne @fail3a
+  pppLcpNegotiationRequireEqual @fail3a
 
   ; Peer termination uses the peer Identifier and an empty Ack payload.
   jsr pppTransmitInitialize
@@ -1056,21 +1180,73 @@
   ldx #$0042
   jsr @writeEmptyPacket
   jsr pppLcpReceiveFrame
-  bcs @fail3b
+  pppLcpNegotiationRequireCarryClear @fail3b
   lda pppLcpPendingAction
   cmp #PPP_LCP_ACTION_TERMINATE_ACK
-  bne @fail3b
+  pppLcpNegotiationRequireEqual @fail3b
   jsr pppLcpBuildPending
-  bcs @fail3b
+  pppLcpNegotiationRequireCarryClear @fail3b
   lda pppTransmitBuffer + 4
   cmp #PPP_LCP_CODE_TERMINATE_ACK
-  bne @fail3b
+  pppLcpNegotiationRequireEqual @fail3b
   lda pppTransmitBuffer + 5
   cmp #$42
-  bne @fail3b
+  pppLcpNegotiationRequireEqual @fail3b
   lda pppTransmitBuffer + 7
   cmp #PPP_LCP_HEADER_LENGTH
-  bne @fail3b
+  pppLcpNegotiationRequireEqual @fail3b
+
+  ; A local Close sends Terminate-Request with a fresh Identifier and arms
+  ; Max-Terminate only after the encoder accepts the packet.
+  jsr pppLcpInitialize
+  jsr pppTransmitInitialize
+  lda #PPP_LCP_STATE_OPENED
+  sta pppLcpState
+  jsr pppLcpClose
+  lda pppLcpAdministrativeOpen
+  pppLcpNegotiationRequireEqual @fail3c
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_CLOSING
+  pppLcpNegotiationRequireEqual @fail3c
+  lda pppLcpPendingAction
+  cmp #PPP_LCP_ACTION_TERMINATE_REQUEST
+  pppLcpNegotiationRequireEqual @fail3c
+  lda pppLcpRequestIdentifier
+  cmp #$01
+  pppLcpNegotiationRequireEqual @fail3c
+  lda pppLcpRestartRemaining
+  cmp #(PPP_LCP_DEFAULT_MAX_TERMINATE - 1)
+  pppLcpNegotiationRequireEqual @fail3c
+  jsr pppLcpBuildPending
+  pppLcpNegotiationRequireCarryClear @fail3c
+  lda pppTransmitBuffer + 4
+  cmp #PPP_LCP_CODE_TERMINATE_REQUEST
+  pppLcpNegotiationRequireEqual @fail3c
+  lda pppTransmitBuffer + 5
+  cmp #$01
+  pppLcpNegotiationRequireEqual @fail3c
+  lda pppTransmitBuffer + 7
+  cmp #PPP_LCP_HEADER_LENGTH
+  pppLcpNegotiationRequireEqual @fail3c
+  lda pppLcpTimerActive
+  pppLcpNegotiationRequireNonzero @fail3c
+
+  ; Matching Terminate-Ack completes Closed and keeps auto-Open disabled.
+  jsr pppTransmitInitialize
+  lda #PPP_LCP_CODE_TERMINATE_ACK
+  ldx #$0001
+  jsr @writeEmptyPacket
+  jsr pppLcpReceiveFrame
+  pppLcpNegotiationRequireCarryClear @fail3f
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_CLOSED
+  pppLcpNegotiationRequireEqual @fail3f
+  lda pppLcpAdministrativeOpen
+  pppLcpNegotiationRequireEqual @fail3f
+  lda pppLcpRestartRemaining
+  ora pppLcpPendingAction
+  ora pppLcpTimerActive
+  pppLcpNegotiationRequireEqual @fail3f
 
   jsr pppLcpInitialize
   jsr pppTransmitInitialize
@@ -1113,6 +1289,12 @@
   bra @fail
 @fail3b:
   lda #$3b
+  bra @fail
+@fail3c:
+  lda #$3c
+  bra @fail
+@fail3f:
+  lda #$3f
 
 @fail:
   pha

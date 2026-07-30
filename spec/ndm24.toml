@@ -545,14 +545,14 @@ name = "lcp_request_identifier"
 offset = 80
 size = 1
 type = "u8"
-description = "Identifier of the outstanding local Configure-Request"
+description = "Identifier of the outstanding local Configure-Request or Terminate-Request"
 
 [[ppp_diagnostic.fields]]
 name = "lcp_restart_remaining"
 offset = 81
 size = 1
 type = "u8"
-description = "Remaining LCP Configure retransmissions"
+description = "Remaining LCP Configure-Request or Terminate-Request retransmissions"
 
 [[ppp_diagnostic.fields]]
 name = "lcp_peer_flags"

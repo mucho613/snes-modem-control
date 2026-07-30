@@ -5,15 +5,17 @@
 
 .import frameCounter
 .import pppSnapshotBegin, pppSnapshotEnd
-.import pppLcpInitialize, pppLcpOpen, pppLcpBuildPending
+.import pppLcpInitialize, pppLcpOpen, pppLcpClose, pppLcpBuildPending
 .import pppTransmitInitialize
 .import pppLcpState, pppLcpRequestIdentifier
 .import pppLcpRestartRemaining, pppLcpPendingAction
 .import pppLcpPeerFlags, pppLcpPeerMru, pppLcpPeerAccm
 .import pppLcpPeerMagic, pppLcpRestartDeadline, pppLcpTimerActive
 .import pppLcpDeferredRequest
+.import pppLcpAdministrativeOpen
 
 .export pppLcpArmRestartTimer, pppLcpPollTimeout, pppLcpLowerDown
+.export pppLcpLocalTerminateComplete
 .export pppLcpPeerTerminateComplete
 .export pppLcpTimerRunSelfTest
 
@@ -110,10 +112,14 @@
   pla
   sec
   sbc pppLcpRestartDeadline
-  bmi @unchanged
+  bpl :+
+  jmp @unchanged
+:
 
   m8
   lda pppLcpState
+  cmp #PPP_LCP_STATE_CLOSING
+  beq @closing
   cmp #PPP_LCP_STATE_REQUEST_SENT
   beq @configuring
   cmp #PPP_LCP_STATE_ACK_RECEIVED
@@ -125,6 +131,31 @@
   m16
   plb
   clc
+  rts
+
+@closing:
+  assert_m8_i16
+  jsr pppSnapshotBegin
+  lda pppLcpRestartRemaining
+  beq @closeFinished
+  dec pppLcpRestartRemaining
+  lda #PPP_LCP_ACTION_TERMINATE_REQUEST
+  sta pppLcpPendingAction
+  stz pppLcpTimerActive
+  stz pppLcpDeferredRequest
+  jsr pppSnapshotEnd
+  m16
+  plb
+  sec
+  rts
+
+@closeFinished:
+  assert_m8_i16
+  jsr pppLcpLocalTerminateComplete
+  jsr pppSnapshotEnd
+  m16
+  plb
+  sec
   rts
 
 @configuring:
@@ -167,6 +198,37 @@
   assert_m16_i16
   plb
   clc
+  rts
+.endproc
+
+; Finish a locally initiated Terminate exchange after matching Ack or retry
+; exhaustion. Administrative-open policy is preserved so an Open requested
+; during Closing can start on the next poll.
+.proc pppLcpLocalTerminateComplete
+  .a8
+  .i16
+
+  phb
+  setDBR $7e
+  jsr pppSnapshotBegin
+  lda #PPP_LCP_STATE_CLOSED
+  sta pppLcpState
+  stz pppLcpRestartRemaining
+  stz pppLcpPendingAction
+  stz pppLcpTimerActive
+  stz pppLcpDeferredRequest
+  stz pppLcpPeerFlags
+  m16
+  lda #PPP_DEFAULT_MRU
+  sta pppLcpPeerMru
+  lda #$ffff
+  sta pppLcpPeerAccm
+  sta pppLcpPeerAccm + 2
+  stz pppLcpPeerMagic
+  stz pppLcpPeerMagic + 2
+  m8
+  jsr pppSnapshotEnd
+  plb
   rts
 .endproc
 
@@ -234,7 +296,7 @@
 ;
 ; Output:
 ;   Carry clear, A=$00: passed
-;   Carry set, A=$50-$55: failed step
+;   Carry set, A=$50-$56: failed step
 .proc pppLcpTimerRunSelfTest
   .a8
   .i16
@@ -338,6 +400,52 @@
   lda pppLcpRestartRemaining
   pppLcpTimerRequireEqual @fail54
 
+  ; Local termination retransmits the same Identifier once for
+  ; Max-Terminate=2, then completes Closed without automatic reopening.
+  jsr pppLcpInitialize
+  jsr pppTransmitInitialize
+  lda #PPP_LCP_STATE_OPENED
+  sta pppLcpState
+  jsr pppLcpClose
+  jsr pppLcpBuildPending
+  pppLcpTimerRequireCarryClear @fail56
+  jsr pppTransmitInitialize
+  m16
+  lda #$0300
+  jsr pppLcpArmRestartTimerAt
+  lda pppLcpRestartDeadline
+  jsr pppLcpPollTimeoutAt
+  m8
+  pppLcpTimerRequireCarrySet @fail56
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_CLOSING
+  pppLcpTimerRequireEqual @fail56
+  lda pppLcpPendingAction
+  cmp #PPP_LCP_ACTION_TERMINATE_REQUEST
+  pppLcpTimerRequireEqual @fail56
+  lda pppLcpRestartRemaining
+  pppLcpTimerRequireEqual @fail56
+  lda pppLcpRequestIdentifier
+  cmp #$01
+  pppLcpTimerRequireEqual @fail56
+  jsr pppLcpBuildPending
+  pppLcpTimerRequireCarryClear @fail56
+  jsr pppTransmitInitialize
+  m16
+  lda #$0400
+  jsr pppLcpArmRestartTimerAt
+  lda pppLcpRestartDeadline
+  jsr pppLcpPollTimeoutAt
+  m8
+  pppLcpTimerRequireCarrySet @fail56
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_CLOSED
+  pppLcpTimerRequireEqual @fail56
+  lda pppLcpAdministrativeOpen
+  ora pppLcpPendingAction
+  ora pppLcpTimerActive
+  pppLcpTimerRequireEqual @fail56
+
   ; Lower-down cancels timing and restores peer defaults.
   lda #PPP_LCP_STATE_OPENED
   sta pppLcpState
@@ -395,6 +503,10 @@
   m8
 @fail55:
   lda #$55
+  bra @fail
+@fail56:
+  assert_m8_i16
+  lda #$56
 
 @fail:
   pha

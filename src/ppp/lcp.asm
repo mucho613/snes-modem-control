@@ -18,6 +18,7 @@
 .import pppLcpCodeRejectCount, pppLcpLastRejectedCode
 .import pppLcpEchoRequestCount, pppLcpEchoReplyCount, pppLcpEchoDropCount
 .import pppLcpLastEchoIdentifier, pppLcpLastEchoMagic
+.import pppLcpAdministrativeOpen
 
 .export pppLcpInitialize, pppLcpParseFrame, pppLcpRunSelfTest
 
@@ -45,6 +46,8 @@
   stz pppLcpTimerActive
   stz pppLcpDeferredRequest
   stz pppLcpPollAction
+  lda #$01
+  sta pppLcpAdministrativeOpen
   m16
   lda #PPP_DEFAULT_MRU
   sta pppLcpPeerMru

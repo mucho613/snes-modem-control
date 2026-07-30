@@ -83,8 +83,8 @@ ABI version: `18`. Block size: `468` bytes.
 | `0x4D` | 1 | `u8` | `lcp_last_code` | Code of the most recently parsed LCP packet |
 | `0x4E` | 1 | `u8` | `lcp_last_identifier` | Identifier of the most recently parsed LCP packet |
 | `0x4F` | 1 | `u8` | `lcp_last_error` | Most recent LCP parser or negotiation error |
-| `0x50` | 1 | `u8` | `lcp_request_identifier` | Identifier of the outstanding local Configure-Request |
-| `0x51` | 1 | `u8` | `lcp_restart_remaining` | Remaining LCP Configure retransmissions |
+| `0x50` | 1 | `u8` | `lcp_request_identifier` | Identifier of the outstanding local Configure-Request or Terminate-Request |
+| `0x51` | 1 | `u8` | `lcp_restart_remaining` | Remaining LCP Configure-Request or Terminate-Request retransmissions |
 | `0x52` | 1 | `u8` | `lcp_peer_flags` | Accepted peer LCP option flags |
 | `0x53` | 1 | `u8` | `lcp_pending_action` | LCP transmit action waiting for the shared PPP encoder |
 | `0x54` | 2 | `u16` | `lcp_packet_length` | Length field of the most recently parsed LCP packet |

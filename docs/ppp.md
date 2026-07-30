@@ -70,7 +70,7 @@ Rust参照実装は全入力分割位置、破損FCSからの再同期、Flag直
 - `src/ppp/lcp.asm`: LCP packet parser
 - `src/ppp/lcpNegotiation.asm`: Configure交渉状態機械
 - `src/ppp/lcpOptions.asm`: peer option評価とNak/Reject生成
-- `src/ppp/lcpTimer.asm`: restart timer、Max-Configure、lower-down
+- `src/ppp/lcpTimer.asm`: restart timer、Max-Configure、Max-Terminate、lower-down
 - `src/ppp/lcpPoll.asm`: main-loop、frame所有権、送信直列化
 - `src/ppp/pap.asm`: PAP client、packet parser、restart timer
 - `src/ppp/papPoll.asm`: LCP/PAP frame振り分け、共有送信器との直列化
@@ -210,7 +210,7 @@ cargo run -p ndm24-tools -- ppp-monitor
 
 ## Rust LCP Configure状態機械
 
-`crates/ndm24-ppp/src/lcp/negotiation.rs` は [RFC 1661 section 4と5.8](https://www.rfc-editor.org/rfc/rfc1661.html) のestablishmentとopened-state maintenanceを参照実装します。`Request-Sent`、`Ack-Received`、`Ack-Sent`、`Opened` とConfigure用restart timerに加え、peer起点のTerminate-Requestを同じIdentifierの空Terminate-Ackで応答し、`Opened`から`Stopped`へ移る終了経路を扱います。`Opened`中のEcho-Requestはpeerの合意済みMagic-Numberを照合し、同じIdentifierとDataを持つEcho-Replyを生成します。local Magic-Numberはまだ要求しないため、送信Magicは0です。Dataはpeer MRUを越えない範囲まで保持します。`Opened`中の未知PPP ProtocolにはProtocol-Rejectを生成し、Rejected-Informationをpeer MRUまでに切り詰めます。Protocol fieldの2byteは必ず含めるため、実効MRUは最低6byteとして扱います。未定義のLCP CodeにはLengthで区切った元packetを含むCode-Rejectを生成し、最低でも元の4byte LCP headerを保持します。local起点の終了とEcho-Request送信はまだ含みません。
+`crates/ndm24-ppp/src/lcp/negotiation.rs` は [RFC 1661 section 4、5.5、5.8](https://www.rfc-editor.org/rfc/rfc1661.html) のestablishment、termination、opened-state maintenanceを参照実装します。`Request-Sent`、`Ack-Received`、`Ack-Sent`、`Opened`、`Closing` とrestart timerを持ちます。peer起点のTerminate-Requestには同じIdentifierの空Terminate-Ackで応答します。local `Close` は `ThisLayerDown` と空Terminate-Requestを生成し、既定のMax-Terminate 2回まで同じIdentifierで送信します。一致するTerminate-Ackまたは回数超過で`ThisLayerFinished`と`Closed`へ進み、不一致Ackはtimerを維持して破棄します。`Closing`中にpeerのTerminate-Requestも届いた場合はAckを返しつつlocal終了を継続します。`Opened`中のEcho-Requestはpeerの合意済みMagic-Numberを照合し、同じIdentifierとDataを持つEcho-Replyを生成します。local Magic-Numberはまだ要求しないため、送信Magicは0です。Dataはpeer MRUを越えない範囲まで保持します。`Opened`中の未知PPP ProtocolにはProtocol-Rejectを生成し、Rejected-Informationをpeer MRUまでに切り詰めます。Protocol fieldの2byteは必ず含めるため、実効MRUは最低6byteとして扱います。未定義のLCP CodeにはLengthで区切った元packetを含むCode-Rejectを生成し、最低でも元の4byte LCP headerを保持します。local Echo-Request送信はまだ含みません。
 
 `crates/ndm24-ppp/src/pap.rs` は [RFC 1334 section 2](https://www.rfc-editor.org/rfc/rfc1334.html) のPAP packetをallocation-freeで解析・生成する参照実装です。Authenticate-RequestのPeer-IDとPassword、およびAuthenticate-Ack/NakのMessageについて、各1 octetの長さとPAP packet全体の16 bit Lengthを別々に検証します。宣言Lengthより後のpaddingは無視しますが、宣言Length内で各可変長fieldより後に余分なdataがあればmalformedとして扱います。PAPの認証情報は平文なので、通常の診断やログへpacket dataを出しません。
 
@@ -319,23 +319,23 @@ parserの最終Code、Identifier、Length、error、呼出回数は現在のPPP�
 
 `src/ppp/lcpNegotiation.asm` は、Rust参照実装から `Request-Sent`、`Ack-Received`、`Ack-Sent`、`Opened` の基本遷移を移植しています。local Configure-Requestは既定MRU 1500と既定ACCM `$FFFFFFFF` を維持する空optionです。Identifierは有効なNak/Rejectまたは重複Ack後の新しいRequestで更新し、Identifierやoption列が一致しない応答は状態を変えません。
 
-交渉コアは共有送信encoderを直接上書きせず、`pppLcpPendingAction` にConfigure-Request/Ack/Nak/Reject、Terminate-Ack、Protocol-Reject、Code-Reject、Echo-Replyのいずれかを保持します。`pppLcpBuildPending` はencoderがidleのときだけ `pppTransmitBuffer` を構築します。Configure-Ackは受信packetのIdentifierとoption列をLength境界までそのまま複製し、Nakは置換が必要なoptionだけを元の順序で返し、Rejectは対象optionのbyte列だけを変更せず返します。Terminate-Ackは受信Terminate-RequestのIdentifierを引き継ぐ空packetです。Protocol-Rejectは独立したIdentifierを使い、未知Protocolの非圧縮2byte fieldとInformationを受信順のまま複製します。Code-Rejectは同じReject Identifier系列を使い、未知Codeを持つLCP packetだけをLength境界まで複製してPPP paddingを除外します。どちらもpeer MRUまたは実装上限1500byteを超えるRejected-Informationは末尾を切り詰めます。Echo-ReplyはRequestのIdentifierと任意Dataを保持し、Magicを0へ置換してpeer MRUまでに切り詰めます。
+交渉コアは共有送信encoderを直接上書きせず、`pppLcpPendingAction` にConfigure-Request/Ack/Nak/Reject、Terminate-Request/Ack、Protocol-Reject、Code-Reject、Echo-Replyのいずれかを保持します。`pppLcpBuildPending` はencoderがidleのときだけ `pppTransmitBuffer` を構築します。Configure-Ackは受信packetのIdentifierとoption列をLength境界までそのまま複製し、Nakは置換が必要なoptionだけを元の順序で返し、Rejectは対象optionのbyte列だけを変更せず返します。local Terminate-Requestは新しいIdentifierを持つ空packet、Terminate-Ackは受信Terminate-RequestのIdentifierを引き継ぐ空packetです。Protocol-Rejectは独立したIdentifierを使い、未知Protocolの非圧縮2byte fieldとInformationを受信順のまま複製します。Code-Rejectは同じReject Identifier系列を使い、未知Codeを持つLCP packetだけをLength境界まで複製してPPP paddingを除外します。どちらもpeer MRUまたは実装上限1500byteを超えるRejected-Informationは末尾を切り詰めます。Echo-ReplyはRequestのIdentifierと任意Dataを保持し、Magicを0へ置換してpeer MRUまでに切り詰めます。
 
 `src/ppp/lcpOptions.asm` はMRU、ACCM、PAP、Magic-Numberを選別して受理します。CHAPなどPAP以外の認証方式はPAPへNakし、PFC、ACFC、Quality-Protocol、未知option、重複した全optionはRejectします。同じRequestにReject対象とNak対象があればRejectを優先します。
 
-常設セルフテストのstep `$30`～`$3B` は、Ack到着順が逆の2経路、Opened到達、不正Identifier、Nak後のIdentifier更新、共有encoderへのRequest/Ack構築、peer Terminate-Requestに対する空Terminate-Ackを固定transcriptで検査します。step `$40`～`$43` は、全対応optionの受理と値の公開、MRU・CHAPのNak置換、RejectのNakに対する優先、重複optionを両方Rejectするbyte列を検査します。
+常設セルフテストのstep `$30`～`$3F` は、Ack到着順が逆の2経路、Opened到達、不正Identifier、Nak後のIdentifier更新、共有encoderへのRequest/Ack構築、peer Terminate-Requestに対する空Terminate-Ack、local Terminate-Requestと一致Ackによる`Closing`から`Closed`への遷移を固定transcriptで検査します。step `$40`～`$43` は、全対応optionの受理と値の公開、MRU・CHAPのNak置換、RejectのNakに対する優先、重複optionを両方Rejectするbyte列を検査します。
 
 ## 65816 LCP restart timer
 
-`src/ppp/lcpTimer.asm` はVBlankで進む16bit frame counterを使い、Configure-Requestが共有encoderに受理された時点から180frame（NTSCで約3秒）のrestart timerを開始します。期限前は状態を変えず、期限では同じIdentifierのConfigure-Requestを再送待ちにします。送信encoderがbusyの場合はtimerを先に再開せず、再送packetが実際にencoderへ受理された時点から次の180frameを数えます。
+`src/ppp/lcpTimer.asm` はVBlankで進む16bit frame counterを使い、Configure-RequestまたはTerminate-Requestが共有encoderに受理された時点から180frame（NTSCで約3秒）のrestart timerを開始します。期限前は状態を変えず、期限では同じIdentifierのRequestを再送待ちにします。送信encoderがbusyの場合はtimerを先に再開せず、再送packetが実際にencoderへ受理された時点から次の180frameを数えます。
 
-Max-Configureは初回送信を含む10回です。初回Requestの後に9回まで再送し、次の期限で `Stopped` へ遷移します。`Ack-Received` で期限に達した場合は `Request-Sent` に戻ります。双方のAckが成立して `Opened` へ入った場合、またはcarrier喪失を表すlower-downではtimerを停止します。lower-downはpeer MRU、ACCM、PAP、Magic-Numberも既定値へ戻し、次の接続へ交渉結果を持ち越しません。
+Max-Configureは初回送信を含む10回です。初回Requestの後に9回まで再送し、次の期限で `Stopped` へ遷移します。Max-Terminateは初回送信を含む2回で、再送後の次の期限ではAckがなくても`Closed`へ進みます。`Ack-Received` でConfigure期限に達した場合は `Request-Sent` に戻ります。双方のAckが成立して `Opened` へ入った場合、local終了が完了した場合、またはcarrier喪失を表すlower-downではtimerを停止します。終了完了とlower-downはpeer MRU、ACCM、PAP、Magic-Numberも既定値へ戻し、次の接続へ交渉結果を持ち越しません。常設timer自己試験のstep `$56`は同一IdentifierのTerminate再送と回数超過を検査します。
 
 16bit counterの比較は期限までの差が半周未満であることを利用した減算で行うため、`$FFFF` から `$0000` をまたぐ場合も同じです。常設セルフテストのstep `$50`～`$55` は、共有encoder受理時のtimer開始、wrap-around直前、期限ちょうど、同一Identifier再送、回数超過、`Ack-Received` fallback、lower-downによる初期化を実時間待ちなしで検査します。
 
 ## 65816 LCP main-loop接続
 
-`src/ppp/lcpPoll.asm` は `pppReceivePoll` の後、`pppTransmitPoll` の前に毎main-loop呼び出されます。PPP受信所有権が有効でNDM24が `CONNECTED` のときだけ、ClosedからLCPを開始します。未接続時や所有権無効時はLCPをlower-downし、保持frameと送信中frameを破棄するため、AT sessionやraw binary試験へ状態を持ち越しません。
+`src/ppp/lcpPoll.asm` は `pppReceivePoll` の後、`pppTransmitPoll` の前に毎main-loop呼び出されます。PPP受信所有権が有効でNDM24が `CONNECTED`、かつ管理上Openのときだけ、ClosedからLCPを開始します。local `Close` はこのOpen方針を無効にして`Closing`へ入り、終了後のlive carrier上でConfigure-Requestを自動再開しません。`Closing`中に明示的な`Open`が来た場合は方針だけを予約し、終了完了後の次のpollで再確立を始めます。未接続時や所有権無効時はLCPをlower-downし、保持frameと送信中frameを破棄するため、AT sessionやraw binary試験へ状態を持ち越しません。
 
 完成したLCP frameにAck/Nak/Reject、Terminate-Ack、Echo-Replyのいずれかが必要な場合、その応答が共有encoderへ受理されるまで `pppFrameReady` を保持します。encoderがbusyでも受信bufferを上書きせず、受理後にだけ `pppReleaseFrame` します。受信AckやNak後の新しいlocal Requestは受信frameのbyte列に依存しないため、frameを解放してからpending送信として待機できます。
 
@@ -368,7 +368,7 @@ NMI呼出し経路を実機65816上でも確認しています。
 QUsb2Snes mailboxの`ppp-self-test`（command 10、sequence 1）が合格しました。
 これにより、上記Protocol-Reject fixtureを実機65816上でも確認しています。
 
-Opened中にpeer Configure-Requestを受けた場合は応答packetと新しいlocal Configure-Requestの2packetが必要です。1frame分の応答を先にencoderへ渡し、`lcp_deferred_request` でlocal Requestを保持して直列化します。peer Terminate-Requestでは、Terminate-Ackが共有encoderへ受理されるまでLCPを`Opened`に保ち、受理後に`Stopped`へ遷移させます。これにより上位層のlower-downが先に共有encoderを中止してAckを失う競合を防ぎます。IPCPはlower-down時、送信中frameがLCP Terminate-Ackの場合に限ってこれを温存し、自身の送信中frameは従来どおり中止します。常設セルフテストのstep `$60`～`$65` は、初回Request、TX busy中のframe保持、Ack後の解放、Opened到達、Opened中の再交渉、peer起点の終了、所有権解除時のlower-downを模擬transcriptで検査します。
+Opened中にpeer Configure-Requestを受けた場合は応答packetと新しいlocal Configure-Requestの2packetが必要です。1frame分の応答を先にencoderへ渡し、`lcp_deferred_request` でlocal Requestを保持して直列化します。peer Terminate-Requestでは、Terminate-Ackが共有encoderへ受理されるまでLCPを`Opened`に保ち、受理後に`Stopped`へ遷移させます。local終了中にpeer Terminate-Requestも届いた場合はpeer Ackを先に直列化しますが、localの`Closing`とrestart timerは維持します。これにより上位層のlower-downが先に共有encoderを中止してAckを失う競合を防ぎます。IPCPはlower-down時、送信中frameがLCP Terminate-Ackの場合に限ってこれを温存し、自身の送信中frameは従来どおり中止します。常設セルフテストのstep `$60`～`$68` は、初回Request、TX busy中のframe保持、Ack後の解放、Opened到達、Opened中の再交渉、peer起点の終了、所有権解除時のlower-down、local Closedでの自動再Open抑止を模擬transcriptで検査します。
 
 2026-07-30のrevision A実対向では、`pppd`が送った`TermReq id=0x2`へSFCが
 `TermAck id=0x2`を返し、対向ログの`Connection terminated`まで確認しました。

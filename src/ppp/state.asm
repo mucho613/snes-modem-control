@@ -283,6 +283,11 @@ pppLcpLastEchoIdentifier: .res $1
 pppLcpLastEchoMagic: .res $4
 pppDiagnosticStateEnd:
 
+; LCP control-plane state that is intentionally private to the ROM. The
+; diagnostic ABI publishes the observable state/counters, not policy flags.
+.export pppLcpAdministrativeOpen
+pppLcpAdministrativeOpen: .res $1
+
 .assert pppDiagnosticMagic - pppDiagnosticState = PPP_DIAG_MAGIC, error, "PPP diagnostic magic offset"
 .assert pppDiagnosticVersion - pppDiagnosticState = PPP_DIAG_VERSION, error, "PPP diagnostic version offset"
 .assert pppDiagnosticSize - pppDiagnosticState = PPP_DIAG_SIZE, error, "PPP diagnostic size offset"

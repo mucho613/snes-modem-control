@@ -11,13 +11,14 @@
 .import pppTransmitInitialize, pppTransmitAbort
 .import pppLcpState, pppLcpLastError, pppLcpPendingAction, pppLcpTimerActive
 .import pppLcpDeferredRequest, pppLcpPollAction
+.import pppLcpAdministrativeOpen
 .import pppLcpPollSavedModemState
 .import pppLcpProtocolRejectCount, pppLcpLastRejectedProtocol
 .import pppLcpRejectIdentifier
 .import pppLcpCodeRejectCount, pppLcpLastRejectedCode
 .import pppLcpEchoRequestCount, pppLcpEchoReplyCount, pppLcpEchoDropCount
 .import pppLcpLastEchoIdentifier, pppLcpLastEchoMagic
-.import pppLcpInitialize, pppLcpOpen, pppLcpReceiveFrame
+.import pppLcpInitialize, pppLcpOpen, pppLcpClose, pppLcpReceiveFrame
 .import pppLcpRejectProtocol
 .import pppLcpBuildPending, pppLcpPollTimeout, pppLcpLowerDown
 .import pppLcpPeerTerminateComplete
@@ -53,6 +54,17 @@
   cmp #PPP_LCP_STATE_STOPPED
   beq @stopped
 
+  ; An administrative close requested while a response owned the pending slot
+  ; begins as soon as that response has entered the transmitter.
+  lda pppLcpAdministrativeOpen
+  bne @serviceExistingPending
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_CLOSING
+  beq @serviceExistingPending
+  lda pppLcpPendingAction
+  bne @serviceExistingPending
+  jsr pppLcpClose
+
 @serviceExistingPending:
   assert_m8_i16
   jsr @servicePending
@@ -60,7 +72,9 @@
   jmp @done
 :
   lda pppFrameReady
-  beq @timer
+  bne :+
+  jmp @timer
+:
   m16
   lda pppLastProtocol
   cmp #PPP_PROTOCOL_LCP
@@ -94,6 +108,8 @@
 
 @open:
   assert_m8_i16
+  lda pppLcpAdministrativeOpen
+  beq @done
   jsr pppLcpOpen
   bra @serviceExistingPending
 
@@ -201,6 +217,9 @@
   beq :+
   jsr pppReleaseFrame
 :
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_CLOSING
+  beq @serviceReady
   jsr pppLcpPeerTerminateComplete
   bra @serviceReady
 
@@ -243,7 +262,7 @@
 ;
 ; Output:
 ;   Carry clear, A=$00: passed
-;   Carry set, A=$60-$67: failed step
+;   Carry set, A=$60-$68: failed step
 .proc pppLcpPollRunSelfTest
   .a8
   .i16
@@ -668,6 +687,32 @@
   ora pppLcpDeferredRequest
   pppLcpPollRequireEqual @fail65
 
+  ; Administrative Closed remains quiescent on a live lower layer until an
+  ; explicit Open re-enables establishment.
+  jsr pppLcpClose
+  lda #$01
+  sta pppReceiveEnabled
+  jsr pppTransmitInitialize
+  m16
+  jsr pppLcpPoll
+  m8
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_CLOSED
+  pppLcpPollRequireEqual @fail68
+  lda pppLcpAdministrativeOpen
+  ora pppLcpPendingAction
+  ora pppTransmitActive
+  pppLcpPollRequireEqual @fail68
+  jsr pppLcpOpen
+  m16
+  jsr pppLcpPoll
+  m8
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_REQUEST_SENT
+  pppLcpPollRequireEqual @fail68
+  lda pppTransmitActive
+  pppLcpPollRequireNonzero @fail68
+
   jsr @cleanup
   lda #$00
   clc
@@ -696,6 +741,9 @@
   bra @fail
 @fail67:
   lda #$67
+  bra @fail
+@fail68:
+  lda #$68
 
 @fail:
   pha
