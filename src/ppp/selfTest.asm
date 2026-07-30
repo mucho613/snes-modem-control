@@ -489,6 +489,7 @@
   rts
 .endproc
 
+.data
 pppSelfTestEncoded:
   .byte $7e, $ff, $7d, $23, $c0, $21, $7d, $21, $7d
   .byte $21, $7d, $20, $7d, $24, $d1, $b5, $7e

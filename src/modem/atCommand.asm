@@ -1,4 +1,4 @@
-.code
+.data
 
 .export at
 .export atz

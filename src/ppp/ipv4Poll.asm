@@ -335,6 +335,7 @@ done:
   rts
 .endproc
 
+.data
 pppIpv4PollSelfTestFrameHeader:
   .byte $ff, $03, $00, $21
   .byte $45, $00, $00, $73, $00, $00, $40, $00

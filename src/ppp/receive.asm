@@ -504,11 +504,13 @@ return:
   rts
 .endproc
 
+.data
 pppCarrierLossSelfTestLine:
   .byte PPP_FLAG_SEQUENCE, 'N'
   .byte 'N', 'O', ' ', 'C', 'A', 'R', 'R', 'I', 'E', 'R', $0d, $0a
 pppCarrierLossSelfTestLineEnd:
 
+.code
 ; Release the completed frame buffer after the upper layer has consumed it.
 .proc pppReleaseFrame
   .a8
