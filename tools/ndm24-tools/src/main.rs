@@ -100,6 +100,9 @@ enum Command {
         websocket: String,
         #[arg(long, default_value = "build/smoke/modem-control.lbl")]
         labels: PathBuf,
+        /// Keep the charged call open for experiments until Enter, Ctrl+C, or the safety limit.
+        #[arg(long)]
+        hold: bool,
     },
     PppClose {
         #[arg(long, default_value = "ws://localhost:23074")]
@@ -381,7 +384,11 @@ async fn main() -> Result<()> {
             )
             .await
         }
-        Command::NiftyDial { websocket, labels } => nifty_dial::run(&websocket, &labels).await,
+        Command::NiftyDial {
+            websocket,
+            labels,
+            hold,
+        } => nifty_dial::run(&websocket, &labels, hold).await,
         Command::PppClose {
             websocket,
             labels,
@@ -607,6 +614,16 @@ mod tests {
                 .unwrap()
                 .command,
             Command::PppOpen { .. }
+        ));
+    }
+
+    #[test]
+    fn parses_nifty_hold_mode() {
+        assert!(matches!(
+            Cli::try_parse_from(["ndm24-tools", "nifty-dial", "--hold"])
+                .unwrap()
+                .command,
+            Command::NiftyDial { hold: true, .. }
         ));
     }
 }

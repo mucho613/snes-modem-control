@@ -1,6 +1,8 @@
 use std::io::{self, Write};
 use std::net::Ipv4Addr;
 use std::path::Path;
+use std::sync::mpsc;
+use std::thread;
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail, ensure};
@@ -16,6 +18,7 @@ use crate::{ppp_dial, qusb2snes};
 const ACCESS_NUMBER: &str = "0570077705";
 const DNS_TEST_NAME: &str = "example.com";
 const TOTAL_CALL_WORKFLOW_LIMIT: Duration = Duration::from_secs(105);
+const HOLD_LIMIT: Duration = Duration::from_secs(10 * 60);
 const CLEANUP_LIMIT: Duration = Duration::from_secs(15);
 const SETUP_TIMEOUT: Duration = Duration::from_secs(15);
 const DIAL_TIMEOUT: Duration = Duration::from_secs(60);
@@ -24,12 +27,17 @@ const DNS_TIMEOUT: Duration = Duration::from_secs(20);
 
 const SETUP_COMMANDS: [&str; 5] = ["AT&F", "ATM0", "AT%B2400", "ATS7=60", "ATX4"];
 
-pub(crate) async fn run(websocket: &str, labels: &Path) -> Result<()> {
+pub(crate) async fn run(websocket: &str, labels: &Path, hold: bool) -> Result<()> {
     confirm_charged_call()?;
     let credentials = PapCredentials::prompt()?;
 
-    let workflow = run_once(websocket, labels, &credentials);
-    let result = tokio::time::timeout(TOTAL_CALL_WORKFLOW_LIMIT, workflow).await;
+    let workflow_limit = if hold {
+        TOTAL_CALL_WORKFLOW_LIMIT + HOLD_LIMIT
+    } else {
+        TOTAL_CALL_WORKFLOW_LIMIT
+    };
+    let workflow = run_once(websocket, labels, &credentials, hold);
+    let result = tokio::time::timeout(workflow_limit, workflow).await;
 
     let cleanup = tokio::time::timeout(CLEANUP_LIMIT, cleanup(websocket, labels)).await;
     match cleanup {
@@ -43,12 +51,18 @@ pub(crate) async fn run(websocket: &str, labels: &Path) -> Result<()> {
     match result {
         Ok(result) => result,
         Err(_) => bail!(
-            "Nifty call workflow exceeded 105 seconds and was cancelled; verify that NDM24 is on-hook"
+            "Nifty call workflow exceeded {} seconds and was cancelled; verify that NDM24 is on-hook",
+            workflow_limit.as_secs()
         ),
     }
 }
 
-async fn run_once(websocket: &str, labels: &Path, credentials: &PapCredentials) -> Result<()> {
+async fn run_once(
+    websocket: &str,
+    labels: &Path,
+    credentials: &PapCredentials,
+    hold: bool,
+) -> Result<()> {
     let initial = qusb2snes::read_snapshot(websocket, labels).await?;
     ensure!(
         initial.driver_state == DriverState::Ready,
@@ -130,7 +144,64 @@ async fn run_once(websocket: &str, labels: &Path, credentials: &PapCredentials) 
         DNS_TEST_NAME,
         Ipv4Addr::from(dns.dns_answer_address)
     );
+    if hold {
+        hold_connection().await?;
+    }
     Ok(())
+}
+
+async fn hold_connection() -> Result<()> {
+    println!(
+        "Nifty connection held for experiments (maximum {} minutes).",
+        HOLD_LIMIT.as_secs() / 60
+    );
+    println!("Run DNS, ICMP, or monitor commands in another terminal.");
+    print!("Press Enter here or Ctrl+C to disconnect: ");
+    io::stdout().flush().context("flush Nifty hold prompt")?;
+
+    let (sender, receiver) = mpsc::channel();
+    thread::spawn(move || {
+        let mut input = String::new();
+        let result = io::stdin()
+            .read_line(&mut input)
+            .context("read Nifty hold prompt");
+        let _ = sender.send(result);
+    });
+
+    let interrupt = tokio::signal::ctrl_c();
+    tokio::pin!(interrupt);
+    let deadline = tokio::time::Instant::now() + HOLD_LIMIT;
+    loop {
+        tokio::select! {
+            result = &mut interrupt => {
+                result.context("wait for Ctrl+C during Nifty hold")?;
+                println!();
+                println!("Ctrl+C received; disconnecting.");
+                return Ok(());
+            }
+            _ = tokio::time::sleep(Duration::from_millis(100)) => {
+                match receiver.try_recv() {
+                    Ok(result) => {
+                        result?;
+                        println!("Disconnect requested.");
+                        return Ok(());
+                    }
+                    Err(mpsc::TryRecvError::Disconnected) => {
+                        bail!("Nifty hold input thread stopped unexpectedly");
+                    }
+                    Err(mpsc::TryRecvError::Empty) => {}
+                }
+                if tokio::time::Instant::now() >= deadline {
+                    println!();
+                    println!(
+                        "Nifty hold safety limit of {} minutes reached; disconnecting.",
+                        HOLD_LIMIT.as_secs() / 60
+                    );
+                    return Ok(());
+                }
+            }
+        }
+    }
 }
 
 async fn cleanup(websocket: &str, labels: &Path) -> Result<()> {
@@ -195,9 +266,14 @@ mod tests {
         assert_eq!(SETUP_COMMANDS[1], "ATM0");
         assert_eq!(DIAL_TIMEOUT, Duration::from_secs(60));
         assert_eq!(TOTAL_CALL_WORKFLOW_LIMIT, Duration::from_secs(105));
+        assert_eq!(HOLD_LIMIT, Duration::from_secs(600));
         assert_eq!(
             TOTAL_CALL_WORKFLOW_LIMIT + CLEANUP_LIMIT,
             Duration::from_secs(120)
+        );
+        assert_eq!(
+            TOTAL_CALL_WORKFLOW_LIMIT + HOLD_LIMIT + CLEANUP_LIMIT,
+            Duration::from_secs(720)
         );
     }
 }

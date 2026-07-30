@@ -89,6 +89,20 @@ cargo run -p ndm24-tools -- nifty-dial
 上限や後始末に失敗した場合は、NDM24がオンフックへ戻ったことを物理的に確認
 します。
 
+DNS、ICMP、NTPなどを別のPowerShellから試す場合は、`--hold`を指定します。
+接続直後の既定DNS試験が成功すると、runnerは最大10分間接続を維持します。
+
+```powershell
+cargo run -p ndm24-tools -- nifty-dial --hold
+```
+
+runnerに待機メッセージが表示された後、別のPowerShellでアプリケーション
+コマンドを実行します。終了時はrunner側でEnterを押すかCtrl+Cを入力します。
+どちらも資格情報clear、LCP Close、PPP receive停止からなる通常の後始末へ
+合流します。操作がなくても10分で自動的に同じ切断処理を開始します。
+`--hold`を付けない従来動作は、既定DNS試験の直後に切断し、発信から後始末まで
+引き続き120秒を上限とします。hold時の全体上限は後始末15秒を含む12分です。
+
 ## 記録方針
 
 Git管理文書には認証方式、MRU/ACCM、IPCP/DNS option、成否だけを残します。
