@@ -483,7 +483,9 @@ Rejectした場合はそのoptionだけを次のRequestから外し、IPCPの成
 共有encoderがbusyならpeer応答と受信frame所有権を保持し、受理後に解放します。
 Opened中の再交渉ではpeer応答を先に送り、local Configure-Requestを1件だけ
 deferred slotへ保持します。lower-downでは交渉済みIP/DNS address、timer、pending
-送信を初期値へ戻します。
+送信を初期値へ戻します。local addressとDNS addressはzeroへ戻しますが、peer
+addressはzero要求へのNakに使う設定済み既定値を保持し、`PEER_VALID`も維持します。
+これは前回の交渉結果ではなく、IPCP `Closed`中はpacket送受信に使用しません。
 
 restart intervalは180 frame、Max-Configureは初回を含む10回です。timeout再送は
 同じIdentifierとoption列を使い、送信器が受理した時点から次の期限を数えます。

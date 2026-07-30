@@ -330,6 +330,11 @@ FXPAK PROへQUsb2Snes経由で転送し、起動確認後にmailbox `ppp-self-te
 （command 10、sequence 1）が合格しました。固定fixtureにより、local
 Configure-RequestのMagic option、完全一致Ack、Ack済みlocal Magicを使う
 Echo-Reply、同じMagicを返すNak後の32bit提案値更新を実機65816上で確認しました。
-この試験は回線へ発信しないため、実対向でのMagic交渉確認とは区別します。
+続くrevision AとDFM-56UのV.22bis実対向では、SFCがlocal Magic
+`0x4E447C2D`を要求し、`pppd`が同じoptionをConfigure-Ackしました。接続中の
+診断はlocal flags 3、loopback count 0、Echo Request/Reply `8/8`、drop 0で、
+Echo-Replyにも同じlocal Magicが入りました。LCP、PAP、IPCPはすべて`Opened`、
+FCS error、invalid、overflow、backpressure、abortは0でした。停止後はpeer
+Terminate-Request/Ackが各1回、pending RXは空で、DFM-56UはCOM5へ戻りました。
 
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。

@@ -493,6 +493,27 @@ Max-Terminate枯渇0で`Closed`へ進みました。2回目は2400 bit/s回線�
 確認しました。FCS error、invalid、overflowは0です。試験後に統合`Stop`を実行し、
 DFM-56UはWindowsのCOM5へ戻りました。
 
+## 2026-07-31 revision A local Magic-Number結果
+
+PPP診断ABI version 20のnormal ROM、revision AのNDM24、DFM-56UをV.22bis
+2400 bit/sで接続しました。`pppd`はpeer Magic `0x94736A74`を要求し、SFCは
+Configure-Ackしました。SFCはlocal Configure-RequestでMagic
+`0x4E447C2D`を要求し、`pppd`は同じoption列をConfigure-Ackしました。
+
+接続中のSFC診断はLCP、PAP、IPCPがすべて`Opened`、local Magic flagsが3
+（要求中かつAck済み）、loopback countが0でした。`pppd`が5秒間隔で送った
+Echo-RequestへSFCはAck済みlocal Magic `0x4E447C2D`を使って応答し、停止前の
+Request/Reply countは`8/8`、drop 0でした。IPCP local/peerは
+`10.24.0.2`/`10.24.0.1`、Primary/Secondary DNSは
+`1.1.1.1`/`1.0.0.1`です。FCS error、invalid、overflow、TX backpressure、
+TX abortはいずれも0でした。
+
+統合`Stop`ではpeer Terminate-Request/Ackが各1回成立しました。切断後はLCPと
+IPCPが`Closed`、PAPが`Inactive`、local Magicとflagsがzero、pending RXが空に
+戻りました。IPCP peer addressの`10.24.0.1`と`PEER_VALID`は前回の交渉結果では
+なく、次回のzero要求へNakする設定済み既定値として設計どおり保持されます。
+DFM-56UはWindowsのCOM5へ正常に戻りました。
+
 試験終了時は必ず停止します。
 
 ```powershell
