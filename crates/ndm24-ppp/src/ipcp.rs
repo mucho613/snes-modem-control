@@ -44,6 +44,8 @@ pub enum OptionType {
     IpAddresses = 1,
     IpCompressionProtocol = 2,
     IpAddress = 3,
+    PrimaryDnsServerAddress = 129,
+    SecondaryDnsServerAddress = 131,
 }
 
 impl OptionType {
@@ -52,6 +54,8 @@ impl OptionType {
             1 => Some(Self::IpAddresses),
             2 => Some(Self::IpCompressionProtocol),
             3 => Some(Self::IpAddress),
+            129 => Some(Self::PrimaryDnsServerAddress),
+            131 => Some(Self::SecondaryDnsServerAddress),
             _ => None,
         }
     }
@@ -132,8 +136,23 @@ pub fn encode_into(
 }
 
 pub fn encode_ip_address_option(address: Ipv4Address) -> [u8; IP_ADDRESS_OPTION_LENGTH] {
+    encode_address_option(OptionType::IpAddress, address)
+}
+
+pub fn encode_primary_dns_address_option(address: Ipv4Address) -> [u8; IP_ADDRESS_OPTION_LENGTH] {
+    encode_address_option(OptionType::PrimaryDnsServerAddress, address)
+}
+
+pub fn encode_secondary_dns_address_option(address: Ipv4Address) -> [u8; IP_ADDRESS_OPTION_LENGTH] {
+    encode_address_option(OptionType::SecondaryDnsServerAddress, address)
+}
+
+fn encode_address_option(
+    option_type: OptionType,
+    address: Ipv4Address,
+) -> [u8; IP_ADDRESS_OPTION_LENGTH] {
     [
-        OptionType::IpAddress as u8,
+        option_type as u8,
         IP_ADDRESS_OPTION_LENGTH as u8,
         address[0],
         address[1],
@@ -163,6 +182,16 @@ impl ConfigurationOption<'_> {
 
     pub fn ip_address(self) -> Option<Ipv4Address> {
         (self.known_type() == Some(OptionType::IpAddress) && self.data.len() == 4)
+            .then(|| self.data.try_into().expect("length checked"))
+    }
+
+    pub fn primary_dns_address(self) -> Option<Ipv4Address> {
+        (self.known_type() == Some(OptionType::PrimaryDnsServerAddress) && self.data.len() == 4)
+            .then(|| self.data.try_into().expect("length checked"))
+    }
+
+    pub fn secondary_dns_address(self) -> Option<Ipv4Address> {
+        (self.known_type() == Some(OptionType::SecondaryDnsServerAddress) && self.data.len() == 4)
             .then(|| self.data.try_into().expect("length checked"))
     }
 }

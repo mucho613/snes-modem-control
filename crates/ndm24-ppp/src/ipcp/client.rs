@@ -3,6 +3,7 @@
 use super::{
     Code, ConfigurationOption, Ipv4Address, OptionParseError, OptionType, Packet,
     UNSPECIFIED_ADDRESS, configuration_options, encode_into, encode_ip_address_option,
+    encode_primary_dns_address_option, encode_secondary_dns_address_option,
 };
 
 pub const DEFAULT_RESTART_INTERVAL_MS: u64 = 3_000;
@@ -23,6 +24,8 @@ pub enum State {
 pub struct AddressConfiguration {
     pub local: Ipv4Address,
     pub peer: Ipv4Address,
+    pub primary_dns: Ipv4Address,
+    pub secondary_dns: Ipv4Address,
 }
 
 impl AddressConfiguration {
@@ -84,7 +87,11 @@ pub struct Client {
     settings: Settings,
     local_address: Ipv4Address,
     peer_address: Ipv4Address,
+    primary_dns_address: Ipv4Address,
+    secondary_dns_address: Ipv4Address,
     request_address_option: bool,
+    request_primary_dns_option: bool,
+    request_secondary_dns_option: bool,
     request_identifier: u8,
     next_identifier: u8,
     restart_remaining: u8,
@@ -97,8 +104,12 @@ impl Client {
             state: State::Closed,
             local_address: settings.requested_local_address,
             peer_address: settings.preferred_peer_address,
+            primary_dns_address: UNSPECIFIED_ADDRESS,
+            secondary_dns_address: UNSPECIFIED_ADDRESS,
             settings,
             request_address_option: true,
+            request_primary_dns_option: true,
+            request_secondary_dns_option: true,
             request_identifier: 0,
             next_identifier: 0,
             restart_remaining: 0,
@@ -114,6 +125,8 @@ impl Client {
         AddressConfiguration {
             local: self.local_address,
             peer: self.peer_address,
+            primary_dns: self.primary_dns_address,
+            secondary_dns: self.secondary_dns_address,
         }
     }
 
@@ -136,7 +149,11 @@ impl Client {
         self.state = State::RequestSent;
         self.local_address = self.settings.requested_local_address;
         self.peer_address = self.settings.preferred_peer_address;
+        self.primary_dns_address = UNSPECIFIED_ADDRESS;
+        self.secondary_dns_address = UNSPECIFIED_ADDRESS;
         self.request_address_option = true;
+        self.request_primary_dns_option = true;
+        self.request_secondary_dns_option = true;
         let packet = self.send_new_request(now_ms, true)?;
         Ok(Transition {
             actions: vec![Action::SendPacket(packet)],
@@ -149,7 +166,11 @@ impl Client {
         self.state = State::Closed;
         self.local_address = self.settings.requested_local_address;
         self.peer_address = self.settings.preferred_peer_address;
+        self.primary_dns_address = UNSPECIFIED_ADDRESS;
+        self.secondary_dns_address = UNSPECIFIED_ADDRESS;
         self.request_address_option = true;
+        self.request_primary_dns_option = true;
+        self.request_secondary_dns_option = true;
         self.restart_deadline_ms = None;
         self.restart_remaining = 0;
         Transition {
@@ -342,15 +363,47 @@ impl Client {
         if has_duplicate_types(&options) {
             return Ok(invalid_response());
         }
-        let Some(address) = options
-            .iter()
-            .find_map(|option| option.ip_address())
-            .filter(|address| *address != UNSPECIFIED_ADDRESS)
-        else {
+        let mut accepted = false;
+        for option in options {
+            match option.known_type() {
+                Some(OptionType::IpAddress) if self.request_address_option => {
+                    let Some(address) = option
+                        .ip_address()
+                        .filter(|address| *address != UNSPECIFIED_ADDRESS)
+                    else {
+                        return Ok(invalid_response());
+                    };
+                    self.local_address = address;
+                    accepted = true;
+                }
+                Some(OptionType::PrimaryDnsServerAddress) if self.request_primary_dns_option => {
+                    let Some(address) = option
+                        .primary_dns_address()
+                        .filter(|address| *address != UNSPECIFIED_ADDRESS)
+                    else {
+                        return Ok(invalid_response());
+                    };
+                    self.primary_dns_address = address;
+                    accepted = true;
+                }
+                Some(OptionType::SecondaryDnsServerAddress)
+                    if self.request_secondary_dns_option =>
+                {
+                    let Some(address) = option
+                        .secondary_dns_address()
+                        .filter(|address| *address != UNSPECIFIED_ADDRESS)
+                    else {
+                        return Ok(invalid_response());
+                    };
+                    self.secondary_dns_address = address;
+                    accepted = true;
+                }
+                _ => return Ok(invalid_response()),
+            }
+        }
+        if !accepted {
             return Ok(invalid_response());
-        };
-        self.local_address = address;
-        self.request_address_option = true;
+        }
         self.after_negative_response(now_ms)
     }
 
@@ -371,11 +424,36 @@ impl Client {
                 });
             }
         };
-        if options.len() != 1 || options[0].encoded != encode_ip_address_option(self.local_address)
-        {
+        if options.is_empty() || has_duplicate_types(&options) {
             return Ok(invalid_response());
         }
-        self.request_address_option = false;
+        for option in options {
+            match option.known_type() {
+                Some(OptionType::IpAddress)
+                    if self.request_address_option
+                        && option.encoded == encode_ip_address_option(self.local_address) =>
+                {
+                    self.request_address_option = false;
+                }
+                Some(OptionType::PrimaryDnsServerAddress)
+                    if self.request_primary_dns_option
+                        && option.encoded
+                            == encode_primary_dns_address_option(self.primary_dns_address) =>
+                {
+                    self.request_primary_dns_option = false;
+                    self.primary_dns_address = UNSPECIFIED_ADDRESS;
+                }
+                Some(OptionType::SecondaryDnsServerAddress)
+                    if self.request_secondary_dns_option
+                        && option.encoded
+                            == encode_secondary_dns_address_option(self.secondary_dns_address) =>
+                {
+                    self.request_secondary_dns_option = false;
+                    self.secondary_dns_address = UNSPECIFIED_ADDRESS;
+                }
+                _ => return Ok(invalid_response()),
+            }
+        }
         self.after_negative_response(now_ms)
     }
 
@@ -424,11 +502,19 @@ impl Client {
     }
 
     fn local_options(&self) -> Vec<u8> {
+        let mut options = Vec::with_capacity(3 * super::IP_ADDRESS_OPTION_LENGTH);
         if self.request_address_option {
-            encode_ip_address_option(self.local_address).to_vec()
-        } else {
-            Vec::new()
+            options.extend_from_slice(&encode_ip_address_option(self.local_address));
         }
+        if self.request_primary_dns_option {
+            options.extend_from_slice(&encode_primary_dns_address_option(self.primary_dns_address));
+        }
+        if self.request_secondary_dns_option {
+            options.extend_from_slice(&encode_secondary_dns_address_option(
+                self.secondary_dns_address,
+            ));
+        }
+        options
     }
 
     fn allocate_identifier(&mut self) -> u8 {
@@ -489,9 +575,13 @@ fn evaluate_peer_request(
                         )
                     }
                 }
-                Some(OptionType::IpAddresses | OptionType::IpCompressionProtocol) | None => {
-                    OptionDisposition::Reject
-                }
+                Some(
+                    OptionType::IpAddresses
+                    | OptionType::IpCompressionProtocol
+                    | OptionType::PrimaryDnsServerAddress
+                    | OptionType::SecondaryDnsServerAddress,
+                )
+                | None => OptionDisposition::Reject,
             }
         };
         dispositions.push(disposition);
@@ -590,19 +680,33 @@ mod tests {
     fn pppd_transcript_negotiates_both_addresses() {
         let mut client = Client::new(SETTINGS);
         let opened = client.open(0).unwrap();
-        assert_eq!(packet(&opened.actions[0]), [1, 1, 0, 10, 3, 6, 0, 0, 0, 0]);
+        assert_eq!(
+            packet(&opened.actions[0]),
+            [
+                1, 1, 0, 22, 3, 6, 0, 0, 0, 0, 129, 6, 0, 0, 0, 0, 131, 6, 0, 0, 0, 0
+            ]
+        );
 
         let peer_request = [1, 11, 0, 10, 3, 6, 10, 24, 0, 1];
         let peer = client.receive(&peer_request, 20).unwrap();
         assert_eq!(client.state(), State::AckSent);
         assert_eq!(packet(&peer.actions[0]), [2, 11, 0, 10, 3, 6, 10, 24, 0, 1]);
 
-        let local_nak = [3, 1, 0, 10, 3, 6, 10, 24, 0, 2];
+        let local_nak = [
+            3, 1, 0, 22, 3, 6, 10, 24, 0, 2, 129, 6, 1, 1, 1, 1, 131, 6, 1, 0, 0, 1,
+        ];
         let nak = client.receive(&local_nak, 30).unwrap();
         assert_eq!(client.state(), State::AckSent);
-        assert_eq!(packet(&nak.actions[0]), [1, 2, 0, 10, 3, 6, 10, 24, 0, 2]);
+        assert_eq!(
+            packet(&nak.actions[0]),
+            [
+                1, 2, 0, 22, 3, 6, 10, 24, 0, 2, 129, 6, 1, 1, 1, 1, 131, 6, 1, 0, 0, 1,
+            ]
+        );
 
-        let local_ack = [2, 2, 0, 10, 3, 6, 10, 24, 0, 2];
+        let local_ack = [
+            2, 2, 0, 22, 3, 6, 10, 24, 0, 2, 129, 6, 1, 1, 1, 1, 131, 6, 1, 0, 0, 1,
+        ];
         let ack = client.receive(&local_ack, 40).unwrap();
         assert_eq!(client.state(), State::Opened);
         assert_eq!(
@@ -610,6 +714,8 @@ mod tests {
             [Action::ThisLayerUp(AddressConfiguration {
                 local: [10, 24, 0, 2],
                 peer: [10, 24, 0, 1],
+                primary_dns: [1, 1, 1, 1],
+                secondary_dns: [1, 0, 0, 1],
             })]
         );
         assert!(client.addresses().is_usable());
@@ -647,8 +753,12 @@ mod tests {
         let mut client = Client::new(SETTINGS);
         client.open(0).unwrap();
         for response in [
-            [2, 2, 0, 10, 3, 6, 0, 0, 0, 0],
-            [2, 1, 0, 10, 3, 6, 10, 24, 0, 2],
+            vec![
+                2, 2, 0, 22, 3, 6, 0, 0, 0, 0, 129, 6, 0, 0, 0, 0, 131, 6, 0, 0, 0, 0,
+            ],
+            vec![
+                2, 1, 0, 22, 3, 6, 10, 24, 0, 2, 129, 6, 0, 0, 0, 0, 131, 6, 0, 0, 0, 0,
+            ],
         ] {
             assert_eq!(
                 client.receive(&response, 1).unwrap().ignored,
@@ -693,7 +803,57 @@ mod tests {
             AddressConfiguration {
                 local: [0, 0, 0, 0],
                 peer: [10, 24, 0, 1],
+                primary_dns: [0, 0, 0, 0],
+                secondary_dns: [0, 0, 0, 0],
             }
+        );
+    }
+
+    #[test]
+    fn dns_options_can_be_rejected_independently() {
+        let mut client = Client::new(SETTINGS);
+        client.open(0).unwrap();
+        let reject_primary = [4, 1, 0, 10, 129, 6, 0, 0, 0, 0];
+        let next = client.receive(&reject_primary, 1).unwrap();
+        assert_eq!(
+            packet(&next.actions[0]),
+            [1, 2, 0, 16, 3, 6, 0, 0, 0, 0, 131, 6, 0, 0, 0, 0]
+        );
+
+        let reject_secondary = [4, 2, 0, 10, 131, 6, 0, 0, 0, 0];
+        let final_request = client.receive(&reject_secondary, 2).unwrap();
+        assert_eq!(
+            packet(&final_request.actions[0]),
+            [1, 3, 0, 10, 3, 6, 0, 0, 0, 0]
+        );
+    }
+
+    #[test]
+    fn zero_dns_nak_is_invalid_but_zero_ack_can_converge() {
+        let mut client = Client::new(SETTINGS);
+        client.open(0).unwrap();
+        let zero_nak = [3, 1, 0, 10, 129, 6, 0, 0, 0, 0];
+        assert_eq!(
+            client.receive(&zero_nak, 1).unwrap().ignored,
+            Some(IgnoreReason::InvalidConfigureResponse)
+        );
+
+        let peer_request = [1, 11, 0, 10, 3, 6, 10, 24, 0, 1];
+        client.receive(&peer_request, 2).unwrap();
+        let address_nak = [3, 1, 0, 10, 3, 6, 10, 24, 0, 2];
+        client.receive(&address_nak, 3).unwrap();
+        let zero_ack = [
+            2, 2, 0, 22, 3, 6, 10, 24, 0, 2, 129, 6, 0, 0, 0, 0, 131, 6, 0, 0, 0, 0,
+        ];
+        let ack = client.receive(&zero_ack, 4).unwrap();
+        assert_eq!(
+            ack.actions,
+            [Action::ThisLayerUp(AddressConfiguration {
+                local: [10, 24, 0, 2],
+                peer: [10, 24, 0, 1],
+                primary_dns: [0, 0, 0, 0],
+                secondary_dns: [0, 0, 0, 0],
+            })]
         );
     }
 }
