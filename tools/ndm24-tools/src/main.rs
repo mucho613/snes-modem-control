@@ -6,6 +6,7 @@ mod labels;
 mod nifty_dial;
 mod peer;
 mod ppp_dial;
+mod prbs;
 mod qusb2snes;
 mod speed_probe;
 mod trace;
