@@ -9,6 +9,7 @@
 
 .export pppDiagnosticInitialize, pppSnapshotBegin, pppSnapshotEnd
 .export pppSnapshotBeginI8, pppSnapshotEndI8
+.export pppSnapshotBeginLong, pppSnapshotEndLong
 
 .proc pppDiagnosticInitialize
   .a8
@@ -90,4 +91,20 @@ nested:
 nested:
   pla
   rts
+.endproc
+
+.proc pppSnapshotBeginLong
+  .a8
+  .i16
+
+  jsr pppSnapshotBegin
+  rtl
+.endproc
+
+.proc pppSnapshotEndLong
+  .a8
+  .i16
+
+  jsr pppSnapshotEnd
+  rtl
 .endproc

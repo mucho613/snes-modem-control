@@ -17,6 +17,7 @@
 .import pppLcpInitialize
 .import pppLcpPoll
 .import pppPapInitialize, pppPapPoll
+.import pppPapCredentialsInitialize
 .import pppIpcpInitialize, pppIpcpPoll
 .import pppIpv4Initialize, pppIpv4Poll
 .import pppIcmpInitialize
@@ -75,6 +76,7 @@
   jsr pppTransmitInitialize
   jsr pppLcpInitialize
   jsr pppPapInitialize
+  jsl pppPapCredentialsInitialize
   jsr pppIpcpInitialize
   jsr pppIpv4Initialize
   jsr pppIcmpInitialize

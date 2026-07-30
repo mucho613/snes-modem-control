@@ -15,6 +15,8 @@
 .import pppTransmitFrameCount, pppTransmitBackpressureCount
 .import pppTransmitAbortCount
 .import pppTransmitBuffer
+.import pppPapCredentialFlags
+.import pppPapScrubTransmitBuffer
 
 .export pppTransmitInitialize, pppTransmitBegin, pppTransmitPoll
 .export pppTransmitAbort
@@ -115,6 +117,7 @@ invalid:
   setDBR $7e
   lda pppTransmitActive
   beq abortDone
+  jsl pppPapScrubTransmitBuffer
   jsr pppSnapshotBegin
   stz pppTransmitActive
   stz pppTransmitEscapeSecond
@@ -146,6 +149,9 @@ abortDone:
   beq connected
   lda pppTransmitActive
   beq done
+  i16
+  jsl pppPapScrubTransmitBuffer
+  i8
   jsr pppSnapshotBeginI8
   stz pppTransmitActive
   stz pppTransmitEscapeSecond
@@ -275,7 +281,18 @@ ready:
   jmp inactiveReturn
 :
   jsr pppSnapshotBegin
+  pha
+  lda pppPapCredentialFlags
+  and #PPP_PAP_CREDENTIAL_FLAG_EXPOSURE_ACTIVE
+  beq :+
+  stz pppTransmitLastWireByte
+  bra :++
+:
+  pla
+  pha
   sta pppTransmitLastWireByte
+:
+  pla
   pppIncrement32 pppTransmitWireByteCount
 
   lda pppTransmitStage
@@ -343,6 +360,7 @@ finishFcsLow:
   bra return
 
 finishClosing:
+  jsl pppPapScrubTransmitBuffer
   lda #PPP_TRANSMIT_STAGE_COMPLETE
   sta pppTransmitStage
   stz pppTransmitActive

@@ -44,7 +44,7 @@ ABI version: `2`. Block size: `128` bytes.
 
 ## PPP Diagnostic ABI
 
-ABI version: `20`. Block size: `490` bytes.
+ABI version: `21`. Block size: `493` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|
@@ -249,10 +249,13 @@ ABI version: `20`. Block size: `490` bytes.
 | `0x1E1` | 4 | `u32` | `lcp_local_magic` | Local Magic-Number currently proposed in Configure-Request |
 | `0x1E5` | 1 | `u8` | `lcp_local_flags` | Local Magic-Number request and acknowledgement flags |
 | `0x1E6` | 4 | `u32` | `lcp_loopback_count` | Peer Configure-Requests whose Magic-Number matched the local proposal |
+| `0x1EA` | 1 | `u8` | `pap_credential_flags` | PAP credential presence and transient-sensitive mode flags; never contains credential bytes |
+| `0x1EB` | 1 | `u8` | `pap_peer_id_length` | Length of the staged PAP Peer-ID |
+| `0x1EC` | 1 | `u8` | `pap_password_length` | Length of the staged PAP password |
 
 ## Mailbox ABI
 
-ABI version: `8`. Block size: `96` bytes.
+ABI version: `9`. Block size: `96` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|

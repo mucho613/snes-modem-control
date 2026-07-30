@@ -1,4 +1,5 @@
 .include "constants.inc"
+.include "../ppp/constants.inc"
 .include "../macro/utility.asm"
 
 .code
@@ -18,6 +19,7 @@
 .import modemReceiveBuffer, modemTransmitBuffer
 .import modemMailbox
 .import terminalMirrorReceivedByte
+.import pppPapCredentialFlags
 
 .export modemInitializeDiagnostics
 .export modemResetQueues
@@ -301,7 +303,20 @@ empty:
   cpy modemTransmitWriteIndex
   beq done
   lda modemTransmitBuffer, y
+  pha
+  lda pppPapCredentialFlags
+  and #PPP_PAP_CREDENTIAL_FLAG_EXPOSURE_ACTIVE
+  beq :+
+  stz modemLastTransmitByte
+  bra :++
+:
+  pla
+  pha
   sta modemLastTransmitByte
+:
+  pla
+  lda #$00
+  sta modemTransmitBuffer, y
   iny
   sty modemTransmitReadIndex
   modemIncrement32 modemTransmitByteCount

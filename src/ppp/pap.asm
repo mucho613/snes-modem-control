@@ -14,6 +14,9 @@
 .import pppPapRestartRemaining, pppPapPendingAction
 .import pppPapTimerActive, pppPapFailure, pppPapPacketLength
 .import pppPapRestartDeadline, pppPapReceiveCount, pppPapTransmitCount
+.import pppPapCredentialFlags, pppPapPeerIdLength, pppPapPasswordLength
+.import pppPapPeerId, pppPapPassword
+.import pppPapCredentialsReady, pppPapCredentialsClearSensitive
 
 .export pppPapInitialize, pppPapLowerUp, pppPapLowerDown
 .export pppPapBuildPending, pppPapReceiveFrame, pppPapPollTimeout
@@ -65,6 +68,16 @@
   lda pppLcpPeerFlags
   and #PPP_LCP_PEER_FLAG_PAP
   beq @notRequired
+  jsl pppPapCredentialsReady
+  bcc @credentialsReady
+  lda #PPP_PAP_STATE_FAILED
+  sta pppPapState
+  lda #PPP_PAP_FAILURE_CREDENTIALS_MISSING
+  sta pppPapFailure
+  stz pppPapPendingAction
+  bra @publish
+@credentialsReady:
+  assert_m8_i16
   lda #PPP_PAP_STATE_REQUEST_PENDING
   sta pppPapState
   lda #PPP_PAP_ACTION_AUTHENTICATE_REQUEST
@@ -99,13 +112,13 @@
   stz pppPapRestartDeadline
   m8
   jsr pppSnapshotEnd
+  jsl pppPapCredentialsClearSensitive
   plb
   rts
 .endproc
 
-; Build the fixed closed-test credential fixture and transfer it to the shared
-; asynchronous encoder. Credentials are deliberately never copied into the
-; public diagnostic block.
+; Build the currently staged credential fields and transfer them to the shared
+; asynchronous encoder. Only their lengths and presence flags are public.
 ;
 ; Carry clear means accepted. Carry set means the shared encoder is busy.
 .proc pppPapBuildPending
@@ -122,6 +135,19 @@
   rts
 
 @build:
+  jsl pppPapCredentialsReady
+  bcc :+
+  jsr pppSnapshotBegin
+  lda #PPP_PAP_STATE_FAILED
+  sta pppPapState
+  lda #PPP_PAP_FAILURE_CREDENTIALS_MISSING
+  sta pppPapFailure
+  stz pppPapPendingAction
+  jsr pppSnapshotEnd
+  plb
+  clc
+  rts
+:
   ; Do not overwrite the unescaped source of an active LCP or PAP frame.
   lda pppTransmitActive
   beq :+
@@ -142,50 +168,49 @@
   lda pppPapNextIdentifier
   sta pppTransmitBuffer + 5
   stz pppTransmitBuffer + 6
-  lda #PPP_PAP_PACKET_LENGTH
+  lda pppPapPeerIdLength
+  clc
+  adc pppPapPasswordLength
+  adc #(PPP_PAP_HEADER_LENGTH + 2)
   sta pppTransmitBuffer + 7
-  lda #PPP_PAP_PEER_ID_LENGTH
+  lda pppPapPeerIdLength
   sta pppTransmitBuffer + 8
-  lda #'n'
-  sta pppTransmitBuffer + 9
-  lda #'d'
-  sta pppTransmitBuffer + 10
-  lda #'m'
-  sta pppTransmitBuffer + 11
-  lda #'2'
-  sta pppTransmitBuffer + 12
-  lda #'4'
-  sta pppTransmitBuffer + 13
-  lda #PPP_PAP_PASSWORD_LENGTH
-  sta pppTransmitBuffer + 14
-  lda #'n'
-  sta pppTransmitBuffer + 15
-  lda #'d'
-  sta pppTransmitBuffer + 16
-  lda #'m'
-  sta pppTransmitBuffer + 17
-  lda #'2'
-  sta pppTransmitBuffer + 18
-  lda #'4'
-  sta pppTransmitBuffer + 19
-  lda #'-'
-  sta pppTransmitBuffer + 20
-  lda #'t'
-  sta pppTransmitBuffer + 21
-  lda #'e'
-  sta pppTransmitBuffer + 22
-  lda #'s'
-  sta pppTransmitBuffer + 23
-  lda #'t'
-  sta pppTransmitBuffer + 24
-
+  i8
+  ldx #$00
+  ldy #$09
+@copyPeerId:
+  lda pppPapPeerId, x
+  sta pppTransmitBuffer, y
+  inx
+  iny
+  cpx pppPapPeerIdLength
+  bne @copyPeerId
+  lda pppPapPasswordLength
+  sta pppTransmitBuffer, y
+  iny
+  ldx #$00
+@copyPassword:
+  lda pppPapPassword, x
+  sta pppTransmitBuffer, y
+  inx
+  iny
+  cpx pppPapPasswordLength
+  bne @copyPassword
+  i16
   m16
-  lda #PPP_PAP_TRANSMIT_FRAME_LENGTH
+  tya
   jsr pppTransmitBegin
   m8
   bcs busyReturn
 
   jsr pppSnapshotBegin
+  lda pppPapCredentialFlags
+  and #PPP_PAP_CREDENTIAL_FLAG_TRANSIENT
+  beq :+
+  lda pppPapCredentialFlags
+  ora #PPP_PAP_CREDENTIAL_FLAG_EXPOSURE_ACTIVE
+  sta pppPapCredentialFlags
+:
   lda pppPapNextIdentifier
   sta pppPapRequestIdentifier
   inc pppPapNextIdentifier
@@ -340,6 +365,7 @@ busyReturn:
   stz pppPapFailure
 @success:
   jsr pppSnapshotEnd
+  jsl pppPapCredentialsClearSensitive
   plb
   clc
   rts
@@ -382,6 +408,7 @@ busyReturn:
   sta pppPapState
   lda #PPP_PAP_FAILURE_RETRY_LIMIT
   sta pppPapFailure
+  jsl pppPapCredentialsClearSensitive
 @publish:
   jsr pppSnapshotEnd
   plb

@@ -817,7 +817,9 @@ available:
 
   jsr prepareResponse
   m16
-  lda #$0209
+  lda pppDnsSentFrame
+  clc
+  adc #$0009
   sta frameCounter
   m8
   jsr pppDnsReceive
@@ -833,7 +835,10 @@ available:
   m16
   lda pppDnsRttFrames
   cmp #$0009
+  beq @rttAccepted
+  cmp #$000a
   pppDnsRequireEqual failab_16
+@rttAccepted:
   m8
   jsr pppTransmitInitialize
   jsr pppDnsRequest
@@ -870,7 +875,9 @@ available:
   jsr pppDnsInitialize
   jsr prepareLinkAndQuery
   jsr pppDnsRequest
-  bcs failae
+  bcc :+
+  jmp failae
+:
   m16
   jsr pppDnsPoll
   lda pppDnsDeadline

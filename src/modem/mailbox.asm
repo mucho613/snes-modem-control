@@ -18,6 +18,8 @@
 .import pppRunSelfTest
 .import pppReceiveStart, pppReceiveStop
 .import pppLcpOpen, pppLcpClose
+.import pppPapCredentialsClear
+.import pppPapCredentialSetPeerId, pppPapCredentialSetPassword
 .import pppNtpRequest
 .import pppIcmpRequestDestination, pppIcmpRequestBegin
 .import pppDnsResolver, pppDnsQueryName, pppDnsQueryNameLength
@@ -184,6 +186,18 @@
   bne :+
   jmp @pppOpen
 :
+  cmp #MODEM_MAILBOX_COMMAND_PAP_CREDENTIALS_CLEAR
+  bne :+
+  jmp @papCredentialsClear
+:
+  cmp #MODEM_MAILBOX_COMMAND_PAP_PEER_ID_SET
+  bne :+
+  jmp @papPeerIdSet
+:
+  cmp #MODEM_MAILBOX_COMMAND_PAP_PASSWORD_SET
+  bne :+
+  jmp @papPasswordSet
+:
   lda #MODEM_MAILBOX_STATUS_FAILED
   sta modemMailboxStatus
   lda #$ff
@@ -341,6 +355,38 @@
   jsr pppLcpOpen
   i8
   lda #MODEM_MAILBOX_STATUS_PASSED
+  sta modemMailboxStatus
+  jmp @commitCommand
+
+@papCredentialsClear:
+  i16
+  jsl pppPapCredentialsClear
+  i8
+  lda #MODEM_MAILBOX_STATUS_PASSED
+  sta modemMailboxStatus
+  jmp @commitCommand
+
+@papPeerIdSet:
+  i16
+  jsl pppPapCredentialSetPeerId
+  i8
+  bcs @papCredentialFailed
+  lda #MODEM_MAILBOX_STATUS_PASSED
+  sta modemMailboxStatus
+  jmp @commitCommand
+
+@papPasswordSet:
+  i16
+  jsl pppPapCredentialSetPassword
+  i8
+  bcs @papCredentialFailed
+  lda #MODEM_MAILBOX_STATUS_PASSED
+  sta modemMailboxStatus
+  jmp @commitCommand
+
+@papCredentialFailed:
+  sta modemMailboxResult
+  lda #MODEM_MAILBOX_STATUS_FAILED
   sta modemMailboxStatus
   jmp @commitCommand
 

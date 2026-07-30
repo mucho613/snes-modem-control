@@ -89,6 +89,7 @@
 .export pppLcpLocalTerminateRequestCount, pppLcpLocalTerminateAckCount
 .export pppLcpLocalTerminateTimeoutCount
 .export pppLcpLocalMagic, pppLcpLocalFlags, pppLcpLoopbackCount
+.export pppPapCredentialFlags, pppPapPeerIdLength, pppPapPasswordLength
 
 pppDiagnosticState:
 pppDiagnosticMagic: .res $4
@@ -292,6 +293,9 @@ pppLcpLocalTerminateTimeoutCount: .res $4
 pppLcpLocalMagic: .res $4
 pppLcpLocalFlags: .res $1
 pppLcpLoopbackCount: .res $4
+pppPapCredentialFlags: .res $1
+pppPapPeerIdLength: .res $1
+pppPapPasswordLength: .res $1
 pppDiagnosticStateEnd:
 
 .assert pppDiagnosticMagic - pppDiagnosticState = PPP_DIAG_MAGIC, error, "PPP diagnostic magic offset"
@@ -495,6 +499,9 @@ pppDiagnosticStateEnd:
 .assert pppLcpLocalMagic - pppDiagnosticState = PPP_DIAG_LCP_LOCAL_MAGIC, error, "PPP LCP local magic offset"
 .assert pppLcpLocalFlags - pppDiagnosticState = PPP_DIAG_LCP_LOCAL_FLAGS, error, "PPP LCP local flags offset"
 .assert pppLcpLoopbackCount - pppDiagnosticState = PPP_DIAG_LCP_LOOPBACK_COUNT, error, "PPP LCP loopback count offset"
+.assert pppPapCredentialFlags - pppDiagnosticState = PPP_DIAG_PAP_CREDENTIAL_FLAGS, error, "PPP PAP credential flags offset"
+.assert pppPapPeerIdLength - pppDiagnosticState = PPP_DIAG_PAP_PEER_ID_LENGTH, error, "PPP PAP Peer-ID length offset"
+.assert pppPapPasswordLength - pppDiagnosticState = PPP_DIAG_PAP_PASSWORD_LENGTH, error, "PPP PAP password length offset"
 .assert pppDiagnosticStateEnd - pppDiagnosticState = PPP_DIAGNOSTIC_SIZE, error, "PPP diagnostic ABI size"
 
 ; Decoder and pump scratch fields are private and intentionally excluded from
@@ -530,6 +537,7 @@ pppDiagnosticStateEnd:
 .export pppDnsRecordRemaining, pppDnsDataLength
 .export pppDnsQueryCursor, pppDnsLabelPosition, pppDnsLabelLength
 .export pppDnsTestSavedFrameCounter
+.export pppPapPeerId, pppPapPassword
 pppLastEvent: .res $1
 pppLastInvalidReason: .res $1
 pppDecoderScratchByte: .res $1
@@ -587,6 +595,8 @@ pppDnsQueryCursor: .res $2
 pppDnsLabelPosition: .res $2
 pppDnsLabelLength: .res $1
 pppDnsTestSavedFrameCounter: .res $4
+pppPapPeerId: .res PPP_PAP_MAXIMUM_PEER_ID_LENGTH
+pppPapPassword: .res PPP_PAP_MAXIMUM_PASSWORD_LENGTH
 pppLcpOptionSeen: .res $100
 pppLcpOptionDuplicate: .res $100
 pppIpcpOptionSeen: .res $100

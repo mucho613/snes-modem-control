@@ -439,7 +439,11 @@ Authenticate-Requestを送信し、Authenticate-Ack/Nakを処理します。LCP�
 `Opened`へ到達し、受理済みpeer optionにPAPが含まれる場合だけ開始します。
 閉じた試験環境の資格情報はPeer-ID `ndm24`、Password `ndm24-test`です。
 これは実サービス用の秘密情報ではなく、WSL2側の`pap-secrets` fixtureと
-一致させています。
+一致させています。実サービスへ接続する場合はmailbox ABI version 9の
+`pap_credentials_clear`、`pap_peer_id_set`、`pap_password_set`をこの順に
+実行し、WRAM上のfixtureを一時的な資格情報へ置き換えます。Peer-IDは8byte、
+Passwordは6～24byteです。clear後に片方の設定が失敗した場合は、受理済みの
+片方も含めてSFC側で全消去します。
 
 Authenticate-Requestは共有PPP encoderがidleであることを確認してからbufferを
 構築します。encoderがbusyならbuffer、Identifier、Max-Authenticate残数、
@@ -452,7 +456,11 @@ timerを変更しません。encoderへ受理された時点でだけIdentifier�
 しますが、Length内のMessageより後ろに余分なdataがあれば不正packetとして
 状態を変えません。最新RequestとIdentifierが一致するAckだけが`Opened`、
 Nakだけが`Failed`を成立させます。Message本文と資格情報は公開診断blockや
-通常traceへ保存しません。
+通常traceへ保存しません。公開診断ABI version 21が公開するのは資格情報の
+存在・一時モード・送信中を示すflagと2つの長さだけで、byte列は含みません。
+一時資格情報はAuthenticate-Ack/Nak、再送上限、lower-down、切断の各終端で
+消去します。mailbox arguments、PPP送信元buffer、送信ringの消費済みslotも
+使用後にzero化し、一時資格情報の送信中はlast-byte診断値へ平文を写しません。
 
 `src/ppp/lcpPoll.asm`はLCPが`Opened`の間だけ非LCP frameを保持し、続く
 `src/ppp/papPoll.asm`がPAPへ振り分けます。LCP再交渉やlower-down中にLCPが

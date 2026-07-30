@@ -62,6 +62,12 @@ AT 行パーサーには `OK`、`ERROR`、`BUSY`、`CONNECT...`、`NO CARRIER`�
 
 mailbox ABI version 6の `binary_transmit` と `binary_receive` はraw byte転送用です。`binary_transmit` は `CONNECTED` 中に限り、入力arguments先頭のlengthと、それに続く最大31byteを空のTX ringへqueueし、受理数をresultへ返します。`binary_receive` は `CONNECTED` または `READY` でRX ringから最大31byteをSFC専用のoutputへ取り出し、取得数をresultへ返します。`READY` での利用は識別照会の終端後に遅れて到着したbyteの診断的drainに限定します。AT行パーサーを通さないため `0x00`、CR、LF、`0xFF` も同じデータとして扱います。PPP受信は通常無効であり、`ppp_receive_start` 後だけCONNECTED中のRX所有権がPPP層へ移ります。`ppp_receive_stop` でraw試験へ戻せます。
 
+mailbox ABI version 9のcommand 18～20は、PAPの一時資格情報を
+clear、Peer-ID、Passwordの3段階で登録します。必ずclearから開始するため、
+中断した更新が既存fixtureや別の更新と混ざりません。設定値は公開診断blockや
+mailbox outputへ返さず、各set命令のargumentsも処理直後にzero化します。
+不正な長さを受けた場合は、それ以前に登録した片方も含めて消去します。
+
 ABI version 6のデバッグ専用 `binary_stress_transmit` は、空のTX ringへ `0x00`～`0xFE` の255byteを一度にqueueします。main loopが `modemPoll`へ戻る前に使用可能容量全体を埋めるため、NDM24入力側のbackpressure、Data2変化、欠落・重複を最大burst条件で調べられます。
 
 QUsb2Snesの `SETX` でホストが書いたWRAMと、同じ場所へSFCが書き戻す値は観測コピー上で安定しなかったため、96byte mailbox内の所有権を分離しています。arguments 32byteはホスト→SFC専用、output 32byteはSFC→ホスト専用で、逆方向からは書きません。ホストは `processed_sequence` と完了statusを見ただけでは結果を確定せず、96byteのmailbox全体が2回連続で一致してから制御結果を採用します。outputは別のQUsb2Snes接続から32byteだけを2回読み、一致した値を採用します。`host_sequence` は最後に書き、SFC側もoutputとresultの更新後に `processed_sequence` をcommitします。

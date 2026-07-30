@@ -20,6 +20,7 @@
 .import pppLcpTimerRunSelfTest
 .import pppLcpPollRunSelfTest
 .import pppPapRunSelfTest
+.import pppPapCredentialsRunSelfTest
 .import pppIpcpRunSelfTest
 .import pppIpcpPollRunSelfTest
 .import pppIpv4RunSelfTest
@@ -48,6 +49,11 @@
   i16
   setDBR $7e
   jsr pppSnapshotBegin
+
+  jsl pppPapCredentialsRunSelfTest
+  bcc :+
+  jmp @fail
+:
 
   ; Decode the fixed empty-option LCP Configure-Request from docs/ppp.md.
   setDBR .bankbyte(pppSelfTestEncoded)

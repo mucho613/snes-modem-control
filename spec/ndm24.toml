@@ -292,8 +292,8 @@ description = "Frame at which the current generic AT transaction started"
 
 [ppp_diagnostic]
 magic = [0x50, 0x50, 0x50, 0x31]
-version = 20
-size = 490
+version = 21
+size = 493
 
 [[ppp_diagnostic.fields]]
 name = "magic"
@@ -1702,9 +1702,30 @@ size = 4
 type = "u32"
 description = "Peer Configure-Requests whose Magic-Number matched the local proposal"
 
+[[ppp_diagnostic.fields]]
+name = "pap_credential_flags"
+offset = 490
+size = 1
+type = "u8"
+description = "PAP credential presence and transient-sensitive mode flags; never contains credential bytes"
+
+[[ppp_diagnostic.fields]]
+name = "pap_peer_id_length"
+offset = 491
+size = 1
+type = "u8"
+description = "Length of the staged PAP Peer-ID"
+
+[[ppp_diagnostic.fields]]
+name = "pap_password_length"
+offset = 492
+size = 1
+type = "u8"
+description = "Length of the staged PAP password"
+
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]
-version = 8
+version = 9
 size = 96
 argument_size = 32
 
@@ -1839,6 +1860,9 @@ icmp_echo_request = 14
 dns_query = 15
 ppp_close = 16
 ppp_open = 17
+pap_credentials_clear = 18
+pap_peer_id_set = 19
+pap_password_set = 20
 
 [mailbox_status]
 idle = 0

@@ -352,6 +352,9 @@ pub struct PppDiagnosticSnapshot {
     pub lcp_local_magic: u32,
     pub lcp_local_flags: u8,
     pub lcp_loopback_count: u32,
+    pub pap_credential_flags: u8,
+    pub pap_peer_id_length: u8,
+    pub pap_password_length: u8,
 }
 
 impl PppDiagnosticSnapshot {
@@ -589,6 +592,9 @@ impl PppDiagnosticSnapshot {
             lcp_local_magic: read_u32(data, PPP_DIAG_LCP_LOCAL_MAGIC)?,
             lcp_local_flags: data[PPP_DIAG_LCP_LOCAL_FLAGS],
             lcp_loopback_count: read_u32(data, PPP_DIAG_LCP_LOOPBACK_COUNT)?,
+            pap_credential_flags: data[PPP_DIAG_PAP_CREDENTIAL_FLAGS],
+            pap_peer_id_length: data[PPP_DIAG_PAP_PEER_ID_LENGTH],
+            pap_password_length: data[PPP_DIAG_PAP_PASSWORD_LENGTH],
         })
     }
 }
@@ -1038,6 +1044,9 @@ mod tests {
         data[PPP_DIAG_LCP_LOCAL_FLAGS] = 3;
         data[PPP_DIAG_LCP_LOOPBACK_COUNT..PPP_DIAG_LCP_LOOPBACK_COUNT + 4]
             .copy_from_slice(&2_u32.to_le_bytes());
+        data[PPP_DIAG_PAP_CREDENTIAL_FLAGS] = 7;
+        data[PPP_DIAG_PAP_PEER_ID_LENGTH] = 8;
+        data[PPP_DIAG_PAP_PASSWORD_LENGTH] = 24;
 
         let snapshot = PppDiagnosticSnapshot::decode(&data).unwrap();
         assert_eq!(snapshot.snapshot_sequence, 8);
@@ -1202,6 +1211,9 @@ mod tests {
         assert_eq!(snapshot.lcp_local_magic, 0x8765_4321);
         assert_eq!(snapshot.lcp_local_flags, 3);
         assert_eq!(snapshot.lcp_loopback_count, 2);
+        assert_eq!(snapshot.pap_credential_flags, 7);
+        assert_eq!(snapshot.pap_peer_id_length, 8);
+        assert_eq!(snapshot.pap_password_length, 24);
     }
 
     #[test]
