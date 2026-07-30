@@ -4,7 +4,7 @@
 
 最初のPPPマイルストーンは、NDM24から受け取る任意位置で分割されたbyte列を、FCS検証済みのPPPフレームへ復元する層です。`crates/ndm24-ppp` を仕様の参照実装とし、同じ状態遷移と試験ベクトルを65816へ移植しています。
 
-現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP、PAP client、IPCP、IPv4 packet層、ICMP Echo responder、UDP datagram層まで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ack、IPCP `Opened`まで確認し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。同日にIPv4とICMP EchoはMesenCE、FXPAK PRO実機、疑似PSTNのV.22bis 2400 bit/s回線上で送受信に合格しました。UDP datagram層はMesenCEとFXPAK PRO実機の固定fixtureまで合格しており、実回線上のUDPとNTP、TCPは未検証です。
+現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP、PAP client、IPCP、IPv4 packet層、ICMP Echo responder、UDP datagram層、NTP clientまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ack、IPCP `Opened`まで確認し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。同日にIPv4とICMP EchoはMesenCE、FXPAK PRO実機、疑似PSTNのV.22bis 2400 bit/s回線上で送受信に合格しました。UDP datagram層とNTP clientはRust、MesenCE、FXPAK PRO実機の固定fixtureまで合格しており、実回線上のUDP/NTPとTCPは未検証です。
 
 PPP接続は次の順序で進みます。
 
@@ -78,6 +78,7 @@ Rust参照実装は全入力分割位置、破損FCSからの再同期、Flag直
 - `src/ppp/ipv4Poll.asm`: IPCP/IPv4 frame所有権、local宛先とfragmentの選別
 - `src/ppp/icmp.asm`: ICMP Echo parser、checksum、Echo Reply生成、送信待ち
 - `src/ppp/udp.asm`: UDP parser、疑似header checksum、送信datagram生成
+- `src/ppp/ntp.asm`: 明示要求型NTP client、応答相関、timeout
 - `src/ppp/selfTest.asm`: 固定fixtureによる常設セルフテスト
 
 `pppDecoderPush` はraw byteを1byteずつ受け取り、次のeventを返します。
@@ -463,21 +464,49 @@ destination IPv4 addressを指定します。UDP headerと省略しないchecksu
 共有PPP encoderがbusy、IPCPが閉じている、またはpayloadが上限を超える場合は
 datagramを受理しません。
 
-公開診断ABI version 9は最後に解析したport、Length、payload length、checksum、
+公開診断ABI version 10は最後に解析したport、Length、payload length、checksum、
 valid/checksum-present flag、受信・checksum error・破棄・送信countを公開します。
 常設セルフテストのstep `$8D`～`$98`は、5byte payload `NDM24`を持つ既知checksum
 `$EDC8`のdatagram、checksum 0、payload破損、Length 7、同一datagramの送信生成を
 検査します。MesenCEのheadless runnerと、QUsb2Snesでsmoke ROMを転送した
 revision AのFXPAK PRO実機で合格済みです。実機ではmailbox command 10、
-sequence 1の完了後にABI version 9のsnapshotも読み取り、UDP状態が初期値へ
+sequence 1の完了後に当時のABI version 9のsnapshotも読み取り、UDP状態が初期値へ
 復帰していることを確認しました。
+
+## 65816 NTP client
+
+`src/ppp/ntp.asm`はmailbox command 13で明示的に要求し、IPCPで確定したpeer
+addressのUDP port 123へ48byteのNTPv4 client packetを送ります。local portは
+49152です。要求のTransmit Timestampにはseconds `$4E444D24`と単調増加する
+fractionからなる64bit cookieを入れ、応答のOriginate Timestampが完全一致した
+場合だけ受理します。重複要求は進行中の要求を破棄せず`request busy`として
+同期的に拒否します。
+
+受信はpeer address、source port 123、destination port 49152、Version 3/4、
+Mode 4、Stratum 1～15、同期済みLIを検証します。Stratum 0のKiss-o'-Death、
+不一致cookie、異なるsource、短いpacketは個別のerrorになります。有効なServer
+Transmit TimestampからNTP epoch差`2208988800`を引き、1970年から2036年の範囲を
+Unix秒として保存します。SFCに絶対時刻がないため、現段階では往復遅延やclock
+offsetの補正は行いません。応答期限は要求送信後900frameです。
+
+公開診断ABI version 10、331byteはstate、error、cookie、Reference ID、
+Receive/Transmit Timestamp、Unix秒、deadline、要求・応答・破棄・timeout countを
+追加します。常設セルフテストのstep `$99`～`$A0`は要求生成、重複要求保護、
+相関済み応答、cookie不一致、Kiss-o'-Death、timeout、IPCP未接続時の拒否を検査
+します。MesenCEのheadless runnerとrevision AのFXPAK PRO実機で合格済みです。
+実回線試験では次を使います。
+
+```powershell
+cargo run -p ndm24-tools -- ntp-request
+```
 
 ## 次の実装
 
 LCP、PAP、IPCPはRust参照実装、65816常設セルフテスト、revision A実機と
 WSL2 `pppd`による実対向まで合格しました。IPv4 packet層とICMP Echo responderも
 Rustと65816へ実装し、固定fixtureと実回線の双方で合格しています。UDP datagram層
-もRustと65816へ実装し、固定fixtureで検証済みです。IPCP `Opened`時のlocalは
-`10.24.0.2`、peerは`10.24.0.1`です。次はUDP application demultiplexerとNTP
-request/response codecを追加し、疑似PSTN上で最初のUDP datagram往復と時刻取得を
-確認します。TCPとHTTPはその後の独立したマイルストーンとします。
+とNTP clientもRustと65816へ実装し、固定fixtureで検証済みです。IPCP `Opened`
+時のlocalは`10.24.0.2`、peerは`10.24.0.1`です。次はWSL2の閉じたNTP応答器を
+使い、疑似PSTN上で最初のUDP datagram往復と時刻取得を確認します。実対向の合格後、
+取得したUnix秒を画面表示用日時へ変換します。TCPとHTTPはその後の独立した
+マイルストーンとします。

@@ -19,6 +19,7 @@
 .import pppUdpDropCount, pppUdpTransmitCount
 .import pppUdpPacketOffset, pppUdpChecksumAccumulator
 .import pppUdpTransmitSourcePort, pppUdpTransmitDestinationPort
+.import pppNtpReceive
 
 .export pppUdpInitialize, pppUdpReceive, pppUdpBeginTransmit
 .export pppUdpRunSelfTest
@@ -176,6 +177,19 @@ valid:
   ora #PPP_UDP_FLAG_VALID
   sta pppUdpFlags
   stz pppUdpLastError
+  rep #$20
+  .a16
+  lda pppUdpDestinationPort
+  cmp #PPP_NTP_CLIENT_PORT
+  bne applicationDone
+  sep #$20
+  .a8
+  jsr pppNtpReceive
+  bra applicationDone8
+applicationDone:
+  sep #$20
+  .a8
+applicationDone8:
   jsr pppSnapshotEnd
   ply
   plx

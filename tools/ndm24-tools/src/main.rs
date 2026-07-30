@@ -15,10 +15,10 @@ use clap::{Parser, Subcommand, ValueEnum};
 use ndm24_protocol::{
     MODEM_MAILBOX_COMMAND_AT_TRANSACTION, MODEM_MAILBOX_COMMAND_CLEAR_TRACE,
     MODEM_MAILBOX_COMMAND_FREEZE_TRACE, MODEM_MAILBOX_COMMAND_INITIALIZE,
-    MODEM_MAILBOX_COMMAND_PPP_RECEIVE_START, MODEM_MAILBOX_COMMAND_PPP_RECEIVE_STOP,
-    MODEM_MAILBOX_COMMAND_PPP_SELF_TEST, MODEM_MAILBOX_COMMAND_QUICK_TEST,
-    MODEM_MAILBOX_COMMAND_RESUME_TRACE, MODEM_SESSION_RESULT_CONNECT,
-    MODEM_SESSION_RESULT_NO_CARRIER, MODEM_SESSION_RESULT_OK,
+    MODEM_MAILBOX_COMMAND_NTP_REQUEST, MODEM_MAILBOX_COMMAND_PPP_RECEIVE_START,
+    MODEM_MAILBOX_COMMAND_PPP_RECEIVE_STOP, MODEM_MAILBOX_COMMAND_PPP_SELF_TEST,
+    MODEM_MAILBOX_COMMAND_QUICK_TEST, MODEM_MAILBOX_COMMAND_RESUME_TRACE,
+    MODEM_SESSION_RESULT_CONNECT, MODEM_SESSION_RESULT_NO_CARRIER, MODEM_SESSION_RESULT_OK,
 };
 
 #[derive(Debug, Parser)]
@@ -109,6 +109,14 @@ enum Command {
         #[arg(long)]
         once: bool,
     },
+    NtpRequest {
+        #[arg(long, default_value = "ws://localhost:23074")]
+        websocket: String,
+        #[arg(long, default_value = "build/smoke/modem-control.lbl")]
+        labels: PathBuf,
+        #[arg(long, default_value_t = 20)]
+        timeout_seconds: u64,
+    },
     PendingRx {
         #[arg(long, default_value = "ws://localhost:23074")]
         websocket: String,
@@ -196,6 +204,7 @@ enum MailboxCommand {
     PppSelfTest,
     PppReceiveStart,
     PppReceiveStop,
+    NtpRequest,
 }
 
 impl MailboxCommand {
@@ -209,6 +218,7 @@ impl MailboxCommand {
             Self::PppSelfTest => MODEM_MAILBOX_COMMAND_PPP_SELF_TEST,
             Self::PppReceiveStart => MODEM_MAILBOX_COMMAND_PPP_RECEIVE_START,
             Self::PppReceiveStop => MODEM_MAILBOX_COMMAND_PPP_RECEIVE_STOP,
+            Self::NtpRequest => MODEM_MAILBOX_COMMAND_NTP_REQUEST,
         }
     }
 }
@@ -324,6 +334,21 @@ async fn main() -> Result<()> {
                 once,
             )
             .await
+        }
+        Command::NtpRequest {
+            websocket,
+            labels,
+            timeout_seconds,
+        } => {
+            let snapshot =
+                qusb2snes::ntp_request(&websocket, &labels, Duration::from_secs(timeout_seconds))
+                    .await?;
+            println!("{}", serde_json::to_string(&snapshot)?);
+            println!(
+                "NTP response: unix_seconds={}, stratum={}, version={}",
+                snapshot.ntp_unix_seconds, snapshot.ntp_stratum, snapshot.ntp_version
+            );
+            Ok(())
         }
         Command::PendingRx { websocket, labels } => {
             let bytes = qusb2snes::read_pending_rx(&websocket, &labels).await?;

@@ -126,8 +126,10 @@ LCP試験に続き、PAP Authenticate-Request/Ack、IPCP `Opened`、SFC側local
 | PPP IPv4セルフテスト | 合格 (2026-07-30) | 未実施 |
 | PPP ICMP Echoセルフテスト | 合格 (2026-07-30) | 未実施 |
 | PPP UDP datagramセルフテスト | 合格 (2026-07-30) | 未実施 |
+| PPP NTP clientセルフテスト | 合格 (2026-07-30) | 未実施 |
 | PPP IPv4実対向 | 合格 (2026-07-30) | 未実施 |
 | PPP ICMP Echo実対向 | 合格 (2026-07-30) | 未実施 |
+| PPP NTP実対向 | 未実施 | 未実施 |
 
 revision B の最新の疑似 PSTN connect 合格記録は test ID `unix-1785329111-revision-b` です。`AT&F`、`AT%B2400`、`ATS7=60`、`ATX3`、`ATDT0` のechoはすべて完全で、各transaction前後のRX discard counterは0のままでした。DFM-56U は `RING`、`CONNECT 115200` を返し、NDM24 は `CONNECT 2400` を受信して `CONNECTED` へ遷移しました。10秒保持中の未処理RXは0byteです。DFM-56UのDTRを下げた直後にはキャリア切断過渡の `07 99 62 A1 74 DD 6B EE 1E` が入り、続く `NO CARRIER` を受信して `READY` へ戻りました。最終snapshotはRX read/write indexがともに105、TX read/write indexがともに42で、error、timeout、RX/TX overflow、`poll_budget_yield`、discard、terminal droppedがすべて0です。transaction別trace、双方のAT transcript、切断前後のraw RX列は `build/hardware-tests/unix-1785329111-revision-b/connect-test.json` に保存されています。旧schemaのJSONでは `poll_budget_yield` と同じ値が `poll_limit` という名前で記録されています。
 
@@ -176,5 +178,13 @@ checksumと不正Lengthの拒否、UDP/IPv4送信header生成を実機65816上�
 完了後はPPP診断ABI version 9、273byteのsnapshotをQUsb2Snesから読み取り、
 UDP状態と各countが初期値へ戻ったことも確認しました。この試験は固定fixtureを
 使い、電話回線や対向Modemには接続しません。
+
+同日、NTP client追加後のsmoke ROMもrevision AのFXPAK PRO実機へ転送し、
+`ppp-self-test`（mailbox command 10、sequence 1）の合格を確認しました。step
+`$99`～`$A0`により、NTPv4要求と64bit cookie生成、重複要求保護、相関済み応答、
+cookie不一致とKiss-o'-Deathの拒否、timeout、IPCP未接続時の拒否を実機65816上で
+検査しています。完了後はPPP診断ABI version 10、331byteのsnapshotをQUsb2Snes
+から安定読取し、NTP状態と要求・応答・破棄・timeout countが初期値へ復帰したことも
+確認しました。この試験は固定fixtureを使い、電話回線や対向Modemには接続しません。
 
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。

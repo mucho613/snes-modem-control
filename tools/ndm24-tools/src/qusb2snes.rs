@@ -148,6 +148,64 @@ pub async fn ppp_monitor(
     }
 }
 
+pub async fn ntp_request(
+    websocket: &str,
+    label_path: &Path,
+    timeout: Duration,
+) -> Result<PppDiagnosticSnapshot> {
+    const NTP_STATE_RECEIVED: u8 = 3;
+    const NTP_STATE_FAILED: u8 = 4;
+
+    let labels = read_labels(label_path)?;
+    let state = labels
+        .get("pppDiagnosticState")
+        .copied()
+        .context("label file does not contain pppDiagnosticState")?;
+    let offset = wram_to_usb2snes(state)?;
+    let mut client = Client::connect(websocket).await?;
+    eprintln!("attached to {}", client.device);
+    let before = read_stable_ppp_snapshot(&mut client, offset).await?;
+    drop(client);
+
+    mailbox_command_with_arguments(
+        websocket,
+        label_path,
+        ndm24_protocol::MODEM_MAILBOX_COMMAND_NTP_REQUEST,
+        &[],
+        timeout,
+    )
+    .await?;
+
+    let mut client = Client::connect(websocket).await?;
+    let started = Instant::now();
+    loop {
+        let snapshot = read_stable_ppp_snapshot(&mut client, offset).await?;
+        if snapshot.ntp_state == NTP_STATE_RECEIVED
+            && snapshot.ntp_response_count != before.ntp_response_count
+        {
+            return Ok(snapshot);
+        }
+        if snapshot.ntp_state == NTP_STATE_FAILED {
+            bail!(
+                "NTP request failed: error=0x{:02x}, requests={}, responses={}, drops={}, timeouts={}",
+                snapshot.ntp_last_error,
+                snapshot.ntp_request_count,
+                snapshot.ntp_response_count,
+                snapshot.ntp_drop_count,
+                snapshot.ntp_timeout_count
+            );
+        }
+        ensure!(
+            started.elapsed() < timeout,
+            "timed out waiting for NTP response: state={}, requests={}, responses={}",
+            snapshot.ntp_state,
+            snapshot.ntp_request_count,
+            snapshot.ntp_response_count
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+
 pub async fn dump_trace(websocket: &str, label_path: &Path) -> Result<()> {
     for event in read_trace_events(websocket, label_path).await? {
         println!("{}", serde_json::to_string(&event)?);

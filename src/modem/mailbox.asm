@@ -16,6 +16,7 @@
 .import modemClearTrace, modemFreezeTrace, modemResumeTrace
 .import pppRunSelfTest
 .import pppReceiveStart, pppReceiveStop
+.import pppNtpRequest
 
 .export modemMailboxPoll
 .proc modemMailboxPoll
@@ -155,6 +156,10 @@
   bne :+
   jmp @pppReceiveStop
 :
+  cmp #MODEM_MAILBOX_COMMAND_NTP_REQUEST
+  bne :+
+  jmp @ntpRequest
+:
   lda #MODEM_MAILBOX_STATUS_FAILED
   sta modemMailboxStatus
   lda #$ff
@@ -235,7 +240,8 @@
   cmp #MODEM_STATE_CONNECTED
   beq @binaryReceiveStateValid
   cmp #MODEM_STATE_READY
-  bne @binaryInvalid
+  beq @binaryReceiveStateValid
+  jmp @binaryInvalid
 @binaryReceiveStateValid:
   ldx #$00
 @binaryReceiveLoop:
@@ -250,7 +256,7 @@
   stx modemMailboxResult
   lda #MODEM_MAILBOX_STATUS_PASSED
   sta modemMailboxStatus
-  bra @commitCommand
+  jmp @commitCommand
 
 @binaryStressTransmit:
   lda modemDriverState
@@ -297,6 +303,23 @@
 @pppReceiveStop:
   jsr pppReceiveStop
   lda #MODEM_MAILBOX_STATUS_PASSED
+  sta modemMailboxStatus
+  bra @commitCommand
+
+@ntpRequest:
+  rep #$10
+  .i16
+  jsr pppNtpRequest
+  sep #$10
+  .i8
+  bcs @ntpRequestFailed
+  lda #MODEM_MAILBOX_STATUS_PASSED
+  sta modemMailboxStatus
+  bra @commitCommand
+
+@ntpRequestFailed:
+  sta modemMailboxResult
+  lda #MODEM_MAILBOX_STATUS_FAILED
   sta modemMailboxStatus
   bra @commitCommand
 

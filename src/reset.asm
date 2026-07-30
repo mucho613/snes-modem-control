@@ -19,6 +19,7 @@
 .import pppIpv4Initialize, pppIpv4Poll
 .import pppIcmpInitialize
 .import pppUdpInitialize
+.import pppNtpInitialize, pppNtpPoll
 .import nmitimenShadow
 
 .include "./registers.inc"
@@ -79,6 +80,7 @@
   jsr pppIpv4Initialize
   jsr pppIcmpInitialize
   jsr pppUdpInitialize
+  jsr pppNtpInitialize
   sep #$10
   .i8
 
@@ -129,6 +131,7 @@
     jsr pppPapPoll
     jsr pppIpcpPoll
     jsr pppIpv4Poll
+    jsr pppNtpPoll
     jsr pppTransmitPoll
   .endif
   bra @mainLoop

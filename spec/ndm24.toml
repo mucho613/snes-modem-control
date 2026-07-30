@@ -289,8 +289,8 @@ description = "Frame at which the current generic AT transaction started"
 
 [ppp_diagnostic]
 magic = [0x50, 0x50, 0x50, 0x31]
-version = 9
-size = 273
+version = 10
+size = 331
 
 [[ppp_diagnostic.fields]]
 name = "magic"
@@ -1146,9 +1146,156 @@ size = 4
 type = "u32"
 description = "UDP datagrams accepted by the IPv4 transmitter"
 
+[[ppp_diagnostic.fields]]
+name = "ntp_state"
+offset = 273
+size = 1
+type = "u8"
+description = "NTP client state"
+
+[[ppp_diagnostic.fields]]
+name = "ntp_last_error"
+offset = 274
+size = 1
+type = "u8"
+description = "Most recent NTP request or response error"
+
+[[ppp_diagnostic.fields]]
+name = "ntp_flags"
+offset = 275
+size = 1
+type = "u8"
+description = "NTP cookie, response, and Unix-time validity flags"
+
+[[ppp_diagnostic.fields]]
+name = "ntp_version"
+offset = 276
+size = 1
+type = "u8"
+description = "Version in the most recently parsed NTP response"
+
+[[ppp_diagnostic.fields]]
+name = "ntp_leap_indicator"
+offset = 277
+size = 1
+type = "u8"
+description = "Leap Indicator in the most recently parsed NTP response"
+
+[[ppp_diagnostic.fields]]
+name = "ntp_stratum"
+offset = 278
+size = 1
+type = "u8"
+description = "Stratum in the most recently parsed NTP response"
+
+[[ppp_diagnostic.fields]]
+name = "ntp_poll"
+offset = 279
+size = 1
+type = "u8"
+description = "Raw signed Poll exponent from the NTP response"
+
+[[ppp_diagnostic.fields]]
+name = "ntp_precision"
+offset = 280
+size = 1
+type = "u8"
+description = "Raw signed Precision exponent from the NTP response"
+
+[[ppp_diagnostic.fields]]
+name = "ntp_reference_id"
+offset = 281
+size = 4
+type = "bytes"
+description = "Reference ID or Kiss-o'-Death code from the NTP response"
+
+[[ppp_diagnostic.fields]]
+name = "ntp_cookie_seconds"
+offset = 285
+size = 4
+type = "u32"
+description = "NTP request cookie seconds word"
+
+[[ppp_diagnostic.fields]]
+name = "ntp_cookie_fraction"
+offset = 289
+size = 4
+type = "u32"
+description = "NTP request cookie fraction word"
+
+[[ppp_diagnostic.fields]]
+name = "ntp_server_receive_seconds"
+offset = 293
+size = 4
+type = "u32"
+description = "Server Receive Timestamp seconds word"
+
+[[ppp_diagnostic.fields]]
+name = "ntp_server_receive_fraction"
+offset = 297
+size = 4
+type = "u32"
+description = "Server Receive Timestamp fraction word"
+
+[[ppp_diagnostic.fields]]
+name = "ntp_server_transmit_seconds"
+offset = 301
+size = 4
+type = "u32"
+description = "Server Transmit Timestamp seconds word"
+
+[[ppp_diagnostic.fields]]
+name = "ntp_server_transmit_fraction"
+offset = 305
+size = 4
+type = "u32"
+description = "Server Transmit Timestamp fraction word"
+
+[[ppp_diagnostic.fields]]
+name = "ntp_unix_seconds"
+offset = 309
+size = 4
+type = "u32"
+description = "Server Transmit Timestamp converted to Unix seconds"
+
+[[ppp_diagnostic.fields]]
+name = "ntp_deadline"
+offset = 313
+size = 2
+type = "u16"
+description = "Low frame counter deadline for the pending NTP response"
+
+[[ppp_diagnostic.fields]]
+name = "ntp_request_count"
+offset = 315
+size = 4
+type = "u32"
+description = "NTP requests accepted by the UDP transmitter"
+
+[[ppp_diagnostic.fields]]
+name = "ntp_response_count"
+offset = 319
+size = 4
+type = "u32"
+description = "Correlated valid NTP server responses"
+
+[[ppp_diagnostic.fields]]
+name = "ntp_drop_count"
+offset = 323
+size = 4
+type = "u32"
+description = "NTP responses or local requests rejected by validation"
+
+[[ppp_diagnostic.fields]]
+name = "ntp_timeout_count"
+offset = 327
+size = 4
+type = "u32"
+description = "NTP requests that expired without a valid response"
+
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]
-version = 6
+version = 7
 size = 96
 argument_size = 32
 
@@ -1278,6 +1425,7 @@ binary_stress_transmit = 9
 ppp_self_test = 10
 ppp_receive_start = 11
 ppp_receive_stop = 12
+ntp_request = 13
 
 [mailbox_status]
 idle = 0

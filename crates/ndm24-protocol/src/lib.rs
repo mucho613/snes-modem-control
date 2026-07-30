@@ -273,6 +273,27 @@ pub struct PppDiagnosticSnapshot {
     pub udp_checksum_error_count: u32,
     pub udp_drop_count: u32,
     pub udp_transmit_count: u32,
+    pub ntp_state: u8,
+    pub ntp_last_error: u8,
+    pub ntp_flags: u8,
+    pub ntp_version: u8,
+    pub ntp_leap_indicator: u8,
+    pub ntp_stratum: u8,
+    pub ntp_poll: u8,
+    pub ntp_precision: u8,
+    pub ntp_reference_id: [u8; 4],
+    pub ntp_cookie_seconds: u32,
+    pub ntp_cookie_fraction: u32,
+    pub ntp_server_receive_seconds: u32,
+    pub ntp_server_receive_fraction: u32,
+    pub ntp_server_transmit_seconds: u32,
+    pub ntp_server_transmit_fraction: u32,
+    pub ntp_unix_seconds: u32,
+    pub ntp_deadline: u16,
+    pub ntp_request_count: u32,
+    pub ntp_response_count: u32,
+    pub ntp_drop_count: u32,
+    pub ntp_timeout_count: u32,
 }
 
 impl PppDiagnosticSnapshot {
@@ -425,6 +446,27 @@ impl PppDiagnosticSnapshot {
             udp_checksum_error_count: read_u32(data, PPP_DIAG_UDP_CHECKSUM_ERROR_COUNT)?,
             udp_drop_count: read_u32(data, PPP_DIAG_UDP_DROP_COUNT)?,
             udp_transmit_count: read_u32(data, PPP_DIAG_UDP_TRANSMIT_COUNT)?,
+            ntp_state: data[PPP_DIAG_NTP_STATE],
+            ntp_last_error: data[PPP_DIAG_NTP_LAST_ERROR],
+            ntp_flags: data[PPP_DIAG_NTP_FLAGS],
+            ntp_version: data[PPP_DIAG_NTP_VERSION],
+            ntp_leap_indicator: data[PPP_DIAG_NTP_LEAP_INDICATOR],
+            ntp_stratum: data[PPP_DIAG_NTP_STRATUM],
+            ntp_poll: data[PPP_DIAG_NTP_POLL],
+            ntp_precision: data[PPP_DIAG_NTP_PRECISION],
+            ntp_reference_id: read_array(data, PPP_DIAG_NTP_REFERENCE_ID)?,
+            ntp_cookie_seconds: read_u32(data, PPP_DIAG_NTP_COOKIE_SECONDS)?,
+            ntp_cookie_fraction: read_u32(data, PPP_DIAG_NTP_COOKIE_FRACTION)?,
+            ntp_server_receive_seconds: read_u32(data, PPP_DIAG_NTP_SERVER_RECEIVE_SECONDS)?,
+            ntp_server_receive_fraction: read_u32(data, PPP_DIAG_NTP_SERVER_RECEIVE_FRACTION)?,
+            ntp_server_transmit_seconds: read_u32(data, PPP_DIAG_NTP_SERVER_TRANSMIT_SECONDS)?,
+            ntp_server_transmit_fraction: read_u32(data, PPP_DIAG_NTP_SERVER_TRANSMIT_FRACTION)?,
+            ntp_unix_seconds: read_u32(data, PPP_DIAG_NTP_UNIX_SECONDS)?,
+            ntp_deadline: read_u16(data, PPP_DIAG_NTP_DEADLINE)?,
+            ntp_request_count: read_u32(data, PPP_DIAG_NTP_REQUEST_COUNT)?,
+            ntp_response_count: read_u32(data, PPP_DIAG_NTP_RESPONSE_COUNT)?,
+            ntp_drop_count: read_u32(data, PPP_DIAG_NTP_DROP_COUNT)?,
+            ntp_timeout_count: read_u32(data, PPP_DIAG_NTP_TIMEOUT_COUNT)?,
         })
     }
 }
@@ -739,6 +781,39 @@ mod tests {
             .copy_from_slice(&2_u32.to_le_bytes());
         data[PPP_DIAG_UDP_TRANSMIT_COUNT..PPP_DIAG_UDP_TRANSMIT_COUNT + 4]
             .copy_from_slice(&8_u32.to_le_bytes());
+        data[PPP_DIAG_NTP_STATE] = 3;
+        data[PPP_DIAG_NTP_LAST_ERROR] = 0;
+        data[PPP_DIAG_NTP_FLAGS] = 7;
+        data[PPP_DIAG_NTP_VERSION] = 4;
+        data[PPP_DIAG_NTP_LEAP_INDICATOR] = 0;
+        data[PPP_DIAG_NTP_STRATUM] = 2;
+        data[PPP_DIAG_NTP_POLL] = 6;
+        data[PPP_DIAG_NTP_PRECISION] = (-20_i8) as u8;
+        data[PPP_DIAG_NTP_REFERENCE_ID..PPP_DIAG_NTP_REFERENCE_ID + 4].copy_from_slice(b"GPS\0");
+        data[PPP_DIAG_NTP_COOKIE_SECONDS..PPP_DIAG_NTP_COOKIE_SECONDS + 4]
+            .copy_from_slice(&0x4e44_4d24_u32.to_le_bytes());
+        data[PPP_DIAG_NTP_COOKIE_FRACTION..PPP_DIAG_NTP_COOKIE_FRACTION + 4]
+            .copy_from_slice(&1_u32.to_le_bytes());
+        data[PPP_DIAG_NTP_SERVER_RECEIVE_SECONDS..PPP_DIAG_NTP_SERVER_RECEIVE_SECONDS + 4]
+            .copy_from_slice(&0xe8fe_6f7f_u32.to_le_bytes());
+        data[PPP_DIAG_NTP_SERVER_RECEIVE_FRACTION..PPP_DIAG_NTP_SERVER_RECEIVE_FRACTION + 4]
+            .copy_from_slice(&0xf000_0000_u32.to_le_bytes());
+        data[PPP_DIAG_NTP_SERVER_TRANSMIT_SECONDS..PPP_DIAG_NTP_SERVER_TRANSMIT_SECONDS + 4]
+            .copy_from_slice(&0xe8fe_6f80_u32.to_le_bytes());
+        data[PPP_DIAG_NTP_SERVER_TRANSMIT_FRACTION..PPP_DIAG_NTP_SERVER_TRANSMIT_FRACTION + 4]
+            .copy_from_slice(&0x8000_0000_u32.to_le_bytes());
+        data[PPP_DIAG_NTP_UNIX_SECONDS..PPP_DIAG_NTP_UNIX_SECONDS + 4]
+            .copy_from_slice(&1_700_000_000_u32.to_le_bytes());
+        data[PPP_DIAG_NTP_DEADLINE..PPP_DIAG_NTP_DEADLINE + 2]
+            .copy_from_slice(&0x4567_u16.to_le_bytes());
+        data[PPP_DIAG_NTP_REQUEST_COUNT..PPP_DIAG_NTP_REQUEST_COUNT + 4]
+            .copy_from_slice(&4_u32.to_le_bytes());
+        data[PPP_DIAG_NTP_RESPONSE_COUNT..PPP_DIAG_NTP_RESPONSE_COUNT + 4]
+            .copy_from_slice(&3_u32.to_le_bytes());
+        data[PPP_DIAG_NTP_DROP_COUNT..PPP_DIAG_NTP_DROP_COUNT + 4]
+            .copy_from_slice(&2_u32.to_le_bytes());
+        data[PPP_DIAG_NTP_TIMEOUT_COUNT..PPP_DIAG_NTP_TIMEOUT_COUNT + 4]
+            .copy_from_slice(&1_u32.to_le_bytes());
 
         let snapshot = PppDiagnosticSnapshot::decode(&data).unwrap();
         assert_eq!(snapshot.snapshot_sequence, 8);
@@ -824,6 +899,27 @@ mod tests {
         assert_eq!(snapshot.udp_checksum_error_count, 1);
         assert_eq!(snapshot.udp_drop_count, 2);
         assert_eq!(snapshot.udp_transmit_count, 8);
+        assert_eq!(snapshot.ntp_state, 3);
+        assert_eq!(snapshot.ntp_last_error, 0);
+        assert_eq!(snapshot.ntp_flags, 7);
+        assert_eq!(snapshot.ntp_version, 4);
+        assert_eq!(snapshot.ntp_leap_indicator, 0);
+        assert_eq!(snapshot.ntp_stratum, 2);
+        assert_eq!(snapshot.ntp_poll, 6);
+        assert_eq!(snapshot.ntp_precision as i8, -20);
+        assert_eq!(snapshot.ntp_reference_id, *b"GPS\0");
+        assert_eq!(snapshot.ntp_cookie_seconds, 0x4e44_4d24);
+        assert_eq!(snapshot.ntp_cookie_fraction, 1);
+        assert_eq!(snapshot.ntp_server_receive_seconds, 0xe8fe_6f7f);
+        assert_eq!(snapshot.ntp_server_receive_fraction, 0xf000_0000);
+        assert_eq!(snapshot.ntp_server_transmit_seconds, 0xe8fe_6f80);
+        assert_eq!(snapshot.ntp_server_transmit_fraction, 0x8000_0000);
+        assert_eq!(snapshot.ntp_unix_seconds, 1_700_000_000);
+        assert_eq!(snapshot.ntp_deadline, 0x4567);
+        assert_eq!(snapshot.ntp_request_count, 4);
+        assert_eq!(snapshot.ntp_response_count, 3);
+        assert_eq!(snapshot.ntp_drop_count, 2);
+        assert_eq!(snapshot.ntp_timeout_count, 1);
     }
 
     #[test]

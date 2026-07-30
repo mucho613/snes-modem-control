@@ -44,7 +44,7 @@ ABI version: `2`. Block size: `128` bytes.
 
 ## PPP Diagnostic ABI
 
-ABI version: `9`. Block size: `273` bytes.
+ABI version: `10`. Block size: `331` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|
@@ -170,10 +170,31 @@ ABI version: `9`. Block size: `273` bytes.
 | `0x105` | 4 | `u32` | `udp_checksum_error_count` | UDP datagrams rejected for an invalid non-zero checksum |
 | `0x109` | 4 | `u32` | `udp_drop_count` | UDP datagrams rejected by parser or transmit handling |
 | `0x10D` | 4 | `u32` | `udp_transmit_count` | UDP datagrams accepted by the IPv4 transmitter |
+| `0x111` | 1 | `u8` | `ntp_state` | NTP client state |
+| `0x112` | 1 | `u8` | `ntp_last_error` | Most recent NTP request or response error |
+| `0x113` | 1 | `u8` | `ntp_flags` | NTP cookie, response, and Unix-time validity flags |
+| `0x114` | 1 | `u8` | `ntp_version` | Version in the most recently parsed NTP response |
+| `0x115` | 1 | `u8` | `ntp_leap_indicator` | Leap Indicator in the most recently parsed NTP response |
+| `0x116` | 1 | `u8` | `ntp_stratum` | Stratum in the most recently parsed NTP response |
+| `0x117` | 1 | `u8` | `ntp_poll` | Raw signed Poll exponent from the NTP response |
+| `0x118` | 1 | `u8` | `ntp_precision` | Raw signed Precision exponent from the NTP response |
+| `0x119` | 4 | `bytes` | `ntp_reference_id` | Reference ID or Kiss-o'-Death code from the NTP response |
+| `0x11D` | 4 | `u32` | `ntp_cookie_seconds` | NTP request cookie seconds word |
+| `0x121` | 4 | `u32` | `ntp_cookie_fraction` | NTP request cookie fraction word |
+| `0x125` | 4 | `u32` | `ntp_server_receive_seconds` | Server Receive Timestamp seconds word |
+| `0x129` | 4 | `u32` | `ntp_server_receive_fraction` | Server Receive Timestamp fraction word |
+| `0x12D` | 4 | `u32` | `ntp_server_transmit_seconds` | Server Transmit Timestamp seconds word |
+| `0x131` | 4 | `u32` | `ntp_server_transmit_fraction` | Server Transmit Timestamp fraction word |
+| `0x135` | 4 | `u32` | `ntp_unix_seconds` | Server Transmit Timestamp converted to Unix seconds |
+| `0x139` | 2 | `u16` | `ntp_deadline` | Low frame counter deadline for the pending NTP response |
+| `0x13B` | 4 | `u32` | `ntp_request_count` | NTP requests accepted by the UDP transmitter |
+| `0x13F` | 4 | `u32` | `ntp_response_count` | Correlated valid NTP server responses |
+| `0x143` | 4 | `u32` | `ntp_drop_count` | NTP responses or local requests rejected by validation |
+| `0x147` | 4 | `u32` | `ntp_timeout_count` | NTP requests that expired without a valid response |
 
 ## Mailbox ABI
 
-ABI version: `6`. Block size: `96` bytes.
+ABI version: `7`. Block size: `96` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|

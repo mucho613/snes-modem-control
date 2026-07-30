@@ -55,6 +55,14 @@
 .export pppUdpLength, pppUdpPayloadLength, pppUdpChecksum
 .export pppUdpReceiveCount, pppUdpChecksumErrorCount
 .export pppUdpDropCount, pppUdpTransmitCount
+.export pppNtpState, pppNtpLastError, pppNtpFlags, pppNtpVersion
+.export pppNtpLeapIndicator, pppNtpStratum, pppNtpPollExponent, pppNtpPrecision
+.export pppNtpReferenceId, pppNtpCookieSeconds, pppNtpCookieFraction
+.export pppNtpServerReceiveSeconds, pppNtpServerReceiveFraction
+.export pppNtpServerTransmitSeconds, pppNtpServerTransmitFraction
+.export pppNtpUnixSeconds, pppNtpDeadline
+.export pppNtpRequestCount, pppNtpResponseCount
+.export pppNtpDropCount, pppNtpTimeoutCount
 
 pppDiagnosticState:
 pppDiagnosticMagic: .res $4
@@ -179,6 +187,27 @@ pppUdpReceiveCount: .res $4
 pppUdpChecksumErrorCount: .res $4
 pppUdpDropCount: .res $4
 pppUdpTransmitCount: .res $4
+pppNtpState: .res $1
+pppNtpLastError: .res $1
+pppNtpFlags: .res $1
+pppNtpVersion: .res $1
+pppNtpLeapIndicator: .res $1
+pppNtpStratum: .res $1
+pppNtpPollExponent: .res $1
+pppNtpPrecision: .res $1
+pppNtpReferenceId: .res $4
+pppNtpCookieSeconds: .res $4
+pppNtpCookieFraction: .res $4
+pppNtpServerReceiveSeconds: .res $4
+pppNtpServerReceiveFraction: .res $4
+pppNtpServerTransmitSeconds: .res $4
+pppNtpServerTransmitFraction: .res $4
+pppNtpUnixSeconds: .res $4
+pppNtpDeadline: .res $2
+pppNtpRequestCount: .res $4
+pppNtpResponseCount: .res $4
+pppNtpDropCount: .res $4
+pppNtpTimeoutCount: .res $4
 .res PPP_DIAGNOSTIC_SIZE - (* - pppDiagnosticState)
 pppDiagnosticStateEnd:
 
@@ -304,6 +333,27 @@ pppDiagnosticStateEnd:
 .assert pppUdpChecksumErrorCount - pppDiagnosticState = PPP_DIAG_UDP_CHECKSUM_ERROR_COUNT, error, "PPP UDP checksum error count offset"
 .assert pppUdpDropCount - pppDiagnosticState = PPP_DIAG_UDP_DROP_COUNT, error, "PPP UDP drop count offset"
 .assert pppUdpTransmitCount - pppDiagnosticState = PPP_DIAG_UDP_TRANSMIT_COUNT, error, "PPP UDP transmit count offset"
+.assert pppNtpState - pppDiagnosticState = PPP_DIAG_NTP_STATE, error, "PPP NTP state offset"
+.assert pppNtpLastError - pppDiagnosticState = PPP_DIAG_NTP_LAST_ERROR, error, "PPP NTP error offset"
+.assert pppNtpFlags - pppDiagnosticState = PPP_DIAG_NTP_FLAGS, error, "PPP NTP flags offset"
+.assert pppNtpVersion - pppDiagnosticState = PPP_DIAG_NTP_VERSION, error, "PPP NTP version offset"
+.assert pppNtpLeapIndicator - pppDiagnosticState = PPP_DIAG_NTP_LEAP_INDICATOR, error, "PPP NTP leap offset"
+.assert pppNtpStratum - pppDiagnosticState = PPP_DIAG_NTP_STRATUM, error, "PPP NTP stratum offset"
+.assert pppNtpPollExponent - pppDiagnosticState = PPP_DIAG_NTP_POLL, error, "PPP NTP poll offset"
+.assert pppNtpPrecision - pppDiagnosticState = PPP_DIAG_NTP_PRECISION, error, "PPP NTP precision offset"
+.assert pppNtpReferenceId - pppDiagnosticState = PPP_DIAG_NTP_REFERENCE_ID, error, "PPP NTP reference ID offset"
+.assert pppNtpCookieSeconds - pppDiagnosticState = PPP_DIAG_NTP_COOKIE_SECONDS, error, "PPP NTP cookie seconds offset"
+.assert pppNtpCookieFraction - pppDiagnosticState = PPP_DIAG_NTP_COOKIE_FRACTION, error, "PPP NTP cookie fraction offset"
+.assert pppNtpServerReceiveSeconds - pppDiagnosticState = PPP_DIAG_NTP_SERVER_RECEIVE_SECONDS, error, "PPP NTP receive seconds offset"
+.assert pppNtpServerReceiveFraction - pppDiagnosticState = PPP_DIAG_NTP_SERVER_RECEIVE_FRACTION, error, "PPP NTP receive fraction offset"
+.assert pppNtpServerTransmitSeconds - pppDiagnosticState = PPP_DIAG_NTP_SERVER_TRANSMIT_SECONDS, error, "PPP NTP transmit seconds offset"
+.assert pppNtpServerTransmitFraction - pppDiagnosticState = PPP_DIAG_NTP_SERVER_TRANSMIT_FRACTION, error, "PPP NTP transmit fraction offset"
+.assert pppNtpUnixSeconds - pppDiagnosticState = PPP_DIAG_NTP_UNIX_SECONDS, error, "PPP NTP Unix seconds offset"
+.assert pppNtpDeadline - pppDiagnosticState = PPP_DIAG_NTP_DEADLINE, error, "PPP NTP deadline offset"
+.assert pppNtpRequestCount - pppDiagnosticState = PPP_DIAG_NTP_REQUEST_COUNT, error, "PPP NTP request count offset"
+.assert pppNtpResponseCount - pppDiagnosticState = PPP_DIAG_NTP_RESPONSE_COUNT, error, "PPP NTP response count offset"
+.assert pppNtpDropCount - pppDiagnosticState = PPP_DIAG_NTP_DROP_COUNT, error, "PPP NTP drop count offset"
+.assert pppNtpTimeoutCount - pppDiagnosticState = PPP_DIAG_NTP_TIMEOUT_COUNT, error, "PPP NTP timeout count offset"
 .assert pppDiagnosticStateEnd - pppDiagnosticState = PPP_DIAGNOSTIC_SIZE, error, "PPP diagnostic ABI size"
 
 ; Decoder and pump scratch fields are private and intentionally excluded from
@@ -330,6 +380,7 @@ pppDiagnosticStateEnd:
 .export pppIcmpPacketOffset, pppIcmpChecksumAccumulator
 .export pppUdpPacketOffset, pppUdpChecksumAccumulator
 .export pppUdpTransmitSourcePort, pppUdpTransmitDestinationPort
+.export pppNtpPacketOffset, pppNtpTestSavedFrameCounter
 pppLastEvent: .res $1
 pppLastInvalidReason: .res $1
 pppDecoderScratchByte: .res $1
@@ -369,6 +420,8 @@ pppUdpPacketOffset: .res $2
 pppUdpChecksumAccumulator: .res $2
 pppUdpTransmitSourcePort: .res $2
 pppUdpTransmitDestinationPort: .res $2
+pppNtpPacketOffset: .res $2
+pppNtpTestSavedFrameCounter: .res $4
 pppLcpOptionSeen: .res $100
 pppLcpOptionDuplicate: .res $100
 pppIpcpOptionSeen: .res $100

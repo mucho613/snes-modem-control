@@ -62,6 +62,9 @@ cargo run -p ndm24-tools -- ppp-monitor --once
 # PPP framing の状態を継続監視（1 行 1 JSON）
 cargo run -p ndm24-tools -- ppp-monitor
 
+# IPCP Opened後、peerのUDP 123へNTP要求を送り、応答または失敗まで待つ
+cargo run -p ndm24-tools -- ntp-request
+
 # メールボックス経由の AT クイックテスト
 cargo run -p ndm24-tools -- test
 
