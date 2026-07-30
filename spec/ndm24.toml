@@ -1802,7 +1802,7 @@ description = "Transmitted CHAP Responses"
 
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]
-version = 9
+version = 10
 size = 96
 argument_size = 32
 
@@ -1940,6 +1940,8 @@ ppp_open = 17
 pap_credentials_clear = 18
 pap_peer_id_set = 19
 pap_password_set = 20
+binary_prbs_transmit = 21
+binary_prbs_receive = 22
 
 [mailbox_status]
 idle = 0

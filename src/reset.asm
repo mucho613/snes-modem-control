@@ -11,6 +11,7 @@
 .import modemInitializeDiagnostics
 .import modemInitialize
 .import modemPoll, modemSessionPoll, modemMailboxPoll
+.import modemSpeedTestInitialize, modemSpeedTestPoll
 .import pppDiagnosticInitialize
 .import pppReceiveInitialize, pppReceivePoll
 .import pppTransmitInitialize, pppTransmitPoll
@@ -71,6 +72,7 @@
 
   mi8
   jsr modemInitializeDiagnostics
+  jsr modemSpeedTestInitialize
   i16
   jsr pppDiagnosticInitialize
   jsr pppReceiveInitialize
@@ -128,6 +130,7 @@
     jsr readController1
     jsr modemMailboxPoll
     jsr modemPoll
+    jsr modemSpeedTestPoll
     jsr modemSessionPoll
     jsr pppReceivePoll
     jsr pppLcpPoll

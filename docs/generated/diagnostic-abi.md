@@ -266,7 +266,7 @@ ABI version: `22`. Block size: `511` bytes.
 
 ## Mailbox ABI
 
-ABI version: `9`. Block size: `96` bytes.
+ABI version: `10`. Block size: `96` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|

@@ -237,3 +237,20 @@ modemAtTimeoutFrames: .res $2
 
 ; transfer9 accesses this state through the bank $80 WRAM mirror.
 .assert modemAtTimeoutFrames + $2 <= $7e2000, lderror, "NDM24 transfer state must remain in the first 8 KiB of WRAM"
+
+.segment "SPEED_BSS"
+
+.export modemSpeedTestMode, modemSpeedTestRemaining, modemSpeedTestProcessed
+.export modemSpeedTestLfsr, modemSpeedTestMismatchCount
+.export modemSpeedTestFirstMismatch, modemSpeedTestExpected, modemSpeedTestActual
+.export modemSpeedTestStartFrame, modemSpeedTestEndFrame
+modemSpeedTestMode: .res $1
+modemSpeedTestRemaining: .res $4
+modemSpeedTestProcessed: .res $4
+modemSpeedTestLfsr: .res $2
+modemSpeedTestMismatchCount: .res $4
+modemSpeedTestFirstMismatch: .res $4
+modemSpeedTestExpected: .res $1
+modemSpeedTestActual: .res $1
+modemSpeedTestStartFrame: .res $4
+modemSpeedTestEndFrame: .res $4

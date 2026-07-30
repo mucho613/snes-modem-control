@@ -24,6 +24,7 @@
 .import pppIcmpRequestDestination, pppIcmpRequestBegin
 .import pppDnsResolver, pppDnsQueryName, pppDnsQueryNameLength
 .import pppDnsRequest
+.import modemSpeedTestBeginTransmit, modemSpeedTestBeginReceive
 
 .export modemMailboxPoll
 .proc modemMailboxPoll
@@ -197,6 +198,14 @@
   cmp #MODEM_MAILBOX_COMMAND_PAP_PASSWORD_SET
   bne :+
   jmp @papPasswordSet
+:
+  cmp #MODEM_MAILBOX_COMMAND_BINARY_PRBS_TRANSMIT
+  bne :+
+  jmp @binaryPrbsTransmit
+:
+  cmp #MODEM_MAILBOX_COMMAND_BINARY_PRBS_RECEIVE
+  bne :+
+  jmp @binaryPrbsReceive
 :
   lda #MODEM_MAILBOX_STATUS_FAILED
   sta modemMailboxStatus
@@ -388,6 +397,20 @@
   sta modemMailboxResult
   lda #MODEM_MAILBOX_STATUS_FAILED
   sta modemMailboxStatus
+  jmp @commitCommand
+
+@binaryPrbsTransmit:
+  jsr modemSpeedTestBeginTransmit
+  bcc :+
+  jmp @binaryInvalid
+:
+  jmp @commitCommand
+
+@binaryPrbsReceive:
+  jsr modemSpeedTestBeginReceive
+  bcc :+
+  jmp @binaryInvalid
+:
   jmp @commitCommand
 
 @ntpRequest:
