@@ -242,6 +242,23 @@ source、destinationを入力とし、Total Lengthとheader checksumを生成時
 one's-complement計算を再利用します。既知のIPv4 header、options付きpacket、
 padding、境界不正、checksum不正、出力不足、予約flagを固定試験で検査します。
 
+## Rust NTP client codec
+
+`crates/ndm24-ppp/src/ntp.rs`は、[RFC 5905](https://www.rfc-editor.org/rfc/rfc5905.html)
+の先頭48byteに限定したallocation-freeのNTP client参照codecです。client requestは
+LI 0、Version 4、Mode 3で構築し、Transmit Timestampへ64bit cookieを入れます。
+server responseはVersion 3または4、Mode 4、Stratum 1～15、同期済みLIを要求し、
+Originate Timestampが送信cookieと完全一致した場合だけ受理します。Stratum 0は
+reference IDを保持したKiss-o'-Deathとして、Stratum 16以上、LI 3、異なるcookieは
+それぞれ個別のerrorとして返します。
+
+Reference、Originate、Receive、Transmit Timestampと、root delay、root dispersion、
+stratum、poll、precision、reference IDをcopyせず読み取ります。NTP era 0のsecondsから
+`2208988800`を引いてUnix秒へ変換するため、最初の対象範囲は1970-01-01から
+2036年のNTP era切り替わり前までです。SFC側には絶対時刻を持つRTCがないため、最初の
+実装では四つのtimestampからclock offsetを推定せず、相関済みresponseのserver
+Transmit Timestampを取得時刻として採用します。
+
 状態機械への入力と出力は分離しています。
 
 - 入力: lower layerのopen/down、現在時刻、受信LCP packet

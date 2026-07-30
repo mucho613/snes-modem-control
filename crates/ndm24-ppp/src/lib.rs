@@ -2,9 +2,8 @@
 //! NDM24 byte transport.
 //!
 //! RFC 1662 framing and the allocation-free LCP packet codec live here.
-//! Authentication, IPCP, IPv4 packet handling, ICMP Echo, and UDP datagrams
-//! live in separate modules. Higher application protocols are intentionally
-//! not implemented here.
+//! Authentication, IPCP, IPv4 packet handling, ICMP Echo, UDP datagrams, and
+//! the NTP client codec live in separate modules.
 
 use std::mem;
 
@@ -12,6 +11,7 @@ pub mod icmp;
 pub mod ipcp;
 pub mod ipv4;
 pub mod lcp;
+pub mod ntp;
 pub mod pap;
 pub mod udp;
 
