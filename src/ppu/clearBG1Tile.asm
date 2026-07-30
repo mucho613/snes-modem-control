@@ -1,7 +1,7 @@
 .include "../registers.inc"
 .include "../macro/utility.asm"
 
-.code
+.segment "BANK1_CODE"
 
 vramResetByte: .byte $00
 
@@ -43,5 +43,5 @@ vramResetByte: .byte $00
   plb
   pla
 
-  rts
+  rtl
 .endproc

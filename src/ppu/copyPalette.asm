@@ -6,7 +6,7 @@
 Palette:
   .incbin "../../assets/palette.bin"
 
-.code
+.segment "BANK1_CODE"
 .export copyPalette
 .proc copyPalette
   .a16
@@ -35,5 +35,5 @@ Palette:
   m16
   plb
 
-  rts
+  rtl
 .endproc

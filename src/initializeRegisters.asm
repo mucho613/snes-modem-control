@@ -3,7 +3,7 @@
 .include "./macro/utility.asm"
 .include "./registers.inc"
 
-.code
+.segment "BANK1_CODE"
 
 .proc initializeRegisters
   .a16
@@ -112,5 +112,5 @@
   stz SETINI
 
   m16
-  rts
+  rtl
 .endproc

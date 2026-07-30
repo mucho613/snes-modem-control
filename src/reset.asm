@@ -58,12 +58,12 @@
 
   m16
   clearRamAll
-  jsr initializeRegisters
+  jsl initializeRegisters
 
   m16
-  jsr clearBG1Tile
-  jsr copyPalette
-  jsr copyPattern
+  jsl clearBG1Tile
+  jsl copyPalette
+  jsl copyPattern
   jsr terminalInitialize
   jsr clockInitialize
 

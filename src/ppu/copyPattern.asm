@@ -5,7 +5,7 @@
 Font:
   .incbin "../../assets/font.bin"
 
-.code
+.segment "BANK1_CODE"
 
 .export copyPattern
 .proc copyPattern
@@ -34,5 +34,5 @@ Font:
   pld
   plb
   pla
-  rts
+  rtl
 .endproc
