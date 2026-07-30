@@ -338,7 +338,8 @@ mailbox ABI version 8のcommand 16/17は、PCからlocal `Close`/`Open` eventを
 `Closed`とadministrative-open解除を待ちます。`ppp-open`はcommand 17の後に
 `Opened`まで待ちます。`ppp-close`はLCPの論理終了だけを要求し、NDM24へ
 hang-up用AT commandを直接送らないため、Terminate交換と物理carrier喪失を
-別々に観測できます。
+別々に観測できます。`ppp-dial`は再接続時の操作漏れを避けるため、発信前に
+command 17を自動発行してadministrative-openを有効にします。
 
 ```powershell
 cargo run -p ndm24-tools -- ppp-close

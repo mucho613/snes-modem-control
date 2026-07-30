@@ -3,8 +3,9 @@ use std::time::Duration;
 
 use anyhow::{Context, Result, ensure};
 use ndm24_protocol::{
-    DriverState, MODEM_MAILBOX_COMMAND_AT_TRANSACTION, MODEM_MAILBOX_COMMAND_PPP_RECEIVE_START,
-    MODEM_MAILBOX_COMMAND_PPP_RECEIVE_STOP, MODEM_SESSION_RESULT_CONNECT, MODEM_SESSION_RESULT_OK,
+    DriverState, MODEM_MAILBOX_COMMAND_AT_TRANSACTION, MODEM_MAILBOX_COMMAND_PPP_OPEN,
+    MODEM_MAILBOX_COMMAND_PPP_RECEIVE_START, MODEM_MAILBOX_COMMAND_PPP_RECEIVE_STOP,
+    MODEM_SESSION_RESULT_CONNECT, MODEM_SESSION_RESULT_OK,
 };
 
 use crate::connect_test::{NDM24_SETUP_COMMANDS, at_arguments};
@@ -39,6 +40,15 @@ pub async fn run(
         .with_context(|| format!("configure NDM24 with {command}"))?;
         println!("{command}: OK");
     }
+
+    qusb2snes::mailbox_command(
+        websocket,
+        labels,
+        MODEM_MAILBOX_COMMAND_PPP_OPEN,
+        setup_timeout,
+    )
+    .await
+    .context("enable local LCP establishment before dialing")?;
 
     qusb2snes::mailbox_command(
         websocket,
