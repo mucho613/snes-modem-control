@@ -13,9 +13,10 @@
 ```powershell
 cargo xtask bootstrap
 cargo xtask check
+cargo xtask mesen-test
 ```
 
-最初のコマンドは、ハッシュを固定した公式 cc65 Windows スナップショットを `.tools/cc65` へ配置します。二番目のコマンドは、仕様・フォント生成物、Rust テスト、通常 ROM、スモークテスト ROM、フォント確認 ROM をまとめて検証します。
+最初のコマンドは、ハッシュを固定した公式 cc65 Windows スナップショットを `.tools/cc65` へ配置します。二番目のコマンドは、仕様・フォント生成物、Rust テスト、通常 ROM、スモークテスト ROM、フォント確認 ROM をまとめて検証します。三番目はMesenCEのheadless test runnerで通常ROMの常設PPPセルフテストを実行し、NDM24やFXPAK PROを使わず終了コードで合否を返します。
 
 生成物:
 

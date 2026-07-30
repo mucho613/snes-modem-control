@@ -47,6 +47,9 @@ cargo xtask deploy --smoke
 # フォント確認 ROM を転送して起動
 cargo xtask deploy --font-test
 
+# MesenCE上でNDM24を使わずPPP常設セルフテスト
+cargo xtask mesen-test
+
 # 一度だけ診断スナップショット
 cargo run -p ndm24-tools -- monitor --once
 
@@ -80,6 +83,48 @@ cargo run -p ndm24-tools -- mailbox freeze-trace
 cargo run -p ndm24-tools -- mailbox clear-trace
 cargo run -p ndm24-tools -- mailbox resume-trace
 ```
+
+## MesenCE 自動セルフテスト
+
+[MesenCE](https://github.com/nesdev-org/MesenCE)のheadless test runnerを使い、
+通常ROMのWRAMメールボックスへ
+`ppp-self-test`を投入して終了コードで合否を返します。通常ROMは起動時にNDM24を
+初期化しないため、この試験ではNDM24、FXPAK PRO、QUsb2Snes、疑似PSTNを
+使用しません。ROMと`.dbg`、`.lbl`は毎回同じビルドから生成し、メールボックス
+アドレスは`.lbl`から解決します。Lua側でもmailbox magic、ABI version、block
+sizeを照合してから命令を書き込みます。
+
+2026-07-30時点の確認環境はMesenCE 2.2.1
+（commit `20ba206cef5ba207c21203176d02cb9f43dda9fb`、Windows x64、
+`Mesen.exe` SHA-256
+`8EF403D6B9AF32075416193914D7993CE8480B347FE1F20A0CFD9815374933E7`）です。
+実行ファイルは次の優先順位で見つけます。
+
+1. `--mesen <path>`
+2. 環境変数`MESEN_EXE`
+3. `PATH`上の`Mesen.exe`
+4. `%USERPROFILE%\PortableApps\Mesen\Mesen.exe`
+
+現在のPortableApps配置では、引数なしで実行できます。
+
+```powershell
+cargo xtask mesen-test
+```
+
+別の配置を明示する場合:
+
+```powershell
+cargo xtask mesen-test --mesen C:\path\to\Mesen.exe
+```
+
+`build/mesen/ppp-self-test.lua`は、テンプレート、現行mailbox ABI、リンク後の
+labelから生成されます。成功時は終了コード0です。PPP fixtureが失敗した場合は
+失敗step番号を1～249の終了コードとして返し、`xtask`が16進のstep番号を表示します。
+ABI version不一致は250、block size不一致は251、600 emulated frames以内に
+初期化または完了しない場合は252です。MesenCE自身のwall-clock timeoutは既定
+30秒で、必要なら`--timeout-seconds`で変更できます。
+このコマンドは実機試験を置き換えず、65816のPPP/IPv4ロジックを高速に回帰確認する
+第一段階として使います。
 
 NDM24自身の識別情報を読み取り専用ATコマンドで収集する場合は、hardware revisionを指定します。
 

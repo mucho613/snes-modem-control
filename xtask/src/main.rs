@@ -39,6 +39,14 @@ enum Task {
         #[arg(long, default_value = "/snes-modem-control.sfc")]
         remote_path: String,
     },
+    MesenTest {
+        /// Path to MesenCE. Falls back to MESEN_EXE, PATH, and PortableApps.
+        #[arg(long)]
+        mesen: Option<PathBuf>,
+        /// MesenCE test-runner wall-clock timeout.
+        #[arg(long, default_value_t = 30)]
+        timeout_seconds: u32,
+    },
     Check,
     Bootstrap,
 }
@@ -193,6 +201,10 @@ fn main() -> Result<()> {
                 .arg(&rom)
                 .args(["--websocket", &websocket, "--remote-path", &remote_path]))
         }
+        Task::MesenTest {
+            mesen,
+            timeout_seconds,
+        } => mesen_test(&root, mesen.as_deref(), timeout_seconds),
         Task::Check => {
             generate(&root, true)?;
             run(Command::new("cargo")
@@ -1076,6 +1088,157 @@ fn build_rom(root: &Path, profile: RomProfile) -> Result<()> {
     Ok(())
 }
 
+fn mesen_test(root: &Path, requested_mesen: Option<&Path>, timeout_seconds: u32) -> Result<()> {
+    ensure!(
+        timeout_seconds > 0,
+        "MesenCE timeout must be greater than zero"
+    );
+
+    build_rom(root, RomProfile::Normal)?;
+    let mesen = find_mesen(requested_mesen)?;
+    let output = root.join("build/mesen");
+    fs::create_dir_all(&output)?;
+
+    let labels = root.join("build/normal/modem-control.lbl");
+    let mailbox_address = read_label_address(&labels, "modemMailbox")?;
+    let mailbox_offset = mailbox_address
+        .checked_sub(0x7e_0000)
+        .context("modemMailbox is not in SNES WRAM bank 7E")?;
+    ensure!(
+        mailbox_offset <= 0x1_ffff,
+        "modemMailbox is outside the 128 KiB SNES WRAM range"
+    );
+
+    let spec = read_spec(root)?;
+    let command = *spec
+        .mailbox_commands
+        .get("ppp_self_test")
+        .context("mailbox command ppp_self_test is missing from the specification")?;
+    let passed = *spec
+        .mailbox_status
+        .get("passed")
+        .context("mailbox status passed is missing from the specification")?;
+    let failed = *spec
+        .mailbox_status
+        .get("failed")
+        .context("mailbox status failed is missing from the specification")?;
+
+    let template = fs::read_to_string(root.join("tools/mesen/ppp-self-test.lua.in"))
+        .context("read tools/mesen/ppp-self-test.lua.in")?;
+    let script = template
+        .replace("@MAILBOX_OFFSET@", &format!("0x{mailbox_offset:05X}"))
+        .replace("@MAILBOX_VERSION@", &spec.mailbox.version.to_string())
+        .replace("@MAILBOX_SIZE@", &spec.mailbox.size.to_string())
+        .replace("@COMMAND_PPP_SELF_TEST@", &command.to_string())
+        .replace("@STATUS_PASSED@", &passed.to_string())
+        .replace("@STATUS_FAILED@", &failed.to_string());
+    ensure!(
+        !script.contains('@'),
+        "MesenCE Lua template contains an unresolved placeholder"
+    );
+    let script_path = output.join("ppp-self-test.lua");
+    fs::write(&script_path, script).with_context(|| format!("write {}", script_path.display()))?;
+
+    let rom = root.join("build/normal/modem-control.sfc");
+    println!(
+        "running MesenCE PPP self-test with {} (mailbox ${mailbox_address:06X})",
+        mesen.display()
+    );
+    let status = Command::new(&mesen)
+        .current_dir(root)
+        .arg("--testRunner")
+        .arg("--enableStdout")
+        .arg("--doNotSaveSettings")
+        .arg(format!("--timeout={timeout_seconds}"))
+        .arg(&script_path)
+        .arg(&rom)
+        .status()
+        .with_context(|| format!("start MesenCE at {}", mesen.display()))?;
+    if !status.success() {
+        match status.code() {
+            Some(250) => bail!("MesenCE test rejected the mailbox ABI version"),
+            Some(251) => bail!("MesenCE test rejected the mailbox block size"),
+            Some(252) => bail!("MesenCE test timed out after 600 emulated frames"),
+            Some(step @ 1..=249) => {
+                bail!("MesenCE PPP self-test failed at step 0x{step:02X}")
+            }
+            Some(code) => bail!("MesenCE test runner failed with exit code {code}"),
+            None => bail!("MesenCE test runner was terminated without an exit code"),
+        }
+    }
+    println!("MesenCE PPP self-test passed");
+    Ok(())
+}
+
+fn find_mesen(requested: Option<&Path>) -> Result<PathBuf> {
+    if let Some(path) = requested {
+        ensure!(
+            path.is_file(),
+            "MesenCE executable was not found at {}",
+            path.display()
+        );
+        return Ok(path.to_path_buf());
+    }
+
+    if let Some(path) = env::var_os("MESEN_EXE").map(PathBuf::from) {
+        ensure!(
+            path.is_file(),
+            "MESEN_EXE does not point to a file: {}",
+            path.display()
+        );
+        return Ok(path);
+    }
+
+    let executable = if cfg!(windows) { "Mesen.exe" } else { "Mesen" };
+    if let Some(paths) = env::var_os("PATH") {
+        for directory in env::split_paths(&paths) {
+            let candidate = directory.join(executable);
+            if candidate.is_file() {
+                return Ok(candidate);
+            }
+        }
+    }
+
+    if cfg!(windows) {
+        if let Some(profile) = env::var_os("USERPROFILE") {
+            let candidate = PathBuf::from(profile).join("PortableApps/Mesen/Mesen.exe");
+            if candidate.is_file() {
+                return Ok(candidate);
+            }
+        }
+    }
+
+    bail!("MesenCE was not found; pass `--mesen <path>` or set the MESEN_EXE environment variable")
+}
+
+fn read_label_address(path: &Path, wanted: &str) -> Result<u32> {
+    let source =
+        fs::read_to_string(path).with_context(|| format!("read label file {}", path.display()))?;
+    parse_label_address(&source, wanted)
+        .with_context(|| format!("find label {wanted} in {}", path.display()))
+}
+
+fn parse_label_address(source: &str, wanted: &str) -> Result<u32> {
+    for line in source.lines() {
+        let mut parts = line.split_whitespace();
+        if parts.next() != Some("al") {
+            continue;
+        }
+        let Some(address) = parts.next() else {
+            continue;
+        };
+        let Some(name) = parts.next() else {
+            continue;
+        };
+        if name.trim_start_matches('.') != wanted {
+            continue;
+        }
+        return u32::from_str_radix(address.trim_start_matches('$'), 16)
+            .with_context(|| format!("invalid address for label {wanted}"));
+    }
+    bail!("label {wanted} was not found")
+}
+
 struct Cc65Tools {
     ca65: PathBuf,
     ld65: PathBuf,
@@ -1268,5 +1431,18 @@ mod tests {
         assert_eq!(&palette[..8], &[0x00, 0x00, 0x7b, 0x6f, 0, 0, 0, 0]);
         assert_eq!(decode_bgr555(0x6f7b), [222, 222, 222]);
         assert!(palette[8..].iter().all(|&byte| byte == 0));
+    }
+
+    #[test]
+    fn parses_ca65_label_address() {
+        let labels = "\
+al 7E078D .modemMailbox
+al C086AD .modemMailboxPoll
+";
+        assert_eq!(
+            parse_label_address(labels, "modemMailbox").unwrap(),
+            0x7e_078d
+        );
+        assert!(parse_label_address(labels, "missing").is_err());
     }
 }

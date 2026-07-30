@@ -1,0 +1,140 @@
+-- Generated into build/mesen by `cargo xtask mesen-test`.
+-- MesenCE executes callbacks synchronously with the emulated CPU, so writing
+-- command first and host sequence last is atomic from the SFC's perspective.
+
+local MAILBOX = @MAILBOX_OFFSET@
+local MAILBOX_VERSION = @MAILBOX_VERSION@
+local MAILBOX_SIZE = @MAILBOX_SIZE@
+local COMMAND_PPP_SELF_TEST = @COMMAND_PPP_SELF_TEST@
+local STATUS_PASSED = @STATUS_PASSED@
+local STATUS_FAILED = @STATUS_FAILED@
+
+local OFFSET_VERSION = 4
+local OFFSET_SIZE = 6
+local OFFSET_HOST_SEQUENCE = 8
+local OFFSET_PROCESSED_SEQUENCE = 12
+local OFFSET_COMMAND = 16
+local OFFSET_STATUS = 17
+local OFFSET_RESULT = 18
+local FRAME_LIMIT = 600
+
+local memory_type = emu.memType.snesWorkRam
+local frame_count = 0
+local command_sent = false
+local sequence = 0
+
+local function read8(offset)
+    return emu.read(MAILBOX + offset, memory_type, false)
+end
+
+local function read16(offset)
+    return read8(offset) | (read8(offset + 1) << 8)
+end
+
+local function read32(offset)
+    return read8(offset)
+        | (read8(offset + 1) << 8)
+        | (read8(offset + 2) << 16)
+        | (read8(offset + 3) << 24)
+end
+
+local function write32(offset, value)
+    emu.write(MAILBOX + offset, value & 0xff, memory_type)
+    emu.write(MAILBOX + offset + 1, (value >> 8) & 0xff, memory_type)
+    emu.write(MAILBOX + offset + 2, (value >> 16) & 0xff, memory_type)
+    emu.write(MAILBOX + offset + 3, (value >> 24) & 0xff, memory_type)
+end
+
+local function magic_ready()
+    return read8(0) == 0x4e
+        and read8(1) == 0x44
+        and read8(2) == 0x4d
+        and read8(3) == 0x43
+end
+
+local function stop_failure(message, exit_code)
+    emu.displayMessage("NDM24 test", "FAIL: " .. message)
+    emu.stop(exit_code)
+end
+
+local function poll()
+    frame_count = frame_count + 1
+    if frame_count > FRAME_LIMIT then
+        local phase = command_sent and "command completion" or "mailbox initialization"
+        stop_failure("timed out waiting for " .. phase, 252)
+        return
+    end
+
+    if not command_sent then
+        if not magic_ready() then
+            return
+        end
+        if read16(OFFSET_VERSION) ~= MAILBOX_VERSION then
+            stop_failure(
+                string.format(
+                    "mailbox ABI version mismatch: expected %d, got %d",
+                    MAILBOX_VERSION,
+                    read16(OFFSET_VERSION)
+                ),
+                250
+            )
+            return
+        end
+        if read16(OFFSET_SIZE) ~= MAILBOX_SIZE then
+            stop_failure(
+                string.format(
+                    "mailbox size mismatch: expected %d, got %d",
+                    MAILBOX_SIZE,
+                    read16(OFFSET_SIZE)
+                ),
+                251
+            )
+            return
+        end
+
+        sequence = (read32(OFFSET_PROCESSED_SEQUENCE) + 1) & 0xffffffff
+        emu.write(MAILBOX + OFFSET_COMMAND, COMMAND_PPP_SELF_TEST, memory_type)
+        write32(OFFSET_HOST_SEQUENCE, sequence)
+        command_sent = true
+        emu.displayMessage(
+            "NDM24 test",
+            string.format(
+                "PPP self-test command sent: sequence=%u mailbox=WRAM+$%05X",
+                sequence,
+                MAILBOX
+            )
+        )
+        return
+    end
+
+    if read32(OFFSET_PROCESSED_SEQUENCE) ~= sequence then
+        return
+    end
+
+    local status = read8(OFFSET_STATUS)
+    local result = read16(OFFSET_RESULT)
+    if status == STATUS_PASSED then
+        emu.displayMessage(
+            "NDM24 test",
+            string.format(
+                "PASS: PPP self-test sequence=%u result=$%04X frames=%d",
+                sequence,
+                result,
+                frame_count
+            )
+        )
+        emu.stop(0)
+    elseif status == STATUS_FAILED then
+        stop_failure(
+            string.format(
+                "PPP self-test failed at step $%04X (sequence=%u, frames=%d)",
+                result,
+                sequence,
+                frame_count
+            ),
+            (result > 0 and result < 250) and result or 1
+        )
+    end
+end
+
+emu.addEventCallback(poll, emu.eventType.endFrame)
