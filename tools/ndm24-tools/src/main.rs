@@ -3,6 +3,7 @@ mod connect_test;
 mod identification_test;
 mod labels;
 mod peer;
+mod ppp_dial;
 mod qusb2snes;
 mod trace;
 
@@ -77,6 +78,16 @@ enum Command {
         labels: PathBuf,
         #[arg(long, default_value_t = 10)]
         timeout_seconds: u64,
+    },
+    PppDial {
+        #[arg(long, default_value = "ws://localhost:23074")]
+        websocket: String,
+        #[arg(long, default_value = "build/smoke/modem-control.lbl")]
+        labels: PathBuf,
+        #[arg(long, default_value_t = 15)]
+        setup_timeout_seconds: u64,
+        #[arg(long, default_value_t = 75)]
+        dial_timeout_seconds: u64,
     },
     Monitor {
         #[arg(long, default_value = "ws://localhost:23074")]
@@ -271,6 +282,20 @@ async fn main() -> Result<()> {
             };
             println!("{display_command}: {}", expect.name());
             Ok(())
+        }
+        Command::PppDial {
+            websocket,
+            labels,
+            setup_timeout_seconds,
+            dial_timeout_seconds,
+        } => {
+            ppp_dial::run(
+                &websocket,
+                &labels,
+                Duration::from_secs(setup_timeout_seconds),
+                Duration::from_secs(dial_timeout_seconds),
+            )
+            .await
         }
         Command::Monitor {
             websocket,

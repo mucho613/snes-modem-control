@@ -153,19 +153,15 @@ V.22bisへ固定しません。発呼のたびに次の設定列を適用しま�
 設定を既定値へ戻すため、speakerを無効化する`ATM0`を必ずその直後に送ります。
 
 ```powershell
-cargo run -p ndm24-tools -- at 'AT&F' --expect ok --timeout-frames 300 --timeout-seconds 15
-cargo run -p ndm24-tools -- at ATM0 --expect ok --timeout-frames 300 --timeout-seconds 15
-cargo run -p ndm24-tools -- at 'AT%B2400' --expect ok --timeout-frames 300 --timeout-seconds 15
-cargo run -p ndm24-tools -- at ATS7=60 --expect ok --timeout-frames 300 --timeout-seconds 15
-cargo run -p ndm24-tools -- at ATX3 --expect ok --timeout-frames 300 --timeout-seconds 15
-cargo run -p ndm24-tools -- mailbox ppp-receive-start
-cargo run -p ndm24-tools -- at ATDT0 --expect connect --timeout-frames 3900 --timeout-seconds 75
+cargo run -p ndm24-tools -- ppp-dial
 ```
 
-`timeout-frames`はSFC側のVBlank基準、`timeout-seconds`はPC側メールボックス
-待機の上限です。前者が必ず先に成立するようPC側を長く設定します。切断時は
-`Stop`で対向を停止し、PPP受信層がpeerのTerminate-Requestとraw
-`NO CARRIER`を処理した後、診断と`pending-rx`を確認します。
+`ppp-dial`はModemが`Ready`であることを確認し、上記の設定5件、発呼前の
+PPP受信開始、`ATDT0`、`CONNECT`待機を順に実行します。SFC側timeoutは設定時
+300 frame、発呼時3900 frame、PC側mailbox待機はそれぞれ15秒、75秒です。
+途中で失敗した場合はPPP受信を停止して終了します。切断時は`Stop`で対向を
+停止し、PPP受信層がpeerのTerminate-Requestとraw `NO CARRIER`を処理した後、
+診断と`pending-rx`を確認します。
 
 SFCの診断は別のPowerShellで取得します。
 

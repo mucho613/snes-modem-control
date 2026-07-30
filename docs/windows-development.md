@@ -70,7 +70,7 @@ cargo run -p ndm24-tools -- at ATM0
 
 # PPP接続では発信前に受信を有効化し、CONNECTを正規parserで待つ
 cargo run -p ndm24-tools -- mailbox ppp-receive-start
-cargo run -p ndm24-tools -- at ATDT0 --expect connect --timeout-frames 3900 --timeout-seconds 75
+cargo run -p ndm24-tools -- ppp-dial
 
 # 次のtransactionへ持ち越される未処理RX byteをJSON配列で確認
 cargo run -p ndm24-tools -- pending-rx
