@@ -345,6 +345,12 @@ cargo run -p ndm24-tools -- ppp-close
 cargo run -p ndm24-tools -- ppp-open
 ```
 
+2026-07-30にmailbox ABI version 8のsmoke ROMをFXPAK PRO実機へ転送し、
+command 10の常設セルフテストとcommand 16の`ppp-close`が合格しました。
+未接続の`Closed`状態に対する`ppp-close`ではTerminate-Requestを生成せず、
+administrative-openだけを0へ変更して即時完了することを診断ABI v19で確認
+しています。`Opened`実対向でのTerminate-Request/Ack交換は別途行います。
+
 16bit counterの比較は期限までの差が半周未満であることを利用した減算で行うため、`$FFFF` から `$0000` をまたぐ場合も同じです。常設セルフテストのstep `$50`～`$55` は、共有encoder受理時のtimer開始、wrap-around直前、期限ちょうど、同一Identifier再送、回数超過、`Ack-Received` fallback、lower-downによる初期化を実時間待ちなしで検査します。
 
 ## 65816 LCP main-loop接続
