@@ -137,6 +137,18 @@ enum Command {
         #[arg(long, default_value_t = 15)]
         timeout_seconds: u64,
     },
+    DnsQuery {
+        #[arg(default_value = "example.com")]
+        name: String,
+        #[arg(long, default_value = "1.1.1.1")]
+        resolver: Ipv4Addr,
+        #[arg(long, default_value = "ws://localhost:23074")]
+        websocket: String,
+        #[arg(long, default_value = "build/smoke/modem-control.lbl")]
+        labels: PathBuf,
+        #[arg(long, default_value_t = 20)]
+        timeout_seconds: u64,
+    },
     PendingRx {
         #[arg(long, default_value = "ws://localhost:23074")]
         websocket: String,
@@ -403,6 +415,29 @@ async fn main() -> Result<()> {
                 snapshot.icmp_request_identifier,
                 snapshot.icmp_request_sequence,
                 snapshot.icmp_request_rtt_frames
+            );
+            Ok(())
+        }
+        Command::DnsQuery {
+            name,
+            resolver,
+            websocket,
+            labels,
+            timeout_seconds,
+        } => {
+            let snapshot = qusb2snes::dns_query(
+                &websocket,
+                &labels,
+                resolver.octets(),
+                &name,
+                Duration::from_secs(timeout_seconds),
+            )
+            .await?;
+            let answer = Ipv4Addr::from(snapshot.dns_answer_address);
+            println!("{}", serde_json::to_string(&snapshot)?);
+            println!(
+                "DNS A {name} = {answer} via {resolver}: transaction=0x{:04x}, answers={}, rtt_frames={}",
+                snapshot.dns_transaction_id, snapshot.dns_answer_count, snapshot.dns_rtt_frames
             );
             Ok(())
         }

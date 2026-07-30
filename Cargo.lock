@@ -781,6 +781,7 @@ dependencies = [
  "anyhow",
  "clap",
  "futures-util",
+ "ndm24-ppp",
  "ndm24-protocol",
  "serde",
  "serde_json",

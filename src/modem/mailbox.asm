@@ -1,4 +1,5 @@
 .include "../macro/utility.asm"
+.include "../ppp/constants.inc"
 .include "constants.inc"
 
 .code
@@ -18,6 +19,8 @@
 .import pppReceiveStart, pppReceiveStop
 .import pppNtpRequest
 .import pppIcmpRequestDestination, pppIcmpRequestBegin
+.import pppDnsResolver, pppDnsQueryName, pppDnsQueryNameLength
+.import pppDnsRequest
 
 .export modemMailboxPoll
 .proc modemMailboxPoll
@@ -165,6 +168,10 @@
   bne :+
   jmp @icmpEchoRequest
 :
+  cmp #MODEM_MAILBOX_COMMAND_DNS_QUERY
+  bne :+
+  jmp @dnsQuery
+:
   lda #MODEM_MAILBOX_STATUS_FAILED
   sta modemMailboxStatus
   lda #$ff
@@ -303,19 +310,19 @@
   sta modemMailboxResult
   lda #MODEM_MAILBOX_STATUS_FAILED
   sta modemMailboxStatus
-  bra @commitCommand
+  jmp @commitCommand
 
 @pppReceiveStart:
   jsr pppReceiveStart
   lda #MODEM_MAILBOX_STATUS_PASSED
   sta modemMailboxStatus
-  bra @commitCommand
+  jmp @commitCommand
 
 @pppReceiveStop:
   jsr pppReceiveStop
   lda #MODEM_MAILBOX_STATUS_PASSED
   sta modemMailboxStatus
-  bra @commitCommand
+  jmp @commitCommand
 
 @ntpRequest:
   rep #$10
@@ -326,13 +333,13 @@
   bcs @ntpRequestFailed
   lda #MODEM_MAILBOX_STATUS_PASSED
   sta modemMailboxStatus
-  bra @commitCommand
+  jmp @commitCommand
 
 @ntpRequestFailed:
   sta modemMailboxResult
   lda #MODEM_MAILBOX_STATUS_FAILED
   sta modemMailboxStatus
-  bra @commitCommand
+  jmp @commitCommand
 
 @icmpEchoRequest:
   ldx #$00
@@ -350,32 +357,70 @@
   bcs @icmpEchoRequestFailed
   lda #MODEM_MAILBOX_STATUS_PASSED
   sta modemMailboxStatus
-  bra @commitCommand
+  jmp @commitCommand
 
 @icmpEchoRequestFailed:
   sta modemMailboxResult
   lda #MODEM_MAILBOX_STATUS_FAILED
   sta modemMailboxStatus
-  bra @commitCommand
+  jmp @commitCommand
+
+@dnsQuery:
+  lda modemMailboxArguments + 4
+  beq @dnsQueryInvalid
+  cmp #(PPP_DNS_MAXIMUM_NAME_LENGTH + 1)
+  bcs @dnsQueryInvalid
+  sta pppDnsQueryNameLength
+  ldx #$00
+@dnsCopyResolver:
+  lda modemMailboxArguments, x
+  sta pppDnsResolver, x
+  inx
+  cpx #$04
+  bne @dnsCopyResolver
+  ldx #$00
+@dnsCopyName:
+  lda modemMailboxArguments + 5, x
+  sta pppDnsQueryName, x
+  inx
+  cpx pppDnsQueryNameLength
+  bne @dnsCopyName
+  rep #$10
+  .i16
+  jsr pppDnsRequest
+  sep #$10
+  .i8
+  bcs @dnsQueryFailed
+  lda #MODEM_MAILBOX_STATUS_PASSED
+  sta modemMailboxStatus
+  jmp @commitCommand
+
+@dnsQueryInvalid:
+  lda #PPP_DNS_ERROR_INVALID_NAME
+@dnsQueryFailed:
+  sta modemMailboxResult
+  lda #MODEM_MAILBOX_STATUS_FAILED
+  sta modemMailboxStatus
+  jmp @commitCommand
 
 @binaryInvalid:
   lda #MODEM_MAILBOX_STATUS_FAILED
   sta modemMailboxStatus
   lda #MODEM_ERROR_AT_INVALID
   sta modemMailboxResult
-  bra @commitCommand
+  jmp @commitCommand
 
 @clearTrace:
   jsr modemClearTrace
   lda #MODEM_MAILBOX_STATUS_PASSED
   sta modemMailboxStatus
-  bra @commitCommand
+  jmp @commitCommand
 
 @freezeTrace:
   jsr modemFreezeTrace
   lda #MODEM_MAILBOX_STATUS_PASSED
   sta modemMailboxStatus
-  bra @commitCommand
+  jmp @commitCommand
 
 @resumeTrace:
   jsr modemResumeTrace

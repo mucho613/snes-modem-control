@@ -69,6 +69,11 @@
 .export pppIcmpRequestDeadline, pppIcmpRequestSentFrame, pppIcmpRequestRttFrames
 .export pppIcmpRequestCount, pppIcmpRequestResponseCount
 .export pppIcmpRequestDropCount, pppIcmpRequestTimeoutCount
+.export pppDnsState, pppDnsLastError, pppDnsFlags, pppDnsResponseCode
+.export pppDnsResolver, pppDnsTransactionId, pppDnsAnswerCount
+.export pppDnsAnswerAddress, pppDnsDeadline, pppDnsSentFrame, pppDnsRttFrames
+.export pppDnsQueryCount, pppDnsResponseCount
+.export pppDnsDropCount, pppDnsTimeoutCount
 
 pppDiagnosticState:
 pppDiagnosticMagic: .res $4
@@ -227,6 +232,21 @@ pppIcmpRequestCount: .res $4
 pppIcmpRequestResponseCount: .res $4
 pppIcmpRequestDropCount: .res $4
 pppIcmpRequestTimeoutCount: .res $4
+pppDnsState: .res $1
+pppDnsLastError: .res $1
+pppDnsFlags: .res $1
+pppDnsResponseCode: .res $1
+pppDnsResolver: .res $4
+pppDnsTransactionId: .res $2
+pppDnsAnswerCount: .res $2
+pppDnsAnswerAddress: .res $4
+pppDnsDeadline: .res $2
+pppDnsSentFrame: .res $2
+pppDnsRttFrames: .res $2
+pppDnsQueryCount: .res $4
+pppDnsResponseCount: .res $4
+pppDnsDropCount: .res $4
+pppDnsTimeoutCount: .res $4
 .res PPP_DIAGNOSTIC_SIZE - (* - pppDiagnosticState)
 pppDiagnosticStateEnd:
 
@@ -386,6 +406,21 @@ pppDiagnosticStateEnd:
 .assert pppIcmpRequestResponseCount - pppDiagnosticState = PPP_DIAG_ICMP_REQUEST_RESPONSE_COUNT, error, "PPP ICMP request response count offset"
 .assert pppIcmpRequestDropCount - pppDiagnosticState = PPP_DIAG_ICMP_REQUEST_DROP_COUNT, error, "PPP ICMP request drop count offset"
 .assert pppIcmpRequestTimeoutCount - pppDiagnosticState = PPP_DIAG_ICMP_REQUEST_TIMEOUT_COUNT, error, "PPP ICMP request timeout count offset"
+.assert pppDnsState - pppDiagnosticState = PPP_DIAG_DNS_STATE, error, "PPP DNS state offset"
+.assert pppDnsLastError - pppDiagnosticState = PPP_DIAG_DNS_LAST_ERROR, error, "PPP DNS error offset"
+.assert pppDnsFlags - pppDiagnosticState = PPP_DIAG_DNS_FLAGS, error, "PPP DNS flags offset"
+.assert pppDnsResponseCode - pppDiagnosticState = PPP_DIAG_DNS_RESPONSE_CODE, error, "PPP DNS response code offset"
+.assert pppDnsResolver - pppDiagnosticState = PPP_DIAG_DNS_RESOLVER, error, "PPP DNS resolver offset"
+.assert pppDnsTransactionId - pppDiagnosticState = PPP_DIAG_DNS_TRANSACTION_ID, error, "PPP DNS transaction offset"
+.assert pppDnsAnswerCount - pppDiagnosticState = PPP_DIAG_DNS_ANSWER_COUNT, error, "PPP DNS answer count offset"
+.assert pppDnsAnswerAddress - pppDiagnosticState = PPP_DIAG_DNS_ANSWER_ADDRESS, error, "PPP DNS answer address offset"
+.assert pppDnsDeadline - pppDiagnosticState = PPP_DIAG_DNS_DEADLINE, error, "PPP DNS deadline offset"
+.assert pppDnsSentFrame - pppDiagnosticState = PPP_DIAG_DNS_SENT_FRAME, error, "PPP DNS sent frame offset"
+.assert pppDnsRttFrames - pppDiagnosticState = PPP_DIAG_DNS_RTT_FRAMES, error, "PPP DNS RTT offset"
+.assert pppDnsQueryCount - pppDiagnosticState = PPP_DIAG_DNS_QUERY_COUNT, error, "PPP DNS query count offset"
+.assert pppDnsResponseCount - pppDiagnosticState = PPP_DIAG_DNS_RESPONSE_COUNT, error, "PPP DNS response count offset"
+.assert pppDnsDropCount - pppDiagnosticState = PPP_DIAG_DNS_DROP_COUNT, error, "PPP DNS drop count offset"
+.assert pppDnsTimeoutCount - pppDiagnosticState = PPP_DIAG_DNS_TIMEOUT_COUNT, error, "PPP DNS timeout count offset"
 .assert pppDiagnosticStateEnd - pppDiagnosticState = PPP_DIAGNOSTIC_SIZE, error, "PPP diagnostic ABI size"
 
 ; Decoder and pump scratch fields are private and intentionally excluded from
@@ -416,6 +451,11 @@ pppDiagnosticStateEnd:
 .export pppNtpPacketOffset, pppNtpTestSavedFrameCounter
 .export pppNtpTestSavedClockValid, pppNtpTestSavedClockSeconds
 .export pppNtpTestSavedClockSubsecond
+.export pppDnsQueryName, pppDnsQueryNameLength
+.export pppDnsPacketOffset, pppDnsPacketEnd, pppDnsCursor
+.export pppDnsRecordRemaining, pppDnsDataLength
+.export pppDnsQueryCursor, pppDnsLabelPosition, pppDnsLabelLength
+.export pppDnsTestSavedFrameCounter
 pppLastEvent: .res $1
 pppLastInvalidReason: .res $1
 pppDecoderScratchByte: .res $1
@@ -461,6 +501,17 @@ pppNtpTestSavedFrameCounter: .res $4
 pppNtpTestSavedClockValid: .res $1
 pppNtpTestSavedClockSeconds: .res $4
 pppNtpTestSavedClockSubsecond: .res $4
+pppDnsQueryName: .res PPP_DNS_MAXIMUM_NAME_LENGTH
+pppDnsQueryNameLength: .res $1
+pppDnsPacketOffset: .res $2
+pppDnsPacketEnd: .res $2
+pppDnsCursor: .res $2
+pppDnsRecordRemaining: .res $2
+pppDnsDataLength: .res $2
+pppDnsQueryCursor: .res $2
+pppDnsLabelPosition: .res $2
+pppDnsLabelLength: .res $1
+pppDnsTestSavedFrameCounter: .res $4
 pppLcpOptionSeen: .res $100
 pppLcpOptionDuplicate: .res $100
 pppIpcpOptionSeen: .res $100

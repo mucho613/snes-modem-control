@@ -71,6 +71,9 @@ cargo run -p ndm24-tools -- ntp-request
 # IPCP Opened後、任意のIPv4 addressへICMP Echoを送り、相関済み応答まで待つ
 cargo run -p ndm24-tools -- icmp-echo 1.1.1.1
 
+# IPCP Opened後、任意のresolverへDNS A問い合わせを送り、最初のIPv4回答を表示
+cargo run -p ndm24-tools -- dns-query example.com --resolver 1.1.1.1
+
 # メールボックス経由の AT クイックテスト
 cargo run -p ndm24-tools -- test
 

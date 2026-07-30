@@ -225,6 +225,28 @@ cargo run -p ndm24-tools -- trace-live
 `debug`はLCPなどの制御packetを記録しますが、`show-password`は設定せず、
 PAP passwordをログへ出しません。
 
+## 公開DNS／外向きUDP試験
+
+IPCPが`Opened`になった後、SFCから任意の公開resolverへA問い合わせを送れます。
+既定値でCloudflareの`1.1.1.1:53`へ`example.com`を問い合わせるコマンドは次です。
+
+```powershell
+cargo run -p ndm24-tools -- dns-query example.com --resolver 1.1.1.1
+```
+
+mailbox command 15へresolver、名前長、最大27byteのASCII名を渡します。SFC側は
+local UDP port 49153からport 53へ送信し、source address、両port、Transaction IDが
+一致する応答だけを受理します。成功時は最初のA address、回答数、RCODE、RTT frame数
+と診断snapshotを表示します。NATを経由するため、PPP serverを`Start`した状態で
+実行してください。
+
+2026-07-30のrevision A実対向では、`example.com`の回答2件を受信し、最初の
+`104.20.23.154`を67frameで取得しました。SFC診断はIPv4受信/受理/送信が1/1/1、
+UDP受信/送信が1/1、DNS要求/応答が1/1でした。PPP FCS error、invalid、overflow、
+IPv4/UDP checksum error、各層のdrop、DNS timeoutは0です。`iptables-legacy`の
+counterは`ppp0`から`eth0`へ57byte、戻り89byte、MASQUERADE 1 packetを記録し、
+公開InternetとのUDP往復であることを対向側からも確認しました。
+
 ## UDP/NTP試験
 
 NTP serviceは閉じた試験網の`10.24.0.1:123/UDP`を待ちます。PPP interfaceがまだ

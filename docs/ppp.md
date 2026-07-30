@@ -4,7 +4,7 @@
 
 最初のPPPマイルストーンは、NDM24から受け取る任意位置で分割されたbyte列を、FCS検証済みのPPPフレームへ復元する層です。`crates/ndm24-ppp` を仕様の参照実装とし、同じ状態遷移と試験ベクトルを65816へ移植しています。
 
-現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP、PAP client、IPCP、IPv4 packet層、ICMP Echo responder/requester、UDP datagram層、NTP clientまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ack、IPCP `Opened`まで確認し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。同日にIPv4、ICMP Echo、UDP/NTPはMesenCE、FXPAK PRO実機、疑似PSTNのV.22bis 2400 bit/s回線上で送受信に合格しました。さらにWSL2のNATを介し、SFC実機から公開IPv4 `1.1.1.1`へのICMP Echo往復にも合格しています。NTPでは2回連続で相関済み応答からUnix秒を取得しています。TCPは未実装です。
+現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP、PAP client、IPCP、IPv4 packet層、ICMP Echo responder/requester、UDP datagram層、NTP client、最小DNS A clientまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ack、IPCP `Opened`まで確認し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。同日にIPv4、ICMP Echo、UDP/NTP/DNSはMesenCE、FXPAK PRO実機、疑似PSTNのV.22bis 2400 bit/s回線上で送受信に合格しました。さらにWSL2のNATを介し、SFC実機から公開IPv4 `1.1.1.1`へのICMP Echo往復と公開DNS問い合わせにも合格しています。NTPでは2回連続で相関済み応答からUnix秒を取得しています。TCPは未実装です。
 
 PPP接続は次の順序で進みます。
 
@@ -16,7 +16,9 @@ flowchart LR
     A --> I["IPCP negotiation"]
     I --> V["IPv4"]
     V --> E["ICMP Echo"]
-    V --> U["UDP → NTP"]
+    V --> U["UDP"]
+    U --> N["NTP"]
+    U --> D["DNS A"]
     V --> T["TCP"]
 ```
 
@@ -80,6 +82,7 @@ Rust参照実装は全入力分割位置、破損FCSからの再同期、Flag直
 - `src/ppp/icmpRequest.asm`: Echo Request生成、応答相関、timeout、RTT診断
 - `src/ppp/udp.asm`: UDP parser、疑似header checksum、送信datagram生成
 - `src/ppp/ntp.asm`: 明示要求型NTP client、応答相関、timeout
+- `src/ppp/dns.asm`: DNS A要求生成、応答相関、圧縮名解析、timeout
 - `src/ppp/selfTest.asm`: 固定fixtureによる常設セルフテスト
 
 `pppDecoderPush` はraw byteを1byteずつ受け取り、次のeventを返します。
@@ -143,7 +146,7 @@ Address 1 + Control 1 + Protocol 2 + Information 1500 + FCS 2
 
 ## 常設PPP診断
 
-`pppDiagnosticState` はmagic `PPP1`、ABI version 9、273byteの公開診断blockです。レイアウトの正本は `spec/ndm24.toml` で、AssemblyとRustのoffset定数および[生成済みABI表](generated/diagnostic-abi.md)を同時に生成します。
+`pppDiagnosticState` はmagic `PPP1`、ABI version 12、402byteの公開診断blockです。レイアウトの正本は `spec/ndm24.toml` で、AssemblyとRustのoffset定数および[生成済みABI表](generated/diagnostic-abi.md)を同時に生成します。
 
 PC側では次のコマンドでJSON Linesとして読み取れます。
 
@@ -179,6 +182,9 @@ cargo run -p ndm24-tools -- ppp-monitor
 - IPv4受信、受理、checksum error、破棄、送信の各countと次のIdentification
 - ICMP EchoのType、Code、Identifier、Sequence、checksum、pendingと各count
 - UDPのsource/destination port、Length、checksum、valid flagと各count
+- NTPのstate、cookie、時刻、server属性、期限と各count
+- 外向きICMP Echoのstate、相関キー、宛先、RTT、期限と各count
+- DNSのstate、resolver、Transaction ID、RCODE、回答数、A address、RTTと各count
 
 認証frameには利用者IDやpasswordが含まれ得るため、常設traceへpayload全体は保存しません。protocol、code、identifier、length、エラー理由までを診断対象とし、credential byte列は記録対象外とします。
 
@@ -423,7 +429,7 @@ checksum error、同一headerの送信生成、共有encoder受理を検査し�
 `$85`～`$87`はlocal宛先の受理、宛先不一致の破棄、IPCP phase gateを検査します。
 2026-07-30にFXPAK PRO実機で起動完了後3回連続合格し、当時のABI version 7の
 snapshot取得も確認しました。この試験は電話回線へ発信せず、固定fixtureだけを
-使います。ICMPとUDP診断はABI version 9で末尾へ追加され、現行version 11でも
+使います。ICMPとUDP診断はABI version 9で末尾へ追加され、現行version 12でも
 同じoffsetを維持しています。
 
 ## 65816 ICMP Echo
@@ -474,9 +480,9 @@ payloadは末尾をzero paddingした16bit wordとして集計します。
 
 受信側はIPv4のlocal宛先・非fragment policyを通過したProtocol 17 packetだけを
 解析します。UDP Lengthが8未満、またはIPv4 payloadより長いdatagramは破棄します。
-IPv4 payload末尾のpaddingはUDP Lengthへ含めません。現在はapplication demultiplexer
-をまだ持たないため、検証済みdatagramのportと長さを診断へ記録した後にframeを
-解放します。
+IPv4 payload末尾のpaddingはUDP Lengthへ含めません。検証済みdatagramはdestination
+portでNTP clientまたはDNS clientへ振り分け、どちらも所有しないportは診断へ
+記録した後にframeを解放します。
 
 送信側はpayloadを`pppTransmitBuffer + 32`へ置き、source/destination portと
 destination IPv4 addressを指定します。UDP headerと省略しないchecksumを生成して
@@ -520,9 +526,45 @@ Receive/Transmit Timestamp、Unix秒、deadline、要求・応答・破棄・tim
 cargo run -p ndm24-tools -- ntp-request
 ```
 
+## 65816 DNS A client
+
+Rust参照codecの`crates/ndm24-ppp/src/dns.rs`と65816版の`src/ppp/dns.asm`は、
+allocationなしでDNS A queryを構築し、応答のTransaction ID、QR、Opcode、TC、
+RCODE、QDCOUNT、ANCOUNTを検証します。回答名は通常labelと圧縮pointerを読み飛ばし、
+回答列から最初のClass IN、Type A、RDLENGTH 4のIPv4 addressを取得します。
+
+mailbox command 15のargumentsはresolver IPv4 4byte、名前長1byte、ASCII名最大
+27byteです。名前は空label、先頭・末尾・連続dot、英数字とhyphen以外を拒否します。
+送信先portは53、local portは49153です。UDP payloadは共通の
+`PPP_UDP_TRANSMIT_PAYLOAD_OFFSET`へ配置し、既存の`pppUdpBeginTransmit`へ任意の
+resolver、source/destination port、payload終端を渡します。この境界は今後の
+UDP applicationでも再利用します。
+
+応答はresolver address、source port 53、destination port 49153、Transaction IDが
+一致した場合だけ現在の要求へ相関します。異なる候補packetでは要求を待機させたまま
+drop理由を残し、相関済みのDNS errorや構文errorでは`Failed`へ遷移します。期限は
+送信受理後900frameです。公開診断ABI version 12、402byteはresolver、Transaction
+ID、回答数、A address、RCODE、deadline、送信frame、RTT、要求・応答・破棄・
+timeout countを末尾へ追加します。
+
+常設セルフテストのstep `$A8`～`$AF`は`example.com`のquery生成、送信backpressure、
+圧縮名を持つ応答、Transaction ID不一致、NXDOMAIN、timeout、不正名、IPCP phase
+gateを検査します。MesenCEとrevision AのFXPAK PRO実機で合格済みです。公開resolver
+を使う実回線試験は次のコマンドで行います。
+
+```powershell
+cargo run -p ndm24-tools -- dns-query example.com --resolver 1.1.1.1
+```
+
+2026-07-30の試験ではWSL2 NATを介して`1.1.1.1:53`へ送信し、回答2件のうち
+`104.20.23.154`を67frameで取得しました。SFC診断はIPv4とUDPの送受信が各1、
+DNS要求/応答が1/1で、FCS、IPv4/UDP checksum、各層のdrop、timeoutは0でした。
+legacy iptablesのcounterも外向き57byte、戻り89byte、MASQUERADE 1 packetを
+記録しています。
+
 ## 次の実装
 
-LCP、PAP、IPCP、IPv4、ICMP Echo、UDP、NTPはRust参照実装、65816常設
+LCP、PAP、IPCP、IPv4、ICMP Echo、UDP、NTP、DNS AはRust参照実装、65816常設
 セルフテスト、revision A実機とWSL2による実対向まで合格しました。IPCP `Opened`
 時のlocalは`10.24.0.2`、peerは`10.24.0.1`です。NTP時刻のJST変換、フレーム基準の
 進行、人間向けステータス画面も実装済みです。次はTCPとHTTPを独立したマイルストーン

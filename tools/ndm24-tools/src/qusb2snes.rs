@@ -325,6 +325,86 @@ pub async fn icmp_echo(
     }
 }
 
+pub async fn dns_query(
+    websocket: &str,
+    label_path: &Path,
+    resolver: [u8; 4],
+    name: &str,
+    timeout: Duration,
+) -> Result<PppDiagnosticSnapshot> {
+    const DNS_STATE_RECEIVED: u8 = 3;
+    const DNS_STATE_FAILED: u8 = 4;
+    const SFC_DNS_MAXIMUM_NAME_LENGTH: usize = 27;
+
+    ensure!(
+        !name.ends_with('.'),
+        "the SFC DNS mailbox expects a hostname without a trailing dot"
+    );
+    ensure!(
+        name.len() <= SFC_DNS_MAXIMUM_NAME_LENGTH,
+        "DNS name is {} bytes; the SFC DNS mailbox supports at most {}",
+        name.len(),
+        SFC_DNS_MAXIMUM_NAME_LENGTH
+    );
+    let mut encoded = [0_u8; 64];
+    ndm24_ppp::dns::encode_a_query(0, name, &mut encoded)
+        .map_err(|error| anyhow::anyhow!("invalid DNS name {name:?}: {error:?}"))?;
+
+    let labels = read_labels(label_path)?;
+    let state = labels
+        .get("pppDiagnosticState")
+        .copied()
+        .context("label file does not contain pppDiagnosticState")?;
+    let offset = wram_to_usb2snes(state)?;
+    let mut client = Client::connect(websocket).await?;
+    eprintln!("attached to {}", client.device);
+    let before = read_stable_ppp_snapshot(&mut client, offset).await?;
+    drop(client);
+
+    let mut arguments = Vec::with_capacity(5 + name.len());
+    arguments.extend_from_slice(&resolver);
+    arguments.push(name.len() as u8);
+    arguments.extend_from_slice(name.as_bytes());
+    mailbox_command_with_arguments(
+        websocket,
+        label_path,
+        ndm24_protocol::MODEM_MAILBOX_COMMAND_DNS_QUERY,
+        &arguments,
+        timeout,
+    )
+    .await?;
+
+    let mut client = Client::connect(websocket).await?;
+    let started = Instant::now();
+    loop {
+        let snapshot = read_stable_ppp_snapshot(&mut client, offset).await?;
+        if snapshot.dns_state == DNS_STATE_RECEIVED
+            && snapshot.dns_response_count != before.dns_response_count
+        {
+            return Ok(snapshot);
+        }
+        if snapshot.dns_state == DNS_STATE_FAILED {
+            bail!(
+                "DNS query failed: error=0x{:02x}, rcode={}, queries={}, responses={}, drops={}, timeouts={}",
+                snapshot.dns_last_error,
+                snapshot.dns_response_code,
+                snapshot.dns_query_count,
+                snapshot.dns_response_count,
+                snapshot.dns_drop_count,
+                snapshot.dns_timeout_count
+            );
+        }
+        ensure!(
+            started.elapsed() < timeout,
+            "timed out waiting for DNS response: state={}, queries={}, responses={}",
+            snapshot.dns_state,
+            snapshot.dns_query_count,
+            snapshot.dns_response_count
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+
 pub async fn dump_trace(websocket: &str, label_path: &Path) -> Result<()> {
     for event in read_trace_events(websocket, label_path).await? {
         println!("{}", serde_json::to_string(&event)?);

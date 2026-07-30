@@ -292,8 +292,8 @@ description = "Frame at which the current generic AT transaction started"
 
 [ppp_diagnostic]
 magic = [0x50, 0x50, 0x50, 0x31]
-version = 11
-size = 364
+version = 12
+size = 402
 
 [[ppp_diagnostic.fields]]
 name = "magic"
@@ -1387,6 +1387,111 @@ size = 4
 type = "u32"
 description = "Outbound Echo Requests that expired without a correlated reply"
 
+[[ppp_diagnostic.fields]]
+name = "dns_state"
+offset = 364
+size = 1
+type = "u8"
+description = "DNS A-query client state"
+
+[[ppp_diagnostic.fields]]
+name = "dns_last_error"
+offset = 365
+size = 1
+type = "u8"
+description = "Most recent DNS request, response, or parser error"
+
+[[ppp_diagnostic.fields]]
+name = "dns_flags"
+offset = 366
+size = 1
+type = "u8"
+description = "DNS response-valid flag"
+
+[[ppp_diagnostic.fields]]
+name = "dns_response_code"
+offset = 367
+size = 1
+type = "u8"
+description = "DNS RCODE from the most recent correlated response"
+
+[[ppp_diagnostic.fields]]
+name = "dns_resolver"
+offset = 368
+size = 4
+type = "ipv4"
+description = "Resolver IPv4 address for the current or most recent query"
+
+[[ppp_diagnostic.fields]]
+name = "dns_transaction_id"
+offset = 372
+size = 2
+type = "u16"
+description = "Transaction ID for the current or most recent query"
+
+[[ppp_diagnostic.fields]]
+name = "dns_answer_count"
+offset = 374
+size = 2
+type = "u16"
+description = "ANCOUNT from the most recent correlated response"
+
+[[ppp_diagnostic.fields]]
+name = "dns_answer_address"
+offset = 376
+size = 4
+type = "ipv4"
+description = "First validated IN A-record address"
+
+[[ppp_diagnostic.fields]]
+name = "dns_deadline"
+offset = 380
+size = 2
+type = "u16"
+description = "Low frame counter deadline for the pending DNS response"
+
+[[ppp_diagnostic.fields]]
+name = "dns_sent_frame"
+offset = 382
+size = 2
+type = "u16"
+description = "Low frame counter when the DNS query entered the IPv4 transmitter"
+
+[[ppp_diagnostic.fields]]
+name = "dns_rtt_frames"
+offset = 384
+size = 2
+type = "u16"
+description = "Round-trip time of the correlated DNS response in SFC frames"
+
+[[ppp_diagnostic.fields]]
+name = "dns_query_count"
+offset = 386
+size = 4
+type = "u32"
+description = "DNS queries accepted by the UDP transmitter"
+
+[[ppp_diagnostic.fields]]
+name = "dns_response_count"
+offset = 390
+size = 4
+type = "u32"
+description = "Correlated DNS responses containing a valid IN A record"
+
+[[ppp_diagnostic.fields]]
+name = "dns_drop_count"
+offset = 394
+size = 4
+type = "u32"
+description = "DNS requests or candidate responses rejected"
+
+[[ppp_diagnostic.fields]]
+name = "dns_timeout_count"
+offset = 398
+size = 4
+type = "u32"
+description = "DNS queries that expired without a valid response"
+
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]
 version = 7
@@ -1521,6 +1626,7 @@ ppp_receive_start = 11
 ppp_receive_stop = 12
 ntp_request = 13
 icmp_echo_request = 14
+dns_query = 15
 
 [mailbox_status]
 idle = 0

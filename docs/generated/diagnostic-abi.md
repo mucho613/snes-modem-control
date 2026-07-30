@@ -44,7 +44,7 @@ ABI version: `2`. Block size: `128` bytes.
 
 ## PPP Diagnostic ABI
 
-ABI version: `11`. Block size: `364` bytes.
+ABI version: `12`. Block size: `402` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|
@@ -204,6 +204,21 @@ ABI version: `11`. Block size: `364` bytes.
 | `0x160` | 4 | `u32` | `icmp_request_response_count` | Correlated valid Echo Replies received |
 | `0x164` | 4 | `u32` | `icmp_request_drop_count` | Outbound requests or candidate replies rejected |
 | `0x168` | 4 | `u32` | `icmp_request_timeout_count` | Outbound Echo Requests that expired without a correlated reply |
+| `0x16C` | 1 | `u8` | `dns_state` | DNS A-query client state |
+| `0x16D` | 1 | `u8` | `dns_last_error` | Most recent DNS request, response, or parser error |
+| `0x16E` | 1 | `u8` | `dns_flags` | DNS response-valid flag |
+| `0x16F` | 1 | `u8` | `dns_response_code` | DNS RCODE from the most recent correlated response |
+| `0x170` | 4 | `ipv4` | `dns_resolver` | Resolver IPv4 address for the current or most recent query |
+| `0x174` | 2 | `u16` | `dns_transaction_id` | Transaction ID for the current or most recent query |
+| `0x176` | 2 | `u16` | `dns_answer_count` | ANCOUNT from the most recent correlated response |
+| `0x178` | 4 | `ipv4` | `dns_answer_address` | First validated IN A-record address |
+| `0x17C` | 2 | `u16` | `dns_deadline` | Low frame counter deadline for the pending DNS response |
+| `0x17E` | 2 | `u16` | `dns_sent_frame` | Low frame counter when the DNS query entered the IPv4 transmitter |
+| `0x180` | 2 | `u16` | `dns_rtt_frames` | Round-trip time of the correlated DNS response in SFC frames |
+| `0x182` | 4 | `u32` | `dns_query_count` | DNS queries accepted by the UDP transmitter |
+| `0x186` | 4 | `u32` | `dns_response_count` | Correlated DNS responses containing a valid IN A record |
+| `0x18A` | 4 | `u32` | `dns_drop_count` | DNS requests or candidate responses rejected |
+| `0x18E` | 4 | `u32` | `dns_timeout_count` | DNS queries that expired without a valid response |
 
 ## Mailbox ABI
 

@@ -23,6 +23,7 @@
 .import pppIcmpRequestPoll
 .import pppUdpInitialize
 .import pppNtpInitialize, pppNtpPoll
+.import pppDnsInitialize, pppDnsPoll
 .import nmitimenShadow
 
 .include "./registers.inc"
@@ -85,6 +86,7 @@
   jsr pppIcmpInitialize
   jsr pppUdpInitialize
   jsr pppNtpInitialize
+  jsr pppDnsInitialize
 
   rep #$30
   .a16
@@ -147,6 +149,7 @@
     jsr pppIpv4Poll
     jsr pppIcmpRequestPoll
     jsr pppNtpPoll
+    jsr pppDnsPoll
     jsr clockPoll
     jsr statusPoll
     jsr pppTransmitPoll

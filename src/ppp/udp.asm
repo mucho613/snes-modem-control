@@ -19,7 +19,7 @@
 .import pppUdpDropCount, pppUdpTransmitCount
 .import pppUdpPacketOffset, pppUdpChecksumAccumulator
 .import pppUdpTransmitSourcePort, pppUdpTransmitDestinationPort
-.import pppNtpReceive
+.import pppNtpReceive, pppDnsReceive
 
 .export pppUdpInitialize, pppUdpReceive, pppUdpBeginTransmit
 .export pppUdpRunSelfTest
@@ -181,10 +181,19 @@ valid:
   .a16
   lda pppUdpDestinationPort
   cmp #PPP_NTP_CLIENT_PORT
-  bne applicationDone
+  bne dnsApplication
   sep #$20
   .a8
   jsr pppNtpReceive
+  bra applicationDone8
+dnsApplication:
+  rep #$20
+  .a16
+  cmp #PPP_DNS_CLIENT_PORT
+  bne applicationDone
+  sep #$20
+  .a8
+  jsr pppDnsReceive
   bra applicationDone8
 applicationDone:
   sep #$20
@@ -259,7 +268,7 @@ addChecksumWord:
 .endproc
 
 ; Build a UDP header around a payload already staged at
-; pppTransmitBuffer + 32 and submit the surrounding IPv4 packet.
+; pppTransmitBuffer + PPP_UDP_TRANSMIT_PAYLOAD_OFFSET and submit the surrounding IPv4 packet.
 ;
 ; Input X16=payload length. Source and destination ports are provided in
 ; pppUdpTransmitSourcePort and pppUdpTransmitDestinationPort; destination
@@ -529,15 +538,15 @@ initialValid:
   sep #$20
   .a8
   lda #$4e
-  sta pppTransmitBuffer + PPP_UNCOMPRESSED_HEADER_LENGTH + PPP_IPV4_MINIMUM_HEADER_LENGTH + PPP_UDP_HEADER_LENGTH + 0
+  sta pppTransmitBuffer + PPP_UDP_TRANSMIT_PAYLOAD_OFFSET + 0
   lda #$44
-  sta pppTransmitBuffer + PPP_UNCOMPRESSED_HEADER_LENGTH + PPP_IPV4_MINIMUM_HEADER_LENGTH + PPP_UDP_HEADER_LENGTH + 1
+  sta pppTransmitBuffer + PPP_UDP_TRANSMIT_PAYLOAD_OFFSET + 1
   lda #$4d
-  sta pppTransmitBuffer + PPP_UNCOMPRESSED_HEADER_LENGTH + PPP_IPV4_MINIMUM_HEADER_LENGTH + PPP_UDP_HEADER_LENGTH + 2
+  sta pppTransmitBuffer + PPP_UDP_TRANSMIT_PAYLOAD_OFFSET + 2
   lda #$32
-  sta pppTransmitBuffer + PPP_UNCOMPRESSED_HEADER_LENGTH + PPP_IPV4_MINIMUM_HEADER_LENGTH + PPP_UDP_HEADER_LENGTH + 3
+  sta pppTransmitBuffer + PPP_UDP_TRANSMIT_PAYLOAD_OFFSET + 3
   lda #$34
-  sta pppTransmitBuffer + PPP_UNCOMPRESSED_HEADER_LENGTH + PPP_IPV4_MINIMUM_HEADER_LENGTH + PPP_UDP_HEADER_LENGTH + 4
+  sta pppTransmitBuffer + PPP_UDP_TRANSMIT_PAYLOAD_OFFSET + 4
   ldx #$0005
   jsr pppUdpBeginTransmit
   bcc :+

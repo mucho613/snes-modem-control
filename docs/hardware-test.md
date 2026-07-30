@@ -127,9 +127,11 @@ LCP試験に続き、PAP Authenticate-Request/Ack、IPCP `Opened`、SFC側local
 | PPP ICMP Echoセルフテスト | 合格 (2026-07-30) | 未実施 |
 | PPP UDP datagramセルフテスト | 合格 (2026-07-30) | 未実施 |
 | PPP NTP clientセルフテスト | 合格 (2026-07-30) | 未実施 |
+| PPP DNS A clientセルフテスト | 合格 (2026-07-30) | 未実施 |
 | PPP IPv4実対向 | 合格 (2026-07-30) | 未実施 |
 | PPP ICMP Echo実対向 | 合格 (2026-07-30) | 未実施 |
 | PPP 外向きICMP Echo／NAT | 合格 (2026-07-30) | 未実施 |
+| PPP 外向きDNS／UDP／NAT | 合格 (2026-07-30) | 未実施 |
 | PPP NTP実対向 | 合格 (2026-07-30) | 未実施 |
 
 revision B の最新の疑似 PSTN connect 合格記録は test ID `unix-1785329111-revision-b` です。`AT&F`、`AT%B2400`、`ATS7=60`、`ATX3`、`ATDT0` のechoはすべて完全で、各transaction前後のRX discard counterは0のままでした。DFM-56U は `RING`、`CONNECT 115200` を返し、NDM24 は `CONNECT 2400` を受信して `CONNECTED` へ遷移しました。10秒保持中の未処理RXは0byteです。DFM-56UのDTRを下げた直後にはキャリア切断過渡の `07 99 62 A1 74 DD 6B EE 1E` が入り、続く `NO CARRIER` を受信して `READY` へ戻りました。最終snapshotはRX read/write indexがともに105、TX read/write indexがともに42で、error、timeout、RX/TX overflow、`poll_budget_yield`、discard、terminal droppedがすべて0です。transaction別trace、双方のAT transcript、切断前後のraw RX列は `build/hardware-tests/unix-1785329111-revision-b/connect-test.json` に保存されています。旧schemaのJSONでは `poll_budget_yield` と同じ値が `poll_limit` という名前で記録されています。
@@ -234,5 +236,20 @@ SFCは35 frame後にIdentifier `$4E44`、Sequence Number 1、payload `NDM24`が
 ICMP受信/Echo Reply受信/送信が1/1/1、外向き要求/応答が1/1です。PPP FCS error、
 invalid、overflow、IPv4/ICMP checksum error、各層のdrop、外向きtimeoutは
 すべて0でした。公開診断ABIはversion 11、364byteです。
+
+同日、DNS A client追加後のsmoke ROMをrevision AのFXPAK PROへ転送し、
+`ppp-self-test`（mailbox command 10、sequence 1）の合格を確認しました。新設step
+`$A8`～`$AF`はquery生成、送信器busy時の保持、圧縮名を含むA応答、Transaction ID
+不一致、NXDOMAIN、900frame timeout、不正名とIPCP phase gateを検査します。
+同じfixtureはMesenCEでも合格しています。公開診断ABIはversion 12、402byteです。
+
+続いてrevision AとDFM-56UをV.22bis 2400 bit/sで接続し、SFC側`10.24.0.2`から
+WSL2 NATを介してCloudflare `1.1.1.1:53`へ`example.com`のDNS A queryを
+送信しました。回答2件を持つ応答から`104.20.23.154`を67frameで取得しました。
+最終診断はIPv4受信/受理/送信が1/1/1、UDP受信/送信が1/1、DNS要求/応答が
+1/1です。PPP FCS error、invalid、overflow、IPv4/UDP checksum error、各層の
+drop、DNS timeoutはすべて0でした。対向のlegacy iptables counterは外向き
+57byte、戻り89byte、MASQUERADE 1 packetを記録しました。試験後にPPP serverを
+停止し、DFM-56UがWindowsのCOM5へ戻ったことも確認しています。
 
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。

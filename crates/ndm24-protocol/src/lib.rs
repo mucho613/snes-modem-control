@@ -307,6 +307,21 @@ pub struct PppDiagnosticSnapshot {
     pub icmp_request_response_count: u32,
     pub icmp_request_drop_count: u32,
     pub icmp_request_timeout_count: u32,
+    pub dns_state: u8,
+    pub dns_last_error: u8,
+    pub dns_flags: u8,
+    pub dns_response_code: u8,
+    pub dns_resolver: [u8; 4],
+    pub dns_transaction_id: u16,
+    pub dns_answer_count: u16,
+    pub dns_answer_address: [u8; 4],
+    pub dns_deadline: u16,
+    pub dns_sent_frame: u16,
+    pub dns_rtt_frames: u16,
+    pub dns_query_count: u32,
+    pub dns_response_count: u32,
+    pub dns_drop_count: u32,
+    pub dns_timeout_count: u32,
 }
 
 impl PppDiagnosticSnapshot {
@@ -493,6 +508,21 @@ impl PppDiagnosticSnapshot {
             icmp_request_response_count: read_u32(data, PPP_DIAG_ICMP_REQUEST_RESPONSE_COUNT)?,
             icmp_request_drop_count: read_u32(data, PPP_DIAG_ICMP_REQUEST_DROP_COUNT)?,
             icmp_request_timeout_count: read_u32(data, PPP_DIAG_ICMP_REQUEST_TIMEOUT_COUNT)?,
+            dns_state: data[PPP_DIAG_DNS_STATE],
+            dns_last_error: data[PPP_DIAG_DNS_LAST_ERROR],
+            dns_flags: data[PPP_DIAG_DNS_FLAGS],
+            dns_response_code: data[PPP_DIAG_DNS_RESPONSE_CODE],
+            dns_resolver: read_array(data, PPP_DIAG_DNS_RESOLVER)?,
+            dns_transaction_id: read_u16(data, PPP_DIAG_DNS_TRANSACTION_ID)?,
+            dns_answer_count: read_u16(data, PPP_DIAG_DNS_ANSWER_COUNT)?,
+            dns_answer_address: read_array(data, PPP_DIAG_DNS_ANSWER_ADDRESS)?,
+            dns_deadline: read_u16(data, PPP_DIAG_DNS_DEADLINE)?,
+            dns_sent_frame: read_u16(data, PPP_DIAG_DNS_SENT_FRAME)?,
+            dns_rtt_frames: read_u16(data, PPP_DIAG_DNS_RTT_FRAMES)?,
+            dns_query_count: read_u32(data, PPP_DIAG_DNS_QUERY_COUNT)?,
+            dns_response_count: read_u32(data, PPP_DIAG_DNS_RESPONSE_COUNT)?,
+            dns_drop_count: read_u32(data, PPP_DIAG_DNS_DROP_COUNT)?,
+            dns_timeout_count: read_u32(data, PPP_DIAG_DNS_TIMEOUT_COUNT)?,
         })
     }
 }
@@ -863,6 +893,31 @@ mod tests {
             .copy_from_slice(&2_u32.to_le_bytes());
         data[PPP_DIAG_ICMP_REQUEST_TIMEOUT_COUNT..PPP_DIAG_ICMP_REQUEST_TIMEOUT_COUNT + 4]
             .copy_from_slice(&1_u32.to_le_bytes());
+        data[PPP_DIAG_DNS_STATE] = 3;
+        data[PPP_DIAG_DNS_LAST_ERROR] = 0;
+        data[PPP_DIAG_DNS_FLAGS] = 1;
+        data[PPP_DIAG_DNS_RESPONSE_CODE] = 0;
+        data[PPP_DIAG_DNS_RESOLVER..PPP_DIAG_DNS_RESOLVER + 4].copy_from_slice(&[1, 1, 1, 1]);
+        data[PPP_DIAG_DNS_TRANSACTION_ID..PPP_DIAG_DNS_TRANSACTION_ID + 2]
+            .copy_from_slice(&0x4e44_u16.to_le_bytes());
+        data[PPP_DIAG_DNS_ANSWER_COUNT..PPP_DIAG_DNS_ANSWER_COUNT + 2]
+            .copy_from_slice(&2_u16.to_le_bytes());
+        data[PPP_DIAG_DNS_ANSWER_ADDRESS..PPP_DIAG_DNS_ANSWER_ADDRESS + 4]
+            .copy_from_slice(&[93, 184, 216, 34]);
+        data[PPP_DIAG_DNS_DEADLINE..PPP_DIAG_DNS_DEADLINE + 2]
+            .copy_from_slice(&0x2800_u16.to_le_bytes());
+        data[PPP_DIAG_DNS_SENT_FRAME..PPP_DIAG_DNS_SENT_FRAME + 2]
+            .copy_from_slice(&0x2400_u16.to_le_bytes());
+        data[PPP_DIAG_DNS_RTT_FRAMES..PPP_DIAG_DNS_RTT_FRAMES + 2]
+            .copy_from_slice(&6_u16.to_le_bytes());
+        data[PPP_DIAG_DNS_QUERY_COUNT..PPP_DIAG_DNS_QUERY_COUNT + 4]
+            .copy_from_slice(&5_u32.to_le_bytes());
+        data[PPP_DIAG_DNS_RESPONSE_COUNT..PPP_DIAG_DNS_RESPONSE_COUNT + 4]
+            .copy_from_slice(&4_u32.to_le_bytes());
+        data[PPP_DIAG_DNS_DROP_COUNT..PPP_DIAG_DNS_DROP_COUNT + 4]
+            .copy_from_slice(&2_u32.to_le_bytes());
+        data[PPP_DIAG_DNS_TIMEOUT_COUNT..PPP_DIAG_DNS_TIMEOUT_COUNT + 4]
+            .copy_from_slice(&1_u32.to_le_bytes());
 
         let snapshot = PppDiagnosticSnapshot::decode(&data).unwrap();
         assert_eq!(snapshot.snapshot_sequence, 8);
@@ -982,6 +1037,21 @@ mod tests {
         assert_eq!(snapshot.icmp_request_response_count, 4);
         assert_eq!(snapshot.icmp_request_drop_count, 2);
         assert_eq!(snapshot.icmp_request_timeout_count, 1);
+        assert_eq!(snapshot.dns_state, 3);
+        assert_eq!(snapshot.dns_last_error, 0);
+        assert_eq!(snapshot.dns_flags, 1);
+        assert_eq!(snapshot.dns_response_code, 0);
+        assert_eq!(snapshot.dns_resolver, [1, 1, 1, 1]);
+        assert_eq!(snapshot.dns_transaction_id, 0x4e44);
+        assert_eq!(snapshot.dns_answer_count, 2);
+        assert_eq!(snapshot.dns_answer_address, [93, 184, 216, 34]);
+        assert_eq!(snapshot.dns_deadline, 0x2800);
+        assert_eq!(snapshot.dns_sent_frame, 0x2400);
+        assert_eq!(snapshot.dns_rtt_frames, 6);
+        assert_eq!(snapshot.dns_query_count, 5);
+        assert_eq!(snapshot.dns_response_count, 4);
+        assert_eq!(snapshot.dns_drop_count, 2);
+        assert_eq!(snapshot.dns_timeout_count, 1);
     }
 
     #[test]
