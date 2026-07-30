@@ -26,7 +26,7 @@
   setDBR $7e
   stz modemSpeedTestMode
   plb
-  rts
+  rtl
 .endproc
 
 .proc modemSpeedTestBeginTransmit
@@ -43,7 +43,7 @@
   bra modemSpeedTestBegin
 @invalid:
   sec
-  rts
+  rtl
 .endproc
 
 .proc modemSpeedTestBeginReceive
@@ -57,7 +57,7 @@
   bra modemSpeedTestBegin
 @invalid:
   sec
-  rts
+  rtl
 .endproc
 
 ; Input A is the requested speed-test mode.
@@ -99,12 +99,12 @@
   pla
   sta modemSpeedTestMode
   clc
-  rts
+  rtl
 
 @invalid:
   pla
   sec
-  rts
+  rtl
 .endproc
 
 .proc modemSpeedTestPoll
@@ -178,7 +178,7 @@
   plx
   plb
   pla
-  rts
+  rtl
 .endproc
 
 ; Carry set when at least one requested byte remains.

@@ -400,14 +400,14 @@
   jmp @commitCommand
 
 @binaryPrbsTransmit:
-  jsr modemSpeedTestBeginTransmit
+  jsl modemSpeedTestBeginTransmit
   bcc :+
   jmp @binaryInvalid
 :
   jmp @commitCommand
 
 @binaryPrbsReceive:
-  jsr modemSpeedTestBeginReceive
+  jsl modemSpeedTestBeginReceive
   bcc :+
   jmp @binaryInvalid
 :

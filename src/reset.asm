@@ -72,7 +72,7 @@
 
   mi8
   jsr modemInitializeDiagnostics
-  jsr modemSpeedTestInitialize
+  jsl modemSpeedTestInitialize
   i16
   jsr pppDiagnosticInitialize
   jsr pppReceiveInitialize
@@ -130,7 +130,7 @@
     jsr readController1
     jsr modemMailboxPoll
     jsr modemPoll
-    jsr modemSpeedTestPoll
+  jsl modemSpeedTestPoll
     jsr modemSessionPoll
     jsr pppReceivePoll
     jsr pppLcpPoll
