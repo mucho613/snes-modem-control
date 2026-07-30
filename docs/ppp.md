@@ -347,6 +347,11 @@ LCP packetのCode 1～11は既知として扱い、その範囲外のCodeにはC
 Length 10のCode-Rejectへ宣言範囲だけが複製されること、TX backpressure中の
 frame保持、共有Reject Identifier、診断countを検査します。
 
+2026-07-30にABI version 17のnormal ROMをrevision AのFXPAK PROへ転送し、
+QUsb2Snes mailboxの`ppp-self-test`（command 10、sequence 1）が合格しました。
+これにより、上記Code-Reject fixtureとbank 1へ移したステータス画面のmain-loop・
+NMI呼出し経路を実機65816上でも確認しています。
+
 2026-07-30にABI version 16のnormal ROMをrevision AのFXPAK PROへ転送し、
 QUsb2Snes mailboxの`ppp-self-test`（command 10、sequence 1）が合格しました。
 これにより、上記Protocol-Reject fixtureを実機65816上でも確認しています。

@@ -300,4 +300,12 @@ FXPAK PROへQUsb2Snes経由で転送し、起動確認後にmailbox `ppp-self-te
 `$8057`に対するCode 8、Length 9の応答、Identifier、Rejected-Information、
 共有encoderのbackpressure中のframe保持、送信後の診断countを検査します。
 
+同日、LCP Code-Reject対応のABI version 17 normal ROMをrevision Aの
+FXPAK PROへ転送し、起動確認後にmailbox `ppp-self-test`（command 10、
+sequence 1）が合格しました。常設fixtureは未知Code `$7F`に対するCode 7、
+Length 10の応答、Length境界によるPPP padding除外、共有Reject Identifier、
+backpressure中のframe保持、送信後の診断countを検査します。ROM容量確保の
+ためステータス画面コードをbank 1へ移し、main loopとNMIからの4入口を
+`JSL`/`RTL`化した構成も同じ実機試験で動作しました。
+
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。
