@@ -121,7 +121,8 @@ DFM-56Uは次の条件へ固定します。
 `pppd`はPAPを要求し、CHAP、MS-CHAP、EAP、PFC、ACFC、VJ、CCP、
 BSD-Compress、Deflate、IPv6を無効にします。LCP Echo-Requestも無効です。
 SFC側のLCP診断と切断試験を行う時間を確保するため、PAP Authenticate-Request
-の待ち時間は120秒です。SFC側へPAPを実装するまでは時間切れが正常です。
+の待ち時間は120秒です。PAP実装後も、回線上の再試験や診断取得に余裕を持た
+せるためこの値を維持します。
 
 Ubuntuの`pppd`はpeer profileより前に`/etc/ppp/options`も読みます。確認した
 環境には`passive`が設定されているため、Configure-Requestの規定回数を使い
@@ -199,6 +200,33 @@ revision AのNDM24とDFM-56UをV.22bis 2400 bit/sで接続し、最初の実回�
 - RX read/write indexは239/239で一致し、`pending-rx`の結果は空配列だった。
 - 切断直後の新しい`AT` transactionも`OK`で完了し、timeout、overflow、
   discardは0だった。
+
+## 2026-07-30 revision A PAP認証結果
+
+PAP client実装後、同じrevision AのNDM24とDFM-56UをV.22bis
+2400 bit/sで再接続しました。`pppd`ログとPPP診断ABI version 5を照合し、
+次を確認しました。
+
+- LCPは双方2frameで`Opened`となり、peer flagsはACCM、PAP、
+  Magic-Numberの`14`、peer MRUは1500、ACCMは0だった。
+- SFCはPeer-ID `ndm24`のAuthenticate-RequestをIdentifier 1で1回送信した。
+- `pppd`はAuthenticate-Ack Identifier 1、Message `"Login ok"`を返し、
+  `PAP peer authentication succeeded for ndm24`を記録した。
+- `pppd`ログ上のpasswordは`<hidden>`であり、SFC診断にもcredential payloadは
+  保存されていない。
+- SFCのPAP stateは`Opened`、最後のCodeはAuthenticate-Ack、packet Lengthは
+  13、送受信数は各1、restart残数9、timer無効、failure 0だった。
+- この時点のPPP全体は受信6frame、送信3frame、FCS error、invalid、
+  overflow、TX backpressureがすべて0だった。
+- 認証後、`pppd`はIPCP Configure-Requestで`10.24.0.1`を提案した。SFC側IPCPは
+  未実装なので、このpacketは現在のprotocol dispatcherが明示的に解放した。
+
+対向停止後はpeerのTerminate-Requestを受信し、raw `NO CARRIER`でModemが
+`Ready`へ戻りました。LCPは`Closed`、PAPは`Inactive`となり、双方のtimer、
+pending action、peer optionは初期化されました。`carrier_loss_count`は1、
+同じRX burstの末尾12byteも従来どおり消費され、RX read/write indexは
+210/210、`pending-rx`は空配列でした。FCS errorとinvalidは最後まで0です。
+DFM-56UはWindowsのCOM5へ正常に戻っています。
 
 試験終了時は必ず停止します。
 

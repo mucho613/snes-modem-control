@@ -293,5 +293,6 @@ fixtureで検査します。
 
 オフラインで確定できるLCP処理と、実対向での`Opened`到達まで完了しました。
 raw `NO CARRIER`による自動lower-downも実対向で合格しました。PAP clientは
-Rust参照実装と65816常設セルフテストまで実装済みです。次はrevision A実機と
-WSL2 `pppd`でPAP認証成功を確認し、その結果を固定した後にIPCPへ進みます。
+Rust参照実装、65816常設セルフテスト、revision A実機とWSL2 `pppd`による
+Authenticate-Request/Ackまで合格しました。次はIPCP Configure交渉とIPv4
+address確定へ進みます。
