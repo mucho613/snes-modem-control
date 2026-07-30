@@ -32,6 +32,9 @@
 ## 配色
 
 `spec/ndm24.toml`の`[terminal]`から512 byteの`assets/palette.bin`を生成します。
+`font.bin`と`palette.bin`はいずれもROMのDATA segmentへ配置し、bank 0のCODE
+segmentを実行命令だけに使います。VRAM/CGRAM転送routineは各データのbank byteを
+明示して参照します。
 
 | palette index | BGR555 | 用途 |
 |---:|---:|---|

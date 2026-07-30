@@ -1,11 +1,12 @@
 .include "../registers.inc"
 .include "../macro/utility.asm"
 
-.code
+.data
 
 Palette:
   .incbin "../../assets/palette.bin"
 
+.code
 .export copyPalette
 .proc copyPalette
   .a16
