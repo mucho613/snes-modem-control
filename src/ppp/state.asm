@@ -63,6 +63,12 @@
 .export pppNtpUnixSeconds, pppNtpDeadline
 .export pppNtpRequestCount, pppNtpResponseCount
 .export pppNtpDropCount, pppNtpTimeoutCount
+.export pppIcmpRequestState, pppIcmpRequestLastError, pppIcmpRequestFlags
+.export pppIcmpRequestDestination
+.export pppIcmpRequestIdentifier, pppIcmpRequestSequence
+.export pppIcmpRequestDeadline, pppIcmpRequestSentFrame, pppIcmpRequestRttFrames
+.export pppIcmpRequestCount, pppIcmpRequestResponseCount
+.export pppIcmpRequestDropCount, pppIcmpRequestTimeoutCount
 
 pppDiagnosticState:
 pppDiagnosticMagic: .res $4
@@ -208,6 +214,19 @@ pppNtpRequestCount: .res $4
 pppNtpResponseCount: .res $4
 pppNtpDropCount: .res $4
 pppNtpTimeoutCount: .res $4
+pppIcmpRequestState: .res $1
+pppIcmpRequestLastError: .res $1
+pppIcmpRequestFlags: .res $1
+pppIcmpRequestDestination: .res $4
+pppIcmpRequestIdentifier: .res $2
+pppIcmpRequestSequence: .res $2
+pppIcmpRequestDeadline: .res $2
+pppIcmpRequestSentFrame: .res $2
+pppIcmpRequestRttFrames: .res $2
+pppIcmpRequestCount: .res $4
+pppIcmpRequestResponseCount: .res $4
+pppIcmpRequestDropCount: .res $4
+pppIcmpRequestTimeoutCount: .res $4
 .res PPP_DIAGNOSTIC_SIZE - (* - pppDiagnosticState)
 pppDiagnosticStateEnd:
 
@@ -354,6 +373,19 @@ pppDiagnosticStateEnd:
 .assert pppNtpResponseCount - pppDiagnosticState = PPP_DIAG_NTP_RESPONSE_COUNT, error, "PPP NTP response count offset"
 .assert pppNtpDropCount - pppDiagnosticState = PPP_DIAG_NTP_DROP_COUNT, error, "PPP NTP drop count offset"
 .assert pppNtpTimeoutCount - pppDiagnosticState = PPP_DIAG_NTP_TIMEOUT_COUNT, error, "PPP NTP timeout count offset"
+.assert pppIcmpRequestState - pppDiagnosticState = PPP_DIAG_ICMP_REQUEST_STATE, error, "PPP ICMP request state offset"
+.assert pppIcmpRequestLastError - pppDiagnosticState = PPP_DIAG_ICMP_REQUEST_LAST_ERROR, error, "PPP ICMP request error offset"
+.assert pppIcmpRequestFlags - pppDiagnosticState = PPP_DIAG_ICMP_REQUEST_FLAGS, error, "PPP ICMP request flags offset"
+.assert pppIcmpRequestDestination - pppDiagnosticState = PPP_DIAG_ICMP_REQUEST_DESTINATION, error, "PPP ICMP request destination offset"
+.assert pppIcmpRequestIdentifier - pppDiagnosticState = PPP_DIAG_ICMP_REQUEST_IDENTIFIER, error, "PPP ICMP request identifier offset"
+.assert pppIcmpRequestSequence - pppDiagnosticState = PPP_DIAG_ICMP_REQUEST_SEQUENCE, error, "PPP ICMP request sequence offset"
+.assert pppIcmpRequestDeadline - pppDiagnosticState = PPP_DIAG_ICMP_REQUEST_DEADLINE, error, "PPP ICMP request deadline offset"
+.assert pppIcmpRequestSentFrame - pppDiagnosticState = PPP_DIAG_ICMP_REQUEST_SENT_FRAME, error, "PPP ICMP request sent frame offset"
+.assert pppIcmpRequestRttFrames - pppDiagnosticState = PPP_DIAG_ICMP_REQUEST_RTT_FRAMES, error, "PPP ICMP request RTT offset"
+.assert pppIcmpRequestCount - pppDiagnosticState = PPP_DIAG_ICMP_REQUEST_COUNT, error, "PPP ICMP request count offset"
+.assert pppIcmpRequestResponseCount - pppDiagnosticState = PPP_DIAG_ICMP_REQUEST_RESPONSE_COUNT, error, "PPP ICMP request response count offset"
+.assert pppIcmpRequestDropCount - pppDiagnosticState = PPP_DIAG_ICMP_REQUEST_DROP_COUNT, error, "PPP ICMP request drop count offset"
+.assert pppIcmpRequestTimeoutCount - pppDiagnosticState = PPP_DIAG_ICMP_REQUEST_TIMEOUT_COUNT, error, "PPP ICMP request timeout count offset"
 .assert pppDiagnosticStateEnd - pppDiagnosticState = PPP_DIAGNOSTIC_SIZE, error, "PPP diagnostic ABI size"
 
 ; Decoder and pump scratch fields are private and intentionally excluded from
@@ -378,6 +410,7 @@ pppDiagnosticStateEnd:
 .export pppIpv4TransmitDestination, pppIpv4TransmitProtocol
 .export pppIpv4TransmitPayloadLength, pppIpv4PollSavedModemState
 .export pppIcmpPacketOffset, pppIcmpChecksumAccumulator
+.export pppIcmpRequestTestSavedFrameCounter
 .export pppUdpPacketOffset, pppUdpChecksumAccumulator
 .export pppUdpTransmitSourcePort, pppUdpTransmitDestinationPort
 .export pppNtpPacketOffset, pppNtpTestSavedFrameCounter
@@ -418,6 +451,7 @@ pppIpv4TransmitPayloadLength: .res $2
 pppIpv4PollSavedModemState: .res $1
 pppIcmpPacketOffset: .res $2
 pppIcmpChecksumAccumulator: .res $2
+pppIcmpRequestTestSavedFrameCounter: .res $4
 pppUdpPacketOffset: .res $2
 pppUdpChecksumAccumulator: .res $2
 pppUdpTransmitSourcePort: .res $2

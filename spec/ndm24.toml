@@ -292,8 +292,8 @@ description = "Frame at which the current generic AT transaction started"
 
 [ppp_diagnostic]
 magic = [0x50, 0x50, 0x50, 0x31]
-version = 10
-size = 331
+version = 11
+size = 364
 
 [[ppp_diagnostic.fields]]
 name = "magic"
@@ -1070,7 +1070,7 @@ name = "icmp_transmit_count"
 offset = 241
 size = 4
 type = "u32"
-description = "ICMP Echo Replies accepted by the IPv4 transmitter"
+description = "ICMP Echo messages accepted by the IPv4 transmitter"
 
 [[ppp_diagnostic.fields]]
 name = "udp_last_error"
@@ -1296,6 +1296,97 @@ size = 4
 type = "u32"
 description = "NTP requests that expired without a valid response"
 
+[[ppp_diagnostic.fields]]
+name = "icmp_request_state"
+offset = 331
+size = 1
+type = "u8"
+description = "Outbound ICMP Echo request state"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_request_last_error"
+offset = 332
+size = 1
+type = "u8"
+description = "Most recent outbound ICMP Echo request or correlation error"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_request_flags"
+offset = 333
+size = 1
+type = "u8"
+description = "Outbound ICMP Echo response-valid flag"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_request_destination"
+offset = 334
+size = 4
+type = "ipv4"
+description = "Destination of the current or most recent outbound Echo Request"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_request_identifier"
+offset = 338
+size = 2
+type = "u16"
+description = "Identifier used by the current or most recent Echo Request"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_request_sequence"
+offset = 340
+size = 2
+type = "u16"
+description = "Sequence used by the current or most recent Echo Request"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_request_deadline"
+offset = 342
+size = 2
+type = "u16"
+description = "Low frame counter deadline for the pending Echo Reply"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_request_sent_frame"
+offset = 344
+size = 2
+type = "u16"
+description = "Low frame counter when the Echo Request entered the IPv4 transmitter"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_request_rtt_frames"
+offset = 346
+size = 2
+type = "u16"
+description = "Round-trip time of the correlated Echo Reply in SFC frames"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_request_count"
+offset = 348
+size = 4
+type = "u32"
+description = "Outbound Echo Requests accepted by the IPv4 transmitter"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_request_response_count"
+offset = 352
+size = 4
+type = "u32"
+description = "Correlated valid Echo Replies received"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_request_drop_count"
+offset = 356
+size = 4
+type = "u32"
+description = "Outbound requests or candidate replies rejected"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_request_timeout_count"
+offset = 360
+size = 4
+type = "u32"
+description = "Outbound Echo Requests that expired without a correlated reply"
+
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]
 version = 7
@@ -1429,6 +1520,7 @@ ppp_self_test = 10
 ppp_receive_start = 11
 ppp_receive_stop = 12
 ntp_request = 13
+icmp_echo_request = 14
 
 [mailbox_status]
 idle = 0

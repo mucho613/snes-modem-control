@@ -129,6 +129,7 @@ LCP試験に続き、PAP Authenticate-Request/Ack、IPCP `Opened`、SFC側local
 | PPP NTP clientセルフテスト | 合格 (2026-07-30) | 未実施 |
 | PPP IPv4実対向 | 合格 (2026-07-30) | 未実施 |
 | PPP ICMP Echo実対向 | 合格 (2026-07-30) | 未実施 |
+| PPP 外向きICMP Echo／NAT | 合格 (2026-07-30) | 未実施 |
 | PPP NTP実対向 | 合格 (2026-07-30) | 未実施 |
 
 revision B の最新の疑似 PSTN connect 合格記録は test ID `unix-1785329111-revision-b` です。`AT&F`、`AT%B2400`、`ATS7=60`、`ATX3`、`ATDT0` のechoはすべて完全で、各transaction前後のRX discard counterは0のままでした。DFM-56U は `RING`、`CONNECT 115200` を返し、NDM24 は `CONNECT 2400` を受信して `CONNECTED` へ遷移しました。10秒保持中の未処理RXは0byteです。DFM-56UのDTRを下げた直後にはキャリア切断過渡の `07 99 62 A1 74 DD 6B EE 1E` が入り、続く `NO CARRIER` を受信して `READY` へ戻りました。最終snapshotはRX read/write indexがともに105、TX read/write indexがともに42で、error、timeout、RX/TX overflow、`poll_budget_yield`、discard、terminal droppedがすべて0です。transaction別trace、双方のAT transcript、切断前後のraw RX列は `build/hardware-tests/unix-1785329111-revision-b/connect-test.json` に保存されています。旧schemaのJSONでは `poll_budget_yield` と同じ値が `poll_limit` という名前で記録されています。
@@ -218,5 +219,20 @@ drop、NTP timeoutはすべて0です。
 ことです。X保存後は15.021秒に対して内部時計15.025秒、画面表示も14秒間に
 14秒進みました。NTP再取得、LCP/PAP/IPCP Opened、IPv4/UDP/NTP error 0も
 併せて確認しています。
+
+同日、外向きICMP Echo requester追加後のsmoke ROMをrevision AのFXPAK PRO実機へ
+転送し、mailbox PPPセルフテストの合格を確認しました。新設step `$A2`～`$A7`は
+送信器busy時の要求保持、Echo Request生成、応答の完全相関、異なるsourceの拒否、
+600 frame timeout、IPCP未接続時の拒否を検査します。MesenCEでも同じROMロジックが
+合格しています。
+
+続いてrevision AとDFM-56Uを疑似PSTNのV.22bis 2400 bit/sで接続し、SFC側
+`10.24.0.2`からWSL2のNATを介して公開IPv4 `1.1.1.1`へ13byteのICMP Echo
+Requestを送信しました。NATのMASQUERADE counterは0から1 packet、33byteへ増え、
+SFCは35 frame後にIdentifier `$4E44`、Sequence Number 1、payload `NDM24`が
+完全一致するEcho Replyを受理しました。最終診断はIPv4受信/受理/送信が1/1/1、
+ICMP受信/Echo Reply受信/送信が1/1/1、外向き要求/応答が1/1です。PPP FCS error、
+invalid、overflow、IPv4/ICMP checksum error、各層のdrop、外向きtimeoutは
+すべて0でした。公開診断ABIはversion 11、364byteです。
 
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。

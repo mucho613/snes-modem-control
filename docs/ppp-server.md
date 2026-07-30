@@ -199,8 +199,20 @@ IPv4既定経路を非変更の`check`で先に検査します。
 
 PPPサービスの待受中は`sharing=active`、`Stop`後は`sharing=inactive`になります。
 NAT規則の単体適用、重複開始、完全撤去に加え、一時的な仮想`ppp0`上の
-`10.24.0.2`から`1.1.1.1`へのICMP Echo往復もWSL上で確認済みです。SFC実機から
-公開IPv4 hostへの往復は、外向きICMP Echo Request機能を追加した後に検証します。
+`10.24.0.2`から`1.1.1.1`へのICMP Echo往復もWSL上で確認済みです。2026-07-30には
+revision AのSFC実機からも同じ公開IPv4への往復に合格しました。要求前後で
+MASQUERADE counterは0から1 packet、33byteへ増え、SFCは35 frame後に完全相関した
+Echo Replyを受理しています。外部からSFCへの新規接続はこの試験でも許可していません。
+
+IPCPが`Opened`になった後、任意の公開IPv4へ要求するコマンドは次のとおりです。
+
+```powershell
+cargo run -p ndm24-tools -- icmp-echo 1.1.1.1
+```
+
+既定宛先も`1.1.1.1`です。成功時はPPP診断snapshotとIdentifier、Sequence Number、
+RTT frame数を表示し、source、Identifier、Sequence Number、固定payloadのいずれかが
+異なる応答は成功として扱いません。
 
 SFCの診断は別のPowerShellで取得します。
 

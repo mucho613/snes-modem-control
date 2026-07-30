@@ -6,6 +6,8 @@ pub const TYPE_ECHO_REPLY: u8 = 0;
 pub const TYPE_ECHO_REQUEST: u8 = 8;
 pub const ECHO_CODE: u8 = 0;
 pub const ECHO_HEADER_LENGTH: usize = 8;
+pub const REQUEST_IDENTIFIER: u16 = 0x4e44;
+pub const REQUEST_PAYLOAD: &[u8] = b"NDM24";
 
 const TYPE_OFFSET: usize = 0;
 const CODE_OFFSET: usize = 1;
@@ -40,6 +42,24 @@ pub enum ParseError {
 pub enum EncodeError {
     OutputTooSmall { required: usize, available: usize },
     MessageTooLong(usize),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CorrelationError {
+    NotReply,
+    SourceMismatch {
+        expected: [u8; 4],
+        received: [u8; 4],
+    },
+    IdentifierMismatch {
+        expected: u16,
+        received: u16,
+    },
+    SequenceMismatch {
+        expected: u16,
+        received: u16,
+    },
+    PayloadMismatch,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -135,6 +155,41 @@ pub fn encode_echo_reply(request: EchoPacket<'_>, output: &mut [u8]) -> Result<u
     )
 }
 
+pub fn correlate_echo_reply(
+    packet: EchoPacket<'_>,
+    source: [u8; 4],
+    expected_source: [u8; 4],
+    expected_identifier: u16,
+    expected_sequence: u16,
+    expected_payload: &[u8],
+) -> Result<(), CorrelationError> {
+    if packet.kind() != EchoKind::Reply {
+        return Err(CorrelationError::NotReply);
+    }
+    if source != expected_source {
+        return Err(CorrelationError::SourceMismatch {
+            expected: expected_source,
+            received: source,
+        });
+    }
+    if packet.identifier() != expected_identifier {
+        return Err(CorrelationError::IdentifierMismatch {
+            expected: expected_identifier,
+            received: packet.identifier(),
+        });
+    }
+    if packet.sequence() != expected_sequence {
+        return Err(CorrelationError::SequenceMismatch {
+            expected: expected_sequence,
+            received: packet.sequence(),
+        });
+    }
+    if packet.payload() != expected_payload {
+        return Err(CorrelationError::PayloadMismatch);
+    }
+    Ok(())
+}
+
 fn read_u16(bytes: &[u8], offset: usize) -> u16 {
     u16::from_be_bytes([bytes[offset], bytes[offset + 1]])
 }
@@ -191,6 +246,65 @@ mod tests {
         assert_eq!(packet.identifier(), 0xabcd);
         assert_eq!(packet.sequence(), 0x5678);
         assert!(packet.payload().is_empty());
+    }
+
+    #[test]
+    fn outbound_reply_requires_full_correlation() {
+        let mut bytes = [0; ECHO_HEADER_LENGTH + REQUEST_PAYLOAD.len()];
+        encode_echo(
+            EchoKind::Reply,
+            REQUEST_IDENTIFIER,
+            9,
+            REQUEST_PAYLOAD,
+            &mut bytes,
+        )
+        .unwrap();
+        let reply = EchoPacket::parse(&bytes).unwrap();
+        let destination = [1, 1, 1, 1];
+        assert_eq!(
+            correlate_echo_reply(
+                reply,
+                destination,
+                destination,
+                REQUEST_IDENTIFIER,
+                9,
+                REQUEST_PAYLOAD
+            ),
+            Ok(())
+        );
+        assert!(matches!(
+            correlate_echo_reply(
+                reply,
+                [1, 0, 0, 1],
+                destination,
+                REQUEST_IDENTIFIER,
+                9,
+                REQUEST_PAYLOAD
+            ),
+            Err(CorrelationError::SourceMismatch { .. })
+        ));
+        assert!(matches!(
+            correlate_echo_reply(
+                reply,
+                destination,
+                destination,
+                REQUEST_IDENTIFIER,
+                10,
+                REQUEST_PAYLOAD
+            ),
+            Err(CorrelationError::SequenceMismatch { .. })
+        ));
+        assert_eq!(
+            correlate_echo_reply(
+                reply,
+                destination,
+                destination,
+                REQUEST_IDENTIFIER,
+                9,
+                b"other"
+            ),
+            Err(CorrelationError::PayloadMismatch)
+        );
     }
 
     #[test]

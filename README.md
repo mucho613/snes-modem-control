@@ -4,7 +4,7 @@
 
 スーパーファミコンと NTT DATA NDM24 をコントローラーポート経由で通信させるための、実験用ドライバと Windows 向け開発ツールです。JRA PAT の実通信をロジックアナライザで観測した結果を基準に、初期化、非同期送受信、状態管理、常設診断機能を整理しています。
 
-現時点の到達点は、NDM24 固有の `R` 初期化、`ATM0` による応答確認とスピーカー無効化、256 バイトの送受信リング、L/Rで切り替える人間向けステータス画面と32文字幅生ログ、QUsb2Snes 経由の監視・テスト・ROM 転送です。PPPはRFC 1662非同期フレーミング、LCP、PAP client、IPCP、IPv4 packet層、ICMP Echo responder、UDP datagram層、NTP clientをRust参照実装と65816へ実装し、NDM24のRX/TXリングへ中断・再開可能な形で接続済みです。revision AとDFM-56Uを使うWSL2対向環境ではLCP、PAP認証、IPCPまで実対向で合格し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。IPv4、ICMP Echo、UDP/NTPはMesenCEおよびFXPAK PRO実機の常設セルフテストに加え、疑似PSTNのV.22bis 2400 bit/s回線上でも送受信に合格しています。PPPサーバーには、起動中だけSFCの外向きIPv4をWSLの既定回線へNATする構成も追加済みです。仮想`ppp0`から公開IPv4への往復は合格し、SFC実機からのインターネット往復試験は未実施です。NTPで取得したJST時刻はSFCのフレーム進行を基準に表示します。TCPは未実装です。
+現時点の到達点は、NDM24 固有の `R` 初期化、`ATM0` による応答確認とスピーカー無効化、256 バイトの送受信リング、L/Rで切り替える人間向けステータス画面と32文字幅生ログ、QUsb2Snes 経由の監視・テスト・ROM 転送です。PPPはRFC 1662非同期フレーミング、LCP、PAP client、IPCP、IPv4 packet層、ICMP Echo responder/requester、UDP datagram層、NTP clientをRust参照実装と65816へ実装し、NDM24のRX/TXリングへ中断・再開可能な形で接続済みです。revision AとDFM-56Uを使うWSL2対向環境ではLCP、PAP認証、IPCPまで実対向で合格し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。IPv4、ICMP Echo、UDP/NTPはMesenCEおよびFXPAK PRO実機の常設セルフテストに加え、疑似PSTNのV.22bis 2400 bit/s回線上でも送受信に合格しています。PPPサーバーには、起動中だけSFCの外向きIPv4をWSLの既定回線へNATする構成も追加済みです。SFC実機から公開IPv4 `1.1.1.1`へのICMP Echo往復にも合格しています。NTPで取得したJST時刻はSFCのフレーム進行を基準に表示します。TCPは未実装です。
 
 ## Windows での開始
 
@@ -40,6 +40,7 @@ cargo run -p ndm24-tools -- monitor
 cargo run -p ndm24-tools -- ppp-monitor
 cargo run -p ndm24-tools -- frame-rate --seconds 15
 cargo run -p ndm24-tools -- ntp-request
+cargo run -p ndm24-tools -- icmp-echo 1.1.1.1
 cargo run -p ndm24-tools -- identify --revision B
 cargo run -p ndm24-tools -- connect-test --revision B --port COM5
 cargo run -p ndm24-tools -- binary-test --revision B --port COM5

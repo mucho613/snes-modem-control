@@ -4,7 +4,7 @@
 
 最初のPPPマイルストーンは、NDM24から受け取る任意位置で分割されたbyte列を、FCS検証済みのPPPフレームへ復元する層です。`crates/ndm24-ppp` を仕様の参照実装とし、同じ状態遷移と試験ベクトルを65816へ移植しています。
 
-現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP、PAP client、IPCP、IPv4 packet層、ICMP Echo responder、UDP datagram層、NTP clientまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ack、IPCP `Opened`まで確認し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。同日にIPv4、ICMP Echo、UDP/NTPはMesenCE、FXPAK PRO実機、疑似PSTNのV.22bis 2400 bit/s回線上で送受信に合格しました。NTPでは2回連続で相関済み応答からUnix秒を取得しています。TCPは未実装です。
+現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP、PAP client、IPCP、IPv4 packet層、ICMP Echo responder/requester、UDP datagram層、NTP clientまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ack、IPCP `Opened`まで確認し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。同日にIPv4、ICMP Echo、UDP/NTPはMesenCE、FXPAK PRO実機、疑似PSTNのV.22bis 2400 bit/s回線上で送受信に合格しました。さらにWSL2のNATを介し、SFC実機から公開IPv4 `1.1.1.1`へのICMP Echo往復にも合格しています。NTPでは2回連続で相関済み応答からUnix秒を取得しています。TCPは未実装です。
 
 PPP接続は次の順序で進みます。
 
@@ -77,6 +77,7 @@ Rust参照実装は全入力分割位置、破損FCSからの再同期、Flag直
 - `src/ppp/ipv4.asm`: IPv4 parser、header checksum、送信header生成
 - `src/ppp/ipv4Poll.asm`: IPCP/IPv4 frame所有権、local宛先とfragmentの選別
 - `src/ppp/icmp.asm`: ICMP Echo parser、checksum、Echo Reply生成、送信待ち
+- `src/ppp/icmpRequest.asm`: Echo Request生成、応答相関、timeout、RTT診断
 - `src/ppp/udp.asm`: UDP parser、疑似header checksum、送信datagram生成
 - `src/ppp/ntp.asm`: 明示要求型NTP client、応答相関、timeout
 - `src/ppp/selfTest.asm`: 固定fixtureによる常設セルフテスト
@@ -422,7 +423,8 @@ checksum error、同一headerの送信生成、共有encoder受理を検査し�
 `$85`～`$87`はlocal宛先の受理、宛先不一致の破棄、IPCP phase gateを検査します。
 2026-07-30にFXPAK PRO実機で起動完了後3回連続合格し、当時のABI version 7の
 snapshot取得も確認しました。この試験は電話回線へ発信せず、固定fixtureだけを
-使います。現在のABI version 9は末尾へICMPとUDP診断を追加したものです。
+使います。ICMPとUDP診断はABI version 9で末尾へ追加され、現行version 11でも
+同じoffsetを維持しています。
 
 ## 65816 ICMP Echo
 
@@ -445,6 +447,22 @@ version 9から取得できます。
 QUsb2Snesでsmoke ROMを転送したFXPAK PRO実機のmailbox command 10で合格しました。
 NDM24とWSL2 `pppd`を通した実対向Echoは、標準56byteに加えて0、1、17、
 127byte payloadでもpacket loss 0%を確認しています。
+
+外向き要求は`src/ppp/icmpRequest.asm`が担当します。mailbox command 14の4byte
+引数を宛先IPv4 addressとし、Identifier `$4E44`、単調増加するSequence Number、
+5byte payload `NDM24`を持つEcho Requestを生成します。共有PPP送信器がbusyなら
+要求を保持し、送信受理後から600 frameをtimeoutとして計測します。Echo Replyは
+source address、Identifier、Sequence Number、payloadがすべて一致した場合だけ
+完了とし、送信から受信までのRTTをframe数で保存します。不一致packetは進行中の
+要求を消費せず、drop countと理由を診断へ記録します。
+
+公開診断ABI version 11、364byteは要求状態、最終error、宛先、Identifier、
+Sequence Number、deadline、送信frame、RTT、要求・応答・破棄・timeout countを
+末尾へ追加しています。常設セルフテストのstep `$A2`～`$A7`は送信backpressure、
+packet生成、完全相関、異なるsourceの拒否、timeout、IPCP phase gateを検査します。
+2026-07-30にMesenCEとFXPAK PRO実機で合格し、同日のrevision A実対向では
+`1.1.1.1`からIdentifier `$4E44`、Sequence Number 1、payload `NDM24`の応答を
+35 frameで受信しました。PPP、IPv4、ICMPのerror、drop、timeoutはすべて0です。
 
 ## 65816 UDP datagram層
 

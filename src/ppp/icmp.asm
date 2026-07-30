@@ -18,9 +18,11 @@
 .import pppIcmpEchoReplyCount, pppIcmpChecksumErrorCount
 .import pppIcmpDropCount, pppIcmpTransmitCount
 .import pppIcmpPacketOffset, pppIcmpChecksumAccumulator
+.import pppIcmpRequestInitialize, pppIcmpRequestReceive
 
 .export pppIcmpInitialize, pppIcmpReceive
 .export pppIcmpRetryPending, pppIcmpCancelPending
+.export pppIcmpChecksumTransmitMessage
 .export pppIcmpRunSelfTest
 
 .macro pppIcmpReceiveError error
@@ -67,6 +69,7 @@
   stz pppIcmpChecksumAccumulator
   sep #$20
   .a8
+  jsr pppIcmpRequestInitialize
   plb
   rts
 .endproc
@@ -165,6 +168,7 @@ valid:
   lda #(PPP_ICMP_FLAG_VALID | PPP_ICMP_FLAG_ECHO_REPLY)
   sta pppIcmpFlags
   pppIncrement32 pppIcmpEchoReplyCount
+  jsr pppIcmpRequestReceive
   jsr pppSnapshotEnd
   ply
   plx
@@ -335,7 +339,8 @@ copyMessage:
   rep #$20
   .a16
   ldx #(PPP_UNCOMPRESSED_HEADER_LENGTH + PPP_IPV4_MINIMUM_HEADER_LENGTH)
-  jsr checksumTransmitMessage
+  lda pppIpv4PayloadLength
+  jsr pppIcmpChecksumTransmitMessage
   eor #$ffff
   xba
   sta pppTransmitBuffer + PPP_UNCOMPRESSED_HEADER_LENGTH + PPP_IPV4_MINIMUM_HEADER_LENGTH + 2
@@ -364,15 +369,18 @@ copyDestination:
 transmitFailed:
   sec
   rts
+.endproc
 
-checksumTransmitMessage:
+; Calculate the checksum of the transmit-buffer ICMP message at X. A16 is the
+; message length. The returned A16 is the folded, non-complemented sum.
+.proc pppIcmpChecksumTransmitMessage
   .a16
   .i16
+  pha
   stz pppIcmpChecksumAccumulator
-  lda pppIpv4PayloadLength
   lsr
   tay
-checksumTransmitWord:
+@word:
   lda pppTransmitBuffer, x
   xba
   clc
@@ -384,11 +392,11 @@ checksumTransmitWord:
   inx
   inx
   dey
-  bne checksumTransmitWord
+  bne @word
 
-  lda pppIpv4PayloadLength
+  pla
   and #$0001
-  beq checksumTransmitDone
+  beq @done
   sep #$20
   .a8
   lda pppTransmitBuffer, x
@@ -399,9 +407,9 @@ checksumTransmitWord:
   clc
   adc pppIcmpChecksumAccumulator
   sta pppIcmpChecksumAccumulator
-  bcc checksumTransmitDone
+  bcc @done
   inc pppIcmpChecksumAccumulator
-checksumTransmitDone:
+@done:
   lda pppIcmpChecksumAccumulator
   rts
 .endproc

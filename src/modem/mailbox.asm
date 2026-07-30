@@ -17,6 +17,7 @@
 .import pppRunSelfTest
 .import pppReceiveStart, pppReceiveStop
 .import pppNtpRequest
+.import pppIcmpRequestDestination, pppIcmpRequestBegin
 
 .export modemMailboxPoll
 .proc modemMailboxPoll
@@ -160,6 +161,10 @@
   bne :+
   jmp @ntpRequest
 :
+  cmp #MODEM_MAILBOX_COMMAND_ICMP_ECHO_REQUEST
+  bne :+
+  jmp @icmpEchoRequest
+:
   lda #MODEM_MAILBOX_STATUS_FAILED
   sta modemMailboxStatus
   lda #$ff
@@ -261,10 +266,14 @@
 @binaryStressTransmit:
   lda modemDriverState
   cmp #MODEM_STATE_CONNECTED
-  bne @binaryInvalid
+  beq :+
+  jmp @binaryInvalid
+:
   lda modemTransmitReadIndex
   cmp modemTransmitWriteIndex
-  bne @binaryInvalid
+  beq :+
+  jmp @binaryInvalid
+:
   ; Fill the 255-byte usable TX ring with 0x00..0xFE before modemPoll can
   ; consume it. This deliberately creates the largest possible controller-
   ; interface burst for backpressure and byte-acceptance diagnostics.
@@ -272,21 +281,23 @@
 @binaryStressTransmitLoop:
   txa
   jsr modemQueueByte
-  bcs @binaryInvalid
+  bcc :+
+  jmp @binaryInvalid
+:
   inx
   cpx #MODEM_RING_CAPACITY
   bne @binaryStressTransmitLoop
   stx modemMailboxResult
   lda #MODEM_MAILBOX_STATUS_PASSED
   sta modemMailboxStatus
-  bra @commitCommand
+  jmp @commitCommand
 
 @pppSelfTest:
   jsr pppRunSelfTest
   bcs @pppSelfTestFailed
   lda #MODEM_MAILBOX_STATUS_PASSED
   sta modemMailboxStatus
-  bra @commitCommand
+  jmp @commitCommand
 
 @pppSelfTestFailed:
   sta modemMailboxResult
@@ -318,6 +329,30 @@
   bra @commitCommand
 
 @ntpRequestFailed:
+  sta modemMailboxResult
+  lda #MODEM_MAILBOX_STATUS_FAILED
+  sta modemMailboxStatus
+  bra @commitCommand
+
+@icmpEchoRequest:
+  ldx #$00
+@icmpEchoCopyDestination:
+  lda modemMailboxArguments, x
+  sta pppIcmpRequestDestination, x
+  inx
+  cpx #$04
+  bne @icmpEchoCopyDestination
+  rep #$10
+  .i16
+  jsr pppIcmpRequestBegin
+  sep #$10
+  .i8
+  bcs @icmpEchoRequestFailed
+  lda #MODEM_MAILBOX_STATUS_PASSED
+  sta modemMailboxStatus
+  bra @commitCommand
+
+@icmpEchoRequestFailed:
   sta modemMailboxResult
   lda #MODEM_MAILBOX_STATUS_FAILED
   sta modemMailboxStatus

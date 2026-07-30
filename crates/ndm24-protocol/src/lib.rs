@@ -294,6 +294,19 @@ pub struct PppDiagnosticSnapshot {
     pub ntp_response_count: u32,
     pub ntp_drop_count: u32,
     pub ntp_timeout_count: u32,
+    pub icmp_request_state: u8,
+    pub icmp_request_last_error: u8,
+    pub icmp_request_flags: u8,
+    pub icmp_request_destination: [u8; 4],
+    pub icmp_request_identifier: u16,
+    pub icmp_request_sequence: u16,
+    pub icmp_request_deadline: u16,
+    pub icmp_request_sent_frame: u16,
+    pub icmp_request_rtt_frames: u16,
+    pub icmp_request_count: u32,
+    pub icmp_request_response_count: u32,
+    pub icmp_request_drop_count: u32,
+    pub icmp_request_timeout_count: u32,
 }
 
 impl PppDiagnosticSnapshot {
@@ -467,6 +480,19 @@ impl PppDiagnosticSnapshot {
             ntp_response_count: read_u32(data, PPP_DIAG_NTP_RESPONSE_COUNT)?,
             ntp_drop_count: read_u32(data, PPP_DIAG_NTP_DROP_COUNT)?,
             ntp_timeout_count: read_u32(data, PPP_DIAG_NTP_TIMEOUT_COUNT)?,
+            icmp_request_state: data[PPP_DIAG_ICMP_REQUEST_STATE],
+            icmp_request_last_error: data[PPP_DIAG_ICMP_REQUEST_LAST_ERROR],
+            icmp_request_flags: data[PPP_DIAG_ICMP_REQUEST_FLAGS],
+            icmp_request_destination: read_array(data, PPP_DIAG_ICMP_REQUEST_DESTINATION)?,
+            icmp_request_identifier: read_u16(data, PPP_DIAG_ICMP_REQUEST_IDENTIFIER)?,
+            icmp_request_sequence: read_u16(data, PPP_DIAG_ICMP_REQUEST_SEQUENCE)?,
+            icmp_request_deadline: read_u16(data, PPP_DIAG_ICMP_REQUEST_DEADLINE)?,
+            icmp_request_sent_frame: read_u16(data, PPP_DIAG_ICMP_REQUEST_SENT_FRAME)?,
+            icmp_request_rtt_frames: read_u16(data, PPP_DIAG_ICMP_REQUEST_RTT_FRAMES)?,
+            icmp_request_count: read_u32(data, PPP_DIAG_ICMP_REQUEST_COUNT)?,
+            icmp_request_response_count: read_u32(data, PPP_DIAG_ICMP_REQUEST_RESPONSE_COUNT)?,
+            icmp_request_drop_count: read_u32(data, PPP_DIAG_ICMP_REQUEST_DROP_COUNT)?,
+            icmp_request_timeout_count: read_u32(data, PPP_DIAG_ICMP_REQUEST_TIMEOUT_COUNT)?,
         })
     }
 }
@@ -814,6 +840,29 @@ mod tests {
             .copy_from_slice(&2_u32.to_le_bytes());
         data[PPP_DIAG_NTP_TIMEOUT_COUNT..PPP_DIAG_NTP_TIMEOUT_COUNT + 4]
             .copy_from_slice(&1_u32.to_le_bytes());
+        data[PPP_DIAG_ICMP_REQUEST_STATE] = 3;
+        data[PPP_DIAG_ICMP_REQUEST_LAST_ERROR] = 0;
+        data[PPP_DIAG_ICMP_REQUEST_FLAGS] = 1;
+        data[PPP_DIAG_ICMP_REQUEST_DESTINATION..PPP_DIAG_ICMP_REQUEST_DESTINATION + 4]
+            .copy_from_slice(&[1, 1, 1, 1]);
+        data[PPP_DIAG_ICMP_REQUEST_IDENTIFIER..PPP_DIAG_ICMP_REQUEST_IDENTIFIER + 2]
+            .copy_from_slice(&0x4e44_u16.to_le_bytes());
+        data[PPP_DIAG_ICMP_REQUEST_SEQUENCE..PPP_DIAG_ICMP_REQUEST_SEQUENCE + 2]
+            .copy_from_slice(&9_u16.to_le_bytes());
+        data[PPP_DIAG_ICMP_REQUEST_DEADLINE..PPP_DIAG_ICMP_REQUEST_DEADLINE + 2]
+            .copy_from_slice(&0x2468_u16.to_le_bytes());
+        data[PPP_DIAG_ICMP_REQUEST_SENT_FRAME..PPP_DIAG_ICMP_REQUEST_SENT_FRAME + 2]
+            .copy_from_slice(&0x2200_u16.to_le_bytes());
+        data[PPP_DIAG_ICMP_REQUEST_RTT_FRAMES..PPP_DIAG_ICMP_REQUEST_RTT_FRAMES + 2]
+            .copy_from_slice(&7_u16.to_le_bytes());
+        data[PPP_DIAG_ICMP_REQUEST_COUNT..PPP_DIAG_ICMP_REQUEST_COUNT + 4]
+            .copy_from_slice(&5_u32.to_le_bytes());
+        data[PPP_DIAG_ICMP_REQUEST_RESPONSE_COUNT..PPP_DIAG_ICMP_REQUEST_RESPONSE_COUNT + 4]
+            .copy_from_slice(&4_u32.to_le_bytes());
+        data[PPP_DIAG_ICMP_REQUEST_DROP_COUNT..PPP_DIAG_ICMP_REQUEST_DROP_COUNT + 4]
+            .copy_from_slice(&2_u32.to_le_bytes());
+        data[PPP_DIAG_ICMP_REQUEST_TIMEOUT_COUNT..PPP_DIAG_ICMP_REQUEST_TIMEOUT_COUNT + 4]
+            .copy_from_slice(&1_u32.to_le_bytes());
 
         let snapshot = PppDiagnosticSnapshot::decode(&data).unwrap();
         assert_eq!(snapshot.snapshot_sequence, 8);
@@ -920,6 +969,19 @@ mod tests {
         assert_eq!(snapshot.ntp_response_count, 3);
         assert_eq!(snapshot.ntp_drop_count, 2);
         assert_eq!(snapshot.ntp_timeout_count, 1);
+        assert_eq!(snapshot.icmp_request_state, 3);
+        assert_eq!(snapshot.icmp_request_last_error, 0);
+        assert_eq!(snapshot.icmp_request_flags, 1);
+        assert_eq!(snapshot.icmp_request_destination, [1, 1, 1, 1]);
+        assert_eq!(snapshot.icmp_request_identifier, 0x4e44);
+        assert_eq!(snapshot.icmp_request_sequence, 9);
+        assert_eq!(snapshot.icmp_request_deadline, 0x2468);
+        assert_eq!(snapshot.icmp_request_sent_frame, 0x2200);
+        assert_eq!(snapshot.icmp_request_rtt_frames, 7);
+        assert_eq!(snapshot.icmp_request_count, 5);
+        assert_eq!(snapshot.icmp_request_response_count, 4);
+        assert_eq!(snapshot.icmp_request_drop_count, 2);
+        assert_eq!(snapshot.icmp_request_timeout_count, 1);
     }
 
     #[test]

@@ -68,6 +68,9 @@ cargo run -p ndm24-tools -- frame-rate --seconds 15
 # IPCP Opened後、peerのUDP 123へNTP要求を送り、応答または失敗まで待つ
 cargo run -p ndm24-tools -- ntp-request
 
+# IPCP Opened後、任意のIPv4 addressへICMP Echoを送り、相関済み応答まで待つ
+cargo run -p ndm24-tools -- icmp-echo 1.1.1.1
+
 # メールボックス経由の AT クイックテスト
 cargo run -p ndm24-tools -- test
 

@@ -44,7 +44,7 @@ ABI version: `2`. Block size: `128` bytes.
 
 ## PPP Diagnostic ABI
 
-ABI version: `10`. Block size: `331` bytes.
+ABI version: `11`. Block size: `364` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|
@@ -158,7 +158,7 @@ ABI version: `10`. Block size: `331` bytes.
 | `0xE5` | 4 | `u32` | `icmp_echo_reply_count` | Valid ICMP Echo Replies received |
 | `0xE9` | 4 | `u32` | `icmp_checksum_error_count` | ICMP Echo messages rejected for an invalid checksum |
 | `0xED` | 4 | `u32` | `icmp_drop_count` | ICMP messages rejected by parser or transmit handling |
-| `0xF1` | 4 | `u32` | `icmp_transmit_count` | ICMP Echo Replies accepted by the IPv4 transmitter |
+| `0xF1` | 4 | `u32` | `icmp_transmit_count` | ICMP Echo messages accepted by the IPv4 transmitter |
 | `0xF5` | 1 | `u8` | `udp_last_error` | Most recent UDP parser or transmit error |
 | `0xF6` | 1 | `u8` | `udp_flags` | UDP datagram-valid and checksum-present flags |
 | `0xF7` | 2 | `u16` | `udp_source_port` | Source port of the most recently parsed UDP datagram |
@@ -191,6 +191,19 @@ ABI version: `10`. Block size: `331` bytes.
 | `0x13F` | 4 | `u32` | `ntp_response_count` | Correlated valid NTP server responses |
 | `0x143` | 4 | `u32` | `ntp_drop_count` | NTP responses or local requests rejected by validation |
 | `0x147` | 4 | `u32` | `ntp_timeout_count` | NTP requests that expired without a valid response |
+| `0x14B` | 1 | `u8` | `icmp_request_state` | Outbound ICMP Echo request state |
+| `0x14C` | 1 | `u8` | `icmp_request_last_error` | Most recent outbound ICMP Echo request or correlation error |
+| `0x14D` | 1 | `u8` | `icmp_request_flags` | Outbound ICMP Echo response-valid flag |
+| `0x14E` | 4 | `ipv4` | `icmp_request_destination` | Destination of the current or most recent outbound Echo Request |
+| `0x152` | 2 | `u16` | `icmp_request_identifier` | Identifier used by the current or most recent Echo Request |
+| `0x154` | 2 | `u16` | `icmp_request_sequence` | Sequence used by the current or most recent Echo Request |
+| `0x156` | 2 | `u16` | `icmp_request_deadline` | Low frame counter deadline for the pending Echo Reply |
+| `0x158` | 2 | `u16` | `icmp_request_sent_frame` | Low frame counter when the Echo Request entered the IPv4 transmitter |
+| `0x15A` | 2 | `u16` | `icmp_request_rtt_frames` | Round-trip time of the correlated Echo Reply in SFC frames |
+| `0x15C` | 4 | `u32` | `icmp_request_count` | Outbound Echo Requests accepted by the IPv4 transmitter |
+| `0x160` | 4 | `u32` | `icmp_request_response_count` | Correlated valid Echo Replies received |
+| `0x164` | 4 | `u32` | `icmp_request_drop_count` | Outbound requests or candidate replies rejected |
+| `0x168` | 4 | `u32` | `icmp_request_timeout_count` | Outbound Echo Requests that expired without a correlated reply |
 
 ## Mailbox ABI
 

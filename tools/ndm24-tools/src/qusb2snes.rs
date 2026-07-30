@@ -266,6 +266,65 @@ pub async fn ntp_request(
     }
 }
 
+pub async fn icmp_echo(
+    websocket: &str,
+    label_path: &Path,
+    destination: [u8; 4],
+    timeout: Duration,
+) -> Result<PppDiagnosticSnapshot> {
+    const ICMP_REQUEST_STATE_RECEIVED: u8 = 3;
+    const ICMP_REQUEST_STATE_FAILED: u8 = 4;
+
+    let labels = read_labels(label_path)?;
+    let state = labels
+        .get("pppDiagnosticState")
+        .copied()
+        .context("label file does not contain pppDiagnosticState")?;
+    let offset = wram_to_usb2snes(state)?;
+    let mut client = Client::connect(websocket).await?;
+    eprintln!("attached to {}", client.device);
+    let before = read_stable_ppp_snapshot(&mut client, offset).await?;
+    drop(client);
+
+    mailbox_command_with_arguments(
+        websocket,
+        label_path,
+        ndm24_protocol::MODEM_MAILBOX_COMMAND_ICMP_ECHO_REQUEST,
+        &destination,
+        timeout,
+    )
+    .await?;
+
+    let mut client = Client::connect(websocket).await?;
+    let started = Instant::now();
+    loop {
+        let snapshot = read_stable_ppp_snapshot(&mut client, offset).await?;
+        if snapshot.icmp_request_state == ICMP_REQUEST_STATE_RECEIVED
+            && snapshot.icmp_request_response_count != before.icmp_request_response_count
+        {
+            return Ok(snapshot);
+        }
+        if snapshot.icmp_request_state == ICMP_REQUEST_STATE_FAILED {
+            bail!(
+                "ICMP Echo failed: error=0x{:02x}, requests={}, responses={}, drops={}, timeouts={}",
+                snapshot.icmp_request_last_error,
+                snapshot.icmp_request_count,
+                snapshot.icmp_request_response_count,
+                snapshot.icmp_request_drop_count,
+                snapshot.icmp_request_timeout_count
+            );
+        }
+        ensure!(
+            started.elapsed() < timeout,
+            "timed out waiting for ICMP Echo reply: state={}, requests={}, responses={}",
+            snapshot.icmp_request_state,
+            snapshot.icmp_request_count,
+            snapshot.icmp_request_response_count
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+
 pub async fn dump_trace(websocket: &str, label_path: &Path) -> Result<()> {
     for event in read_trace_events(websocket, label_path).await? {
         println!("{}", serde_json::to_string(&event)?);

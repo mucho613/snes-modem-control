@@ -7,6 +7,7 @@ mod ppp_dial;
 mod qusb2snes;
 mod trace;
 
+use std::net::Ipv4Addr;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -14,11 +15,12 @@ use anyhow::{Result, ensure};
 use clap::{Parser, Subcommand, ValueEnum};
 use ndm24_protocol::{
     MODEM_MAILBOX_COMMAND_AT_TRANSACTION, MODEM_MAILBOX_COMMAND_CLEAR_TRACE,
-    MODEM_MAILBOX_COMMAND_FREEZE_TRACE, MODEM_MAILBOX_COMMAND_INITIALIZE,
-    MODEM_MAILBOX_COMMAND_NTP_REQUEST, MODEM_MAILBOX_COMMAND_PPP_RECEIVE_START,
-    MODEM_MAILBOX_COMMAND_PPP_RECEIVE_STOP, MODEM_MAILBOX_COMMAND_PPP_SELF_TEST,
-    MODEM_MAILBOX_COMMAND_QUICK_TEST, MODEM_MAILBOX_COMMAND_RESUME_TRACE,
-    MODEM_SESSION_RESULT_CONNECT, MODEM_SESSION_RESULT_NO_CARRIER, MODEM_SESSION_RESULT_OK,
+    MODEM_MAILBOX_COMMAND_FREEZE_TRACE, MODEM_MAILBOX_COMMAND_ICMP_ECHO_REQUEST,
+    MODEM_MAILBOX_COMMAND_INITIALIZE, MODEM_MAILBOX_COMMAND_NTP_REQUEST,
+    MODEM_MAILBOX_COMMAND_PPP_RECEIVE_START, MODEM_MAILBOX_COMMAND_PPP_RECEIVE_STOP,
+    MODEM_MAILBOX_COMMAND_PPP_SELF_TEST, MODEM_MAILBOX_COMMAND_QUICK_TEST,
+    MODEM_MAILBOX_COMMAND_RESUME_TRACE, MODEM_SESSION_RESULT_CONNECT,
+    MODEM_SESSION_RESULT_NO_CARRIER, MODEM_SESSION_RESULT_OK,
 };
 
 #[derive(Debug, Parser)]
@@ -125,6 +127,16 @@ enum Command {
         #[arg(long, default_value_t = 20)]
         timeout_seconds: u64,
     },
+    IcmpEcho {
+        #[arg(default_value = "1.1.1.1")]
+        address: Ipv4Addr,
+        #[arg(long, default_value = "ws://localhost:23074")]
+        websocket: String,
+        #[arg(long, default_value = "build/smoke/modem-control.lbl")]
+        labels: PathBuf,
+        #[arg(long, default_value_t = 15)]
+        timeout_seconds: u64,
+    },
     PendingRx {
         #[arg(long, default_value = "ws://localhost:23074")]
         websocket: String,
@@ -213,6 +225,7 @@ enum MailboxCommand {
     PppReceiveStart,
     PppReceiveStop,
     NtpRequest,
+    IcmpEchoRequest,
 }
 
 impl MailboxCommand {
@@ -227,6 +240,7 @@ impl MailboxCommand {
             Self::PppReceiveStart => MODEM_MAILBOX_COMMAND_PPP_RECEIVE_START,
             Self::PppReceiveStop => MODEM_MAILBOX_COMMAND_PPP_RECEIVE_STOP,
             Self::NtpRequest => MODEM_MAILBOX_COMMAND_NTP_REQUEST,
+            Self::IcmpEchoRequest => MODEM_MAILBOX_COMMAND_ICMP_ECHO_REQUEST,
         }
     }
 }
@@ -366,6 +380,29 @@ async fn main() -> Result<()> {
             println!(
                 "NTP response: unix_seconds={}, stratum={}, version={}",
                 snapshot.ntp_unix_seconds, snapshot.ntp_stratum, snapshot.ntp_version
+            );
+            Ok(())
+        }
+        Command::IcmpEcho {
+            address,
+            websocket,
+            labels,
+            timeout_seconds,
+        } => {
+            let snapshot = qusb2snes::icmp_echo(
+                &websocket,
+                &labels,
+                address.octets(),
+                Duration::from_secs(timeout_seconds),
+            )
+            .await?;
+            println!("{}", serde_json::to_string(&snapshot)?);
+            println!(
+                "ICMP Echo reply from {}: identifier=0x{:04x}, sequence={}, rtt_frames={}",
+                address,
+                snapshot.icmp_request_identifier,
+                snapshot.icmp_request_sequence,
+                snapshot.icmp_request_rtt_frames
             );
             Ok(())
         }

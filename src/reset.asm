@@ -20,6 +20,7 @@
 .import pppIpcpInitialize, pppIpcpPoll
 .import pppIpv4Initialize, pppIpv4Poll
 .import pppIcmpInitialize
+.import pppIcmpRequestPoll
 .import pppUdpInitialize
 .import pppNtpInitialize, pppNtpPoll
 .import nmitimenShadow
@@ -144,6 +145,7 @@
     jsr pppPapPoll
     jsr pppIpcpPoll
     jsr pppIpv4Poll
+    jsr pppIcmpRequestPoll
     jsr pppNtpPoll
     jsr clockPoll
     jsr statusPoll
