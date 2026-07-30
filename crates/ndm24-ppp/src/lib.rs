@@ -2,12 +2,14 @@
 //! NDM24 byte transport.
 //!
 //! RFC 1662 framing and the allocation-free LCP packet codec live here.
-//! Authentication and IPCP live in separate state machines. IPv4 and the
-//! higher network-layer protocols are intentionally not implemented here.
+//! Authentication, IPCP, and IPv4 packet handling live in separate modules.
+//! Higher transport and application protocols are intentionally not
+//! implemented here.
 
 use std::mem;
 
 pub mod ipcp;
+pub mod ipv4;
 pub mod lcp;
 pub mod pap;
 

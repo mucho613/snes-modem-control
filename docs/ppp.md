@@ -218,6 +218,20 @@ SFCが再要求した後に双方のConfigure-Ackが成立する経路を検査�
 zero peer addressへのNak、圧縮・未知・重複optionのReject、不一致Ackの無視、
 同一Identifierでのtimeout再送と上限到達を検査します。
 
+## Rust IPv4 packet codec
+
+`crates/ndm24-ppp/src/ipv4.rs`はIPv4 packetを追加の確保なしで解析し、
+callerが渡したbufferへ20byte標準headerを生成する参照codecです。version、
+IHL、Total Length、header checksumを検証し、Total Lengthより後ろのstorageは
+packetに含めません。受信側は最大60byteの可変IHL、options、fragment flagsと
+offsetを公開しますが、fragment再構成はまだ行いません。
+
+送信headerはDSCP/ECN、Identification、flags/fragment offset、TTL、Protocol、
+source、destinationを入力とし、Total Lengthとheader checksumを生成時に確定
+します。checksum関数は奇数byte長にも対応し、今後のICMP、UDP、TCPから同じ
+one's-complement計算を再利用します。既知のIPv4 header、options付きpacket、
+padding、境界不正、checksum不正、出力不足、予約flagを固定試験で検査します。
+
 状態機械への入力と出力は分離しています。
 
 - 入力: lower layerのopen/down、現在時刻、受信LCP packet
