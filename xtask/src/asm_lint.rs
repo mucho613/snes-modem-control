@@ -54,6 +54,8 @@ enum StackItem {
     Status { a: Width, i: Width },
     Bank,
     DirectPage,
+    RawByte,
+    RawWord,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -777,15 +779,10 @@ fn transfer(
         }),
         "phb" => state.stack.push(StackItem::Bank),
         "phd" => state.stack.push(StackItem::DirectPage),
+        "pea" | "pei" | "per" => state.stack.push(StackItem::RawWord),
         "pla" => {
             let width = state.a;
-            pop_expected(
-                profile,
-                statement,
-                &mut state,
-                StackItem::A(width),
-                diagnostics,
-            );
+            pop_accumulator(profile, statement, &mut state, width, diagnostics);
         }
         "plx" => {
             let width = state.i;
@@ -807,14 +804,8 @@ fn transfer(
                 diagnostics,
             );
         }
-        "plb" => pop_expected(profile, statement, &mut state, StackItem::Bank, diagnostics),
-        "pld" => pop_expected(
-            profile,
-            statement,
-            &mut state,
-            StackItem::DirectPage,
-            diagnostics,
-        ),
+        "plb" => pop_bank(profile, statement, &mut state, diagnostics),
+        "pld" => pop_direct_page(profile, statement, &mut state, diagnostics),
         "plp" => match state.stack.pop() {
             Some(StackItem::Status { a, i }) => {
                 state.a = a;
@@ -936,6 +927,68 @@ fn pop_expected(
             &statement.location,
             profile,
             format!("stack pop expects {expected:?} but found {actual:?}"),
+        ));
+    }
+}
+
+fn pop_accumulator(
+    profile: Profile,
+    statement: &Statement,
+    state: &mut RuntimeState,
+    width: Width,
+    diagnostics: &mut BTreeSet<Diagnostic>,
+) {
+    let actual = state.stack.pop();
+    let valid = actual == Some(StackItem::A(width))
+        || (width == Width::Sixteen && actual == Some(StackItem::RawWord))
+        || (width == Width::Eight && actual == Some(StackItem::RawByte));
+    if !valid {
+        diagnostics.insert(Diagnostic::new(
+            &statement.location,
+            profile,
+            format!(
+                "stack pop expects A({width:?}) or a raw {} but found {actual:?}",
+                if width == Width::Sixteen {
+                    "word"
+                } else {
+                    "byte"
+                }
+            ),
+        ));
+    }
+}
+
+fn pop_bank(
+    profile: Profile,
+    statement: &Statement,
+    state: &mut RuntimeState,
+    diagnostics: &mut BTreeSet<Diagnostic>,
+) {
+    match state.stack.pop() {
+        Some(StackItem::Bank | StackItem::RawByte) => {}
+        Some(StackItem::RawWord) => state.stack.push(StackItem::RawByte),
+        actual => {
+            diagnostics.insert(Diagnostic::new(
+                &statement.location,
+                profile,
+                format!("stack pop expects Bank or a raw byte but found {actual:?}"),
+            ));
+        }
+    }
+}
+
+fn pop_direct_page(
+    profile: Profile,
+    statement: &Statement,
+    state: &mut RuntimeState,
+    diagnostics: &mut BTreeSet<Diagnostic>,
+) {
+    let actual = state.stack.pop();
+    if !matches!(actual, Some(StackItem::DirectPage | StackItem::RawWord)) {
+        diagnostics.insert(Diagnostic::new(
+            &statement.location,
+            profile,
+            format!("stack pop expects DirectPage or a raw word but found {actual:?}"),
         ));
     }
 }
@@ -1451,6 +1504,25 @@ mod tests {
 @merge:
   m8
   lda #$12
+  rts
+.endproc
+"#,
+        );
+        assert!(messages.is_empty(), "{messages:?}");
+    }
+
+    #[test]
+    fn models_raw_words_consumed_by_bank_or_accumulator_pulls() {
+        let messages = messages(
+            r#"
+.proc raw_stack
+  .a16
+  .i16
+  pea $8000
+  plb
+  plb
+  pea $1234
+  pla
   rts
 .endproc
 "#,
