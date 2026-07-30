@@ -357,6 +357,7 @@ fn parse_procedures(
         match lower.as_str() {
             "m8" => asm_a = Some(Width::Eight),
             "m16" => asm_a = Some(Width::Sixteen),
+            "pppipv4entera16" | "pppudpentera16" => asm_a = Some(Width::Sixteen),
             "i8" => asm_i = Some(Width::Eight),
             "i16" => asm_i = Some(Width::Sixteen),
             "mi8" => {
@@ -689,6 +690,7 @@ fn transfer(
     match statement.mnemonic.as_str() {
         "m8" => state.a = Width::Eight,
         "m16" => state.a = Width::Sixteen,
+        "pppipv4entera16" | "pppudpentera16" => state.a = Width::Sixteen,
         "i8" => state.i = Width::Eight,
         "i16" => state.i = Width::Sixteen,
         "mi8" => {
@@ -843,6 +845,7 @@ fn transfer(
             diagnostics,
         ),
         "rti" | "stp" => return None,
+        mnemonic if is_terminal_return_macro(mnemonic) => return None,
         _ => {}
     }
     Some(state)
@@ -1064,6 +1067,17 @@ fn accumulator_immediate(mnemonic: &str, operand: &str) -> bool {
             mnemonic,
             "adc" | "and" | "bit" | "cmp" | "eor" | "lda" | "ora" | "sbc"
         )
+}
+
+fn is_terminal_return_macro(mnemonic: &str) -> bool {
+    matches!(
+        mnemonic,
+        "pppicmpreceiveerror"
+            | "pppipcpreturnerror"
+            | "pppipv4receiveerror"
+            | "ppppapreturnerror"
+            | "pppudpreceiveerror"
+    )
 }
 
 fn index_immediate(mnemonic: &str, operand: &str) -> bool {
@@ -1370,6 +1384,28 @@ mod tests {
 
 @helper:
   assert_m8_i16
+  rts
+.endproc
+"#,
+        );
+        assert!(messages.is_empty(), "{messages:?}");
+    }
+
+    #[test]
+    fn models_project_width_and_terminal_macros() {
+        let messages = messages(
+            r#"
+.proc parser
+  .a8
+  .i16
+  pppIpv4EnterA16
+  lda #$1234
+  beq @ok
+  m8
+  pppIpv4ReceiveError $01
+@ok:
+  assert_m16_i16
+  m8
   rts
 .endproc
 "#,
