@@ -49,7 +49,7 @@ cargo run -p ndm24-tools -- binary-test --revision B --port COM5
 .\tools\ppp-server\ndm24-ppp-server.ps1 Probe
 ```
 
-実機を使う手順と合格条件は [ハードウェアテスト手順](docs/hardware-test.md)、取得済みの機器情報は [NDM24 AT識別情報](docs/ndm24-hardware-identification.md)、ドライバ API は [NDM24 ドライバ設計](docs/ndm24-driver.md)、PPP対向環境は [WSL2 PPPサーバー](docs/ppp-server.md)、次段階は [PPP実装方針](docs/ppp.md)を参照してください。
+実機を使う手順と合格条件は [ハードウェアテスト手順](docs/hardware-test.md)、取得済みの機器情報は [NDM24 AT識別情報](docs/ndm24-hardware-identification.md)、ドライバ API は [NDM24 ドライバ設計](docs/ndm24-driver.md)、PPP対向環境は [WSL2 PPPサーバー](docs/ppp-server.md)、@nifty実回線試験は [@nifty 実回線ダイヤルアップ試験](docs/nifty-dial.md)、次段階は [PPP実装方針](docs/ppp.md)を参照してください。
 
 ## 仕様と生成物の同期
 

@@ -89,7 +89,7 @@ pub async fn run(
     Ok(())
 }
 
-async fn transact(
+pub(crate) async fn transact(
     websocket: &str,
     labels: &Path,
     command: &str,

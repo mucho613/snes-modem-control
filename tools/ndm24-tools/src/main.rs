@@ -1,7 +1,9 @@
 mod binary_test;
 mod connect_test;
+mod credentials;
 mod identification_test;
 mod labels;
+mod nifty_dial;
 mod peer;
 mod ppp_dial;
 mod qusb2snes;
@@ -91,6 +93,13 @@ enum Command {
         setup_timeout_seconds: u64,
         #[arg(long, default_value_t = 75)]
         dial_timeout_seconds: u64,
+    },
+    /// Make one explicitly confirmed, charged call to Nifty 0570-077-705.
+    NiftyDial {
+        #[arg(long, default_value = "ws://localhost:23074")]
+        websocket: String,
+        #[arg(long, default_value = "build/smoke/modem-control.lbl")]
+        labels: PathBuf,
     },
     PppClose {
         #[arg(long, default_value = "ws://localhost:23074")]
@@ -372,6 +381,7 @@ async fn main() -> Result<()> {
             )
             .await
         }
+        Command::NiftyDial { websocket, labels } => nifty_dial::run(&websocket, &labels).await,
         Command::PppClose {
             websocket,
             labels,

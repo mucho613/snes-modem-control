@@ -16,6 +16,7 @@ use ndm24_protocol::{
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async, tungstenite::Message};
+use zeroize::Zeroize;
 
 use crate::labels::{read_labels, wram_to_usb2snes};
 
@@ -435,6 +436,51 @@ pub async fn ppp_open(
     }
 }
 
+pub async fn read_ppp_snapshot(
+    websocket: &str,
+    label_path: &Path,
+) -> Result<PppDiagnosticSnapshot> {
+    let labels = read_labels(label_path)?;
+    let state = labels
+        .get("pppDiagnosticState")
+        .copied()
+        .context("label file does not contain pppDiagnosticState")?;
+    let offset = wram_to_usb2snes(state)?;
+    let mut client = Client::connect(websocket).await?;
+    read_stable_ppp_snapshot(&mut client, offset).await
+}
+
+pub async fn wait_ppp_network_opened(
+    websocket: &str,
+    label_path: &Path,
+    timeout: Duration,
+) -> Result<PppDiagnosticSnapshot> {
+    const LCP_STATE_OPENED: u8 = 9;
+    const PAP_STATE_OPENED: u8 = 3;
+    const IPCP_STATE_OPENED: u8 = 9;
+
+    let started = Instant::now();
+    loop {
+        let snapshot = read_ppp_snapshot(websocket, label_path).await?;
+        if snapshot.lcp_state == LCP_STATE_OPENED
+            && snapshot.pap_state == PAP_STATE_OPENED
+            && snapshot.ipcp_state == IPCP_STATE_OPENED
+        {
+            return Ok(snapshot);
+        }
+        ensure!(
+            started.elapsed() < timeout,
+            "timed out waiting for PPP network phase: LCP={}, PAP={}, IPCP={}, PAP failure=0x{:02x}, IPCP error=0x{:02x}",
+            snapshot.lcp_state,
+            snapshot.pap_state,
+            snapshot.ipcp_state,
+            snapshot.pap_failure,
+            snapshot.ipcp_last_error
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+
 pub async fn ntp_request(
     websocket: &str,
     label_path: &Path,
@@ -743,10 +789,15 @@ pub async fn mailbox_command_with_arguments(
                 )
             }),
     );
-    let payload = build_wram_write_payload(&writes)?;
-    client
+    let mut payload = build_wram_write_payload(&writes)?;
+    let execute_result = client
         .execute_address(FXPAK_EXECUTION_SCRATCH, &payload)
-        .await?;
+        .await;
+    payload.zeroize();
+    for (_, byte) in &mut writes {
+        byte.zeroize();
+    }
+    execute_result?;
 
     let started = Instant::now();
     let mut completion_candidate: Option<Vec<u8>> = None;
