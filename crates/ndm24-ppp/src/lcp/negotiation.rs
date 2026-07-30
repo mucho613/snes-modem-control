@@ -176,6 +176,44 @@ impl Machine {
         }
     }
 
+    /// Build an RFC 1661 Protocol-Reject for an unrecognized PPP protocol.
+    ///
+    /// The rejected Protocol field is always present. Rejected-Information is
+    /// truncated so the complete LCP packet fits the peer's negotiated MRU.
+    pub fn reject_protocol(
+        &mut self,
+        protocol: u16,
+        information: &[u8],
+    ) -> Result<Transition, MachineError> {
+        if self.state != State::Opened {
+            return Ok(Transition {
+                actions: Vec::new(),
+                ignored: Some(IgnoreReason::NotConfiguring),
+            });
+        }
+
+        let peer_mru = usize::from(
+            self.peer_configuration
+                .unwrap_or_default()
+                .transmit_mru
+                .max(6),
+        );
+        let information_length = information.len().min(peer_mru.saturating_sub(6));
+        let mut rejected = Vec::with_capacity(2 + information_length);
+        rejected.extend_from_slice(&protocol.to_be_bytes());
+        rejected.extend_from_slice(&information[..information_length]);
+        let identifier = self.allocate_identifier();
+
+        Ok(Transition {
+            actions: vec![Action::SendPacket(encode_packet(
+                Code::ProtocolReject as u8,
+                identifier,
+                &rejected,
+            )?)],
+            ignored: None,
+        })
+    }
+
     pub fn poll_timeout(&mut self, now_ms: u64) -> Result<Transition, MachineError> {
         let Some(deadline) = self.restart_deadline_ms else {
             return Ok(Transition::default());
@@ -942,6 +980,35 @@ mod tests {
     }
 
     #[test]
+    fn protocol_reject_contains_protocol_and_truncates_to_peer_mru() {
+        let mut machine = machine(&[]);
+        machine.open(0).unwrap();
+        machine
+            .receive(&[1, 9, 0, 8, 1, 4, 0, 8], 1, SfcPolicy::default())
+            .unwrap();
+        machine
+            .receive(&[2, 1, 0, 4], 2, SfcPolicy::default())
+            .unwrap();
+        assert_eq!(machine.state(), State::Opened);
+
+        let transition = machine
+            .reject_protocol(0x8057, &[0xaa, 0xbb, 0xcc, 0xdd])
+            .unwrap();
+        assert_eq!(
+            packet(&transition.actions[0]),
+            &[8, 2, 0, 8, 0x80, 0x57, 0xaa, 0xbb]
+        );
+    }
+
+    #[test]
+    fn protocol_reject_is_phase_gated_by_lcp_opened() {
+        let mut machine = machine(&[]);
+        let transition = machine.reject_protocol(0x8057, &[1, 2]).unwrap();
+        assert!(transition.actions.is_empty());
+        assert_eq!(transition.ignored, Some(IgnoreReason::NotConfiguring));
+    }
+
+    #[test]
     fn peer_terminate_request_is_acknowledged_before_layer_down() {
         let mut machine = machine(&[]);
         machine.open(0).unwrap();
@@ -955,8 +1022,10 @@ mod tests {
 
         let transition = machine
             .receive(
-                &[5, 0x42, 0, 16, b'U', b's', b'e', b'r', b' ', b'r', b'e', b'q', b'u', b'e',
-                    b's', b't'],
+                &[
+                    5, 0x42, 0, 16, b'U', b's', b'e', b'r', b' ', b'r', b'e', b'q', b'u', b'e',
+                    b's', b't',
+                ],
                 3,
                 SfcPolicy::default(),
             )
