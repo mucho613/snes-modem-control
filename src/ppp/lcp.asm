@@ -16,6 +16,8 @@
 .import pppLcpProtocolRejectCount, pppLcpLastRejectedProtocol
 .import pppLcpRejectIdentifier
 .import pppLcpCodeRejectCount, pppLcpLastRejectedCode
+.import pppLcpEchoRequestCount, pppLcpEchoReplyCount, pppLcpEchoDropCount
+.import pppLcpLastEchoIdentifier, pppLcpLastEchoMagic
 
 .export pppLcpInitialize, pppLcpParseFrame, pppLcpRunSelfTest
 
@@ -61,10 +63,19 @@
   stz pppLcpProtocolRejectCount + 2
   stz pppLcpCodeRejectCount
   stz pppLcpCodeRejectCount + 2
+  stz pppLcpEchoRequestCount
+  stz pppLcpEchoRequestCount + 2
+  stz pppLcpEchoReplyCount
+  stz pppLcpEchoReplyCount + 2
+  stz pppLcpEchoDropCount
+  stz pppLcpEchoDropCount + 2
+  stz pppLcpLastEchoMagic
+  stz pppLcpLastEchoMagic + 2
   stz pppLcpLastRejectedProtocol
   m8
   stz pppLcpRejectIdentifier
   stz pppLcpLastRejectedCode
+  stz pppLcpLastEchoIdentifier
   plb
   rts
 .endproc

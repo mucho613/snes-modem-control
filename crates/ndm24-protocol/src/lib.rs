@@ -340,6 +340,11 @@ pub struct PppDiagnosticSnapshot {
     pub lcp_reject_identifier: u8,
     pub lcp_code_reject_count: u32,
     pub lcp_last_rejected_code: u8,
+    pub lcp_echo_request_count: u32,
+    pub lcp_echo_reply_count: u32,
+    pub lcp_echo_drop_count: u32,
+    pub lcp_last_echo_identifier: u8,
+    pub lcp_last_echo_magic: u32,
 }
 
 impl PppDiagnosticSnapshot {
@@ -559,6 +564,11 @@ impl PppDiagnosticSnapshot {
             lcp_reject_identifier: data[PPP_DIAG_LCP_REJECT_IDENTIFIER],
             lcp_code_reject_count: read_u32(data, PPP_DIAG_LCP_CODE_REJECT_COUNT)?,
             lcp_last_rejected_code: data[PPP_DIAG_LCP_LAST_REJECTED_CODE],
+            lcp_echo_request_count: read_u32(data, PPP_DIAG_LCP_ECHO_REQUEST_COUNT)?,
+            lcp_echo_reply_count: read_u32(data, PPP_DIAG_LCP_ECHO_REPLY_COUNT)?,
+            lcp_echo_drop_count: read_u32(data, PPP_DIAG_LCP_ECHO_DROP_COUNT)?,
+            lcp_last_echo_identifier: data[PPP_DIAG_LCP_LAST_ECHO_IDENTIFIER],
+            lcp_last_echo_magic: read_u32(data, PPP_DIAG_LCP_LAST_ECHO_MAGIC)?,
         })
     }
 }
@@ -985,6 +995,15 @@ mod tests {
         data[PPP_DIAG_LCP_CODE_REJECT_COUNT..PPP_DIAG_LCP_CODE_REJECT_COUNT + 4]
             .copy_from_slice(&5_u32.to_le_bytes());
         data[PPP_DIAG_LCP_LAST_REJECTED_CODE] = 0x7f;
+        data[PPP_DIAG_LCP_ECHO_REQUEST_COUNT..PPP_DIAG_LCP_ECHO_REQUEST_COUNT + 4]
+            .copy_from_slice(&6_u32.to_le_bytes());
+        data[PPP_DIAG_LCP_ECHO_REPLY_COUNT..PPP_DIAG_LCP_ECHO_REPLY_COUNT + 4]
+            .copy_from_slice(&5_u32.to_le_bytes());
+        data[PPP_DIAG_LCP_ECHO_DROP_COUNT..PPP_DIAG_LCP_ECHO_DROP_COUNT + 4]
+            .copy_from_slice(&1_u32.to_le_bytes());
+        data[PPP_DIAG_LCP_LAST_ECHO_IDENTIFIER] = 0x5a;
+        data[PPP_DIAG_LCP_LAST_ECHO_MAGIC..PPP_DIAG_LCP_LAST_ECHO_MAGIC + 4]
+            .copy_from_slice(&0x1234_5678_u32.to_le_bytes());
 
         let snapshot = PppDiagnosticSnapshot::decode(&data).unwrap();
         assert_eq!(snapshot.snapshot_sequence, 8);
@@ -1137,6 +1156,11 @@ mod tests {
         assert_eq!(snapshot.lcp_reject_identifier, 9);
         assert_eq!(snapshot.lcp_code_reject_count, 5);
         assert_eq!(snapshot.lcp_last_rejected_code, 0x7f);
+        assert_eq!(snapshot.lcp_echo_request_count, 6);
+        assert_eq!(snapshot.lcp_echo_reply_count, 5);
+        assert_eq!(snapshot.lcp_echo_drop_count, 1);
+        assert_eq!(snapshot.lcp_last_echo_identifier, 0x5a);
+        assert_eq!(snapshot.lcp_last_echo_magic, 0x1234_5678);
     }
 
     #[test]

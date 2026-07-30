@@ -12,8 +12,11 @@
 .import pppLcpTimerActive, pppLcpDeferredRequest
 .import pppLcpTerminateRequestCount, pppLcpTerminateAckCount
 .import pppLcpProtocolRejectCount, pppLcpLastRejectedProtocol
-.import pppLcpRejectIdentifier, pppLcpPeerMru
+.import pppLcpRejectIdentifier, pppLcpPeerFlags, pppLcpPeerMru
+.import pppLcpPeerMagic
 .import pppLcpCodeRejectCount, pppLcpLastRejectedCode
+.import pppLcpEchoRequestCount, pppLcpEchoReplyCount, pppLcpEchoDropCount
+.import pppLcpLastEchoIdentifier, pppLcpLastEchoMagic
 .import pppLcpPacketEnd, pppLcpOutputCursor
 .import pppFrameBuffer, pppTransmitBuffer, pppTransmitActive
 .import pppTransmitBegin, pppTransmitInitialize
@@ -77,13 +80,19 @@
   assert_m8_i16
   lda pppLcpState
   cmp #PPP_LCP_STATE_CLOSED
-  beq @notConfiguring
+  bne :+
+  jmp @notConfiguring
+:
   cmp #PPP_LCP_STATE_STOPPED
-  beq @notConfiguring
+  bne :+
+  jmp @notConfiguring
+:
 
   lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET
   cmp #PPP_LCP_CODE_CONFIGURE_REQUEST
-  beq @configureRequest
+  bne :+
+  jmp @configureRequest
+:
   cmp #PPP_LCP_CODE_CONFIGURE_ACK
   bne :+
   jmp @configureAck
@@ -97,19 +106,134 @@
   jmp @configureNegative
 :
   cmp #PPP_LCP_CODE_TERMINATE_REQUEST
-  beq @terminateRequest
+  bne :+
+  jmp @terminateRequest
+:
   cmp #PPP_LCP_CODE_TERMINATE_ACK
   bne :+
   jmp @returnSuccess
 :
+  cmp #PPP_LCP_CODE_ECHO_REQUEST
+  bne :+
+  jmp @echoRequest
+:
+  cmp #PPP_LCP_CODE_ECHO_REPLY
+  bne :+
+  jmp @openedMaintenancePacket
+:
+  cmp #PPP_LCP_CODE_DISCARD_REQUEST
+  bne :+
+  jmp @openedMaintenancePacket
+:
 
-  ; Codes 7-11 are defined by RFC 1661 even when their maintenance behavior
-  ; is not implemented yet. Only genuinely unknown values receive Code-Reject.
+  ; Code-Reject and Protocol-Reject are known even though their receive-side
+  ; consequences are not modeled yet. Only genuinely unknown values receive
+  ; Code-Reject.
   cmp #PPP_LCP_CODE_CODE_REJECT
-  bcc @unknownCode
-  cmp #PPP_LCP_CODE_DISCARD_REQUEST + 1
-  bcs @unknownCode
+  bcs :+
+  jmp @unknownCode
+:
+  cmp #PPP_LCP_CODE_PROTOCOL_REJECT + 1
+  bcc :+
+  jmp @unknownCode
+:
   jmp @returnSuccess
+
+@openedMaintenancePacket:
+  assert_m8_i16
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_OPENED
+  bne :+
+  jmp @returnSuccess
+:
+  lda #PPP_LCP_ERROR_NOT_CONFIGURING
+  sta pppLcpLastError
+  jmp @returnFailure
+
+@echoRequest:
+  assert_m8_i16
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_OPENED
+  bne @echoWrongPhase
+
+  m16
+  lda pppLcpPacketLength
+  cmp #(PPP_LCP_HEADER_LENGTH + 4)
+  bcc @echoMalformed16
+  m8
+
+  lda pppLcpPeerFlags
+  and #PPP_LCP_PEER_FLAG_MAGIC_NUMBER
+  beq @echoExpectZeroMagic
+  lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 0
+  cmp pppLcpPeerMagic + 3
+  bne @echoUnexpectedMagic
+  lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 1
+  cmp pppLcpPeerMagic + 2
+  bne @echoUnexpectedMagic
+  lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 2
+  cmp pppLcpPeerMagic + 1
+  bne @echoUnexpectedMagic
+  lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 3
+  cmp pppLcpPeerMagic + 0
+  bne @echoUnexpectedMagic
+  bra @acceptEcho
+
+@echoExpectZeroMagic:
+  assert_m8_i16
+  lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 0
+  ora pppFrameBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 1
+  ora pppFrameBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 2
+  ora pppFrameBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 3
+  bne @echoUnexpectedMagic
+
+@acceptEcho:
+  assert_m8_i16
+  lda pppLcpLastIdentifier
+  sta pppLcpLastEchoIdentifier
+  lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 3
+  sta pppLcpLastEchoMagic + 0
+  lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 2
+  sta pppLcpLastEchoMagic + 1
+  lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 1
+  sta pppLcpLastEchoMagic + 2
+  lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 0
+  sta pppLcpLastEchoMagic + 3
+  m16
+  inc pppLcpEchoRequestCount
+  bne :+
+  inc pppLcpEchoRequestCount + 2
+:
+  m8
+  lda #PPP_LCP_ACTION_ECHO_REPLY
+  sta pppLcpPendingAction
+  jmp @returnSuccess
+
+@echoMalformed16:
+  assert_m16_i16
+  m8
+  lda #PPP_LCP_ERROR_MALFORMED_ECHO_REQUEST
+  bra @dropEcho
+
+@echoUnexpectedMagic:
+  assert_m8_i16
+  lda #PPP_LCP_ERROR_UNEXPECTED_MAGIC_NUMBER
+  bra @dropEcho
+
+@echoWrongPhase:
+  assert_m8_i16
+  lda #PPP_LCP_ERROR_NOT_CONFIGURING
+
+@dropEcho:
+  assert_m8_i16
+  sta pppLcpLastError
+  m16
+  inc pppLcpEchoDropCount
+  bne :+
+  inc pppLcpEchoDropCount + 2
+:
+  m8
+  jmp @returnFailure
 
 @unknownCode:
   assert_m8_i16
@@ -380,22 +504,91 @@
 
   lda pppLcpPendingAction
   cmp #PPP_LCP_ACTION_CONFIGURE_REQUEST
-  beq @buildRequest
+  bne :+
+  jmp @buildRequest
+:
   cmp #PPP_LCP_ACTION_CONFIGURE_ACK
-  beq @copyResponse
+  bne :+
+  jmp @copyResponse
+:
   cmp #PPP_LCP_ACTION_CONFIGURE_NAK
-  beq @buildSelectiveResponse
+  bne :+
+  jmp @buildSelectiveResponse
+:
   cmp #PPP_LCP_ACTION_CONFIGURE_REJECT
-  beq @buildSelectiveResponse
+  bne :+
+  jmp @buildSelectiveResponse
+:
   cmp #PPP_LCP_ACTION_TERMINATE_ACK
-  beq @buildTerminateAck
+  bne :+
+  jmp @buildTerminateAck
+:
   cmp #PPP_LCP_ACTION_PROTOCOL_REJECT
-  beq @buildProtocolReject
+  bne :+
+  jmp @buildProtocolReject
+:
   cmp #PPP_LCP_ACTION_CODE_REJECT
   bne :+
   jmp @buildCodeReject
 :
+  cmp #PPP_LCP_ACTION_ECHO_REPLY
+  bne :+
+  jmp @buildEchoReply
+:
   jmp @busy
+
+@buildEchoReply:
+  assert_m8_i16
+  ; Bound the complete LCP Echo-Reply by the request Length, negotiated peer
+  ; MRU, and fixed transmit Information area. The eight-byte Echo header is
+  ; retained even if a broken peer advertised an unusably small MRU.
+  m16
+  lda pppLcpPacketLength
+  cmp pppLcpPeerMru
+  bcc :+
+  beq :+
+  lda pppLcpPeerMru
+:
+  cmp #PPP_DEFAULT_MRU + 1
+  bcc :+
+  lda #PPP_DEFAULT_MRU
+:
+  cmp #(PPP_LCP_HEADER_LENGTH + 4)
+  bcs :+
+  lda #(PPP_LCP_HEADER_LENGTH + 4)
+:
+  sta pppLcpOutputCursor
+  ldx #$0000
+@copyEchoPacket:
+  assert_m16_i16
+  cpx pppLcpOutputCursor
+  beq @finishEchoPacket
+  m8
+  lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET, x
+  sta pppTransmitBuffer + PPP_LCP_FRAME_OFFSET, x
+  m16
+  inx
+  bra @copyEchoPacket
+
+@finishEchoPacket:
+  assert_m16_i16
+  lda pppLcpOutputCursor
+  xba
+  m8
+  sta pppTransmitBuffer + PPP_LCP_FRAME_OFFSET + 2
+  lda pppLcpOutputCursor
+  sta pppTransmitBuffer + PPP_LCP_FRAME_OFFSET + 3
+  lda #PPP_LCP_CODE_ECHO_REPLY
+  sta pppTransmitBuffer + PPP_LCP_FRAME_OFFSET
+  stz pppTransmitBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 0
+  stz pppTransmitBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 1
+  stz pppTransmitBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 2
+  stz pppTransmitBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 3
+  m16
+  lda pppLcpOutputCursor
+  clc
+  adc #PPP_UNCOMPRESSED_HEADER_LENGTH
+  jmp @begin
 
 @buildRequest:
   assert_m8_i16
@@ -609,11 +802,21 @@
   bra @counterDone
 @maybeCodeReject:
   cmp #PPP_LCP_ACTION_CODE_REJECT
-  bne @counterDone
+  bne @maybeEchoReply
   m16
   inc pppLcpCodeRejectCount
   bne :+
   inc pppLcpCodeRejectCount + 2
+:
+  m8
+  bra @counterDone
+@maybeEchoReply:
+  cmp #PPP_LCP_ACTION_ECHO_REPLY
+  bne @counterDone
+  m16
+  inc pppLcpEchoReplyCount
+  bne :+
+  inc pppLcpEchoReplyCount + 2
 :
   m8
 @counterDone:

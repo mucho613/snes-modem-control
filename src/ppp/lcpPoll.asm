@@ -9,12 +9,14 @@
 .import pppReceiveInitialize
 .import pppTransmitActive, pppTransmitBuffer
 .import pppTransmitInitialize, pppTransmitAbort
-.import pppLcpState, pppLcpPendingAction, pppLcpTimerActive
+.import pppLcpState, pppLcpLastError, pppLcpPendingAction, pppLcpTimerActive
 .import pppLcpDeferredRequest, pppLcpPollAction
 .import pppLcpPollSavedModemState
 .import pppLcpProtocolRejectCount, pppLcpLastRejectedProtocol
 .import pppLcpRejectIdentifier
 .import pppLcpCodeRejectCount, pppLcpLastRejectedCode
+.import pppLcpEchoRequestCount, pppLcpEchoReplyCount, pppLcpEchoDropCount
+.import pppLcpLastEchoIdentifier, pppLcpLastEchoMagic
 .import pppLcpInitialize, pppLcpOpen, pppLcpReceiveFrame
 .import pppLcpRejectProtocol
 .import pppLcpBuildPending, pppLcpPollTimeout, pppLcpLowerDown
@@ -119,6 +121,8 @@
   beq @responsePending
   cmp #PPP_LCP_ACTION_CODE_REJECT
   beq @responsePending
+  cmp #PPP_LCP_ACTION_ECHO_REPLY
+  beq @responsePending
 
 @releaseThenTimer:
   assert_m8_i16
@@ -187,6 +191,8 @@
   beq @responseSent
   cmp #PPP_LCP_ACTION_CODE_REJECT
   beq @responseSent
+  cmp #PPP_LCP_ACTION_ECHO_REPLY
+  beq @responseSent
   bne @serviceReady
 
 @terminateAckSent:
@@ -237,7 +243,7 @@
 ;
 ; Output:
 ;   Carry clear, A=$00: passed
-;   Carry set, A=$60-$66: failed step
+;   Carry set, A=$60-$67: failed step
 .proc pppLcpPollRunSelfTest
   .a8
   .i16
@@ -317,6 +323,117 @@
   ora pppLcpPendingAction
   ora pppLcpTimerActive
   pppLcpPollRequireEqual @fail63
+
+  ; A valid Echo-Request remains owned under encoder backpressure, then
+  ; receives an Echo-Reply with the same Identifier and Data. Because the
+  ; local side did not negotiate Magic-Number, the transmitted value is zero.
+  jsr @writeEchoPacket
+  lda #$01
+  sta pppTransmitActive
+  m16
+  jsr pppLcpPoll
+  m8
+  lda pppFrameReady
+  pppLcpPollRequireNonzero @fail67
+  lda pppLcpPendingAction
+  cmp #PPP_LCP_ACTION_ECHO_REPLY
+  pppLcpPollRequireEqual @fail67
+  m16
+  lda pppLcpEchoRequestCount
+  cmp #$0001
+  beq :+
+  m8
+  jmp @fail67
+:
+  lda pppLcpEchoReplyCount
+  beq :+
+  m8
+  jmp @fail67
+:
+  m8
+  jsr pppTransmitInitialize
+  m16
+  jsr pppLcpPoll
+  m8
+  lda pppFrameReady
+  ora pppLcpPendingAction
+  pppLcpPollRequireEqual @fail67
+  lda pppTransmitBuffer + 4
+  cmp #PPP_LCP_CODE_ECHO_REPLY
+  pppLcpPollRequireEqual @fail67
+  lda pppTransmitBuffer + 5
+  cmp #$5a
+  pppLcpPollRequireEqual @fail67
+  lda pppTransmitBuffer + 7
+  cmp #$0b
+  pppLcpPollRequireEqual @fail67
+  lda pppTransmitBuffer + 8
+  ora pppTransmitBuffer + 9
+  ora pppTransmitBuffer + 10
+  ora pppTransmitBuffer + 11
+  pppLcpPollRequireEqual @fail67
+  lda pppTransmitBuffer + 12
+  cmp #$61
+  pppLcpPollRequireEqual @fail67
+  lda pppTransmitBuffer + 14
+  cmp #$63
+  pppLcpPollRequireEqual @fail67
+  lda pppLcpLastEchoIdentifier
+  cmp #$5a
+  pppLcpPollRequireEqual @fail67
+  m16
+  lda pppLcpEchoReplyCount
+  cmp #$0001
+  beq :+
+  m8
+  jmp @fail67
+:
+  lda pppLcpLastEchoMagic
+  ora pppLcpLastEchoMagic + 2
+  beq :+
+  m8
+  jmp @fail67
+:
+  m8
+
+  ; A mismatched Magic-Number is silently discarded and diagnosed without
+  ; replacing the last valid Echo snapshot or incrementing the reply count.
+  jsr pppTransmitInitialize
+  jsr @writeEchoPacket
+  lda #$01
+  sta pppFrameBuffer + 11
+  m16
+  jsr pppLcpPoll
+  m8
+  lda pppFrameReady
+  ora pppLcpPendingAction
+  ora pppTransmitActive
+  pppLcpPollRequireEqual @fail67
+  lda pppLcpLastError
+  cmp #PPP_LCP_ERROR_UNEXPECTED_MAGIC_NUMBER
+  pppLcpPollRequireEqual @fail67
+  m16
+  lda pppLcpEchoDropCount
+  cmp #$0001
+  beq :+
+  m8
+  jmp @fail67
+:
+  assert_m16_i16
+  lda pppLcpEchoRequestCount
+  cmp #$0001
+  beq :+
+  m8
+  jmp @fail67
+:
+  assert_m16_i16
+  lda pppLcpEchoReplyCount
+  cmp #$0001
+  beq :+
+  m8
+  jmp @fail67
+:
+  m8
 
   ; An unknown PPP protocol is rejected while Opened, including its
   ; uncompressed Protocol field and retained Information.
@@ -576,6 +693,9 @@
   bra @fail
 @fail66:
   lda #$66
+  bra @fail
+@fail67:
+  lda #$67
 
 @fail:
   pha
@@ -611,6 +731,35 @@
   lda #PPP_PROTOCOL_LCP
   sta pppLastProtocol
   lda #PPP_LCP_MINIMUM_FRAME_LENGTH
+  sta pppLastFrameLength
+  m8
+  lda #$01
+  sta pppFrameReady
+  rts
+
+@writeEchoPacket:
+  assert_m8_i16
+  lda #PPP_LCP_CODE_ECHO_REQUEST
+  sta pppFrameBuffer + 4
+  lda #$5a
+  sta pppFrameBuffer + 5
+  stz pppFrameBuffer + 6
+  lda #$0b
+  sta pppFrameBuffer + 7
+  stz pppFrameBuffer + 8
+  stz pppFrameBuffer + 9
+  stz pppFrameBuffer + 10
+  stz pppFrameBuffer + 11
+  lda #$61
+  sta pppFrameBuffer + 12
+  lda #$62
+  sta pppFrameBuffer + 13
+  lda #$63
+  sta pppFrameBuffer + 14
+  m16
+  lda #PPP_PROTOCOL_LCP
+  sta pppLastProtocol
+  lda #$000f
   sta pppLastFrameLength
   m8
   lda #$01

@@ -146,7 +146,7 @@ Address 1 + Control 1 + Protocol 2 + Information 1500 + FCS 2
 
 ## 常設PPP診断
 
-`pppDiagnosticState` はmagic `PPP1`、ABI version 17、451byteの公開診断blockです。レイアウトの正本は `spec/ndm24.toml` で、AssemblyとRustのoffset定数および[生成済みABI表](generated/diagnostic-abi.md)を同時に生成します。
+`pppDiagnosticState` はmagic `PPP1`、ABI version 18、468byteの公開診断blockです。レイアウトの正本は `spec/ndm24.toml` で、AssemblyとRustのoffset定数および[生成済みABI表](generated/diagnostic-abi.md)を同時に生成します。
 
 PC側では次のコマンドでJSON Linesとして読み取れます。
 
@@ -175,6 +175,7 @@ cargo run -p ndm24-tools -- ppp-monitor
 - peer Terminate-Request受信数とTerminate-Ack送信受理数
 - Protocol-Reject送信受理数、最後にRejectしたProtocol、Reject Identifier
 - Code-Reject送信受理数、最後にRejectしたCode
+- LCP Echo-Request受理数、Echo-Reply送信受理数、破棄数、最後のIdentifierとMagic-Number
 - PAP state、Code、Identifier、Length、error、failure、restart状態
 - PAP packet送受信回数
 - IPCP state、Code、Identifier、Length、error、pending/deferred送信
@@ -209,7 +210,7 @@ cargo run -p ndm24-tools -- ppp-monitor
 
 ## Rust LCP Configure状態機械
 
-`crates/ndm24-ppp/src/lcp/negotiation.rs` は [RFC 1661 section 4](https://www.rfc-editor.org/rfc/rfc1661.html) のestablishment部分を参照実装します。`Request-Sent`、`Ack-Received`、`Ack-Sent`、`Opened` とConfigure用restart timerに加え、peer起点のTerminate-Requestを同じIdentifierの空Terminate-Ackで応答し、`Opened`から`Stopped`へ移る終了経路を扱います。`Opened`中の未知PPP ProtocolにはProtocol-Rejectを生成し、Rejected-Informationをpeer MRUまでに切り詰めます。Protocol fieldの2byteは必ず含めるため、実効MRUは最低6byteとして扱います。未定義のLCP CodeにはLengthで区切った元packetを含むCode-Rejectを生成し、最低でも元の4byte LCP headerを保持します。local起点の終了とEchoはまだ含みません。
+`crates/ndm24-ppp/src/lcp/negotiation.rs` は [RFC 1661 section 4と5.8](https://www.rfc-editor.org/rfc/rfc1661.html) のestablishmentとopened-state maintenanceを参照実装します。`Request-Sent`、`Ack-Received`、`Ack-Sent`、`Opened` とConfigure用restart timerに加え、peer起点のTerminate-Requestを同じIdentifierの空Terminate-Ackで応答し、`Opened`から`Stopped`へ移る終了経路を扱います。`Opened`中のEcho-Requestはpeerの合意済みMagic-Numberを照合し、同じIdentifierとDataを持つEcho-Replyを生成します。local Magic-Numberはまだ要求しないため、送信Magicは0です。Dataはpeer MRUを越えない範囲まで保持します。`Opened`中の未知PPP ProtocolにはProtocol-Rejectを生成し、Rejected-Informationをpeer MRUまでに切り詰めます。Protocol fieldの2byteは必ず含めるため、実効MRUは最低6byteとして扱います。未定義のLCP CodeにはLengthで区切った元packetを含むCode-Rejectを生成し、最低でも元の4byte LCP headerを保持します。local起点の終了とEcho-Request送信はまだ含みません。
 
 `crates/ndm24-ppp/src/pap.rs` は [RFC 1334 section 2](https://www.rfc-editor.org/rfc/rfc1334.html) のPAP packetをallocation-freeで解析・生成する参照実装です。Authenticate-RequestのPeer-IDとPassword、およびAuthenticate-Ack/NakのMessageについて、各1 octetの長さとPAP packet全体の16 bit Lengthを別々に検証します。宣言Lengthより後のpaddingは無視しますが、宣言Length内で各可変長fieldより後に余分なdataがあればmalformedとして扱います。PAPの認証情報は平文なので、通常の診断やログへpacket dataを出しません。
 
@@ -310,7 +311,7 @@ Configure-Rejectが必要なoptionとConfigure-Nak候補が同じRequestに含�
 
 ## 65816 LCP packet parser
 
-`src/ppp/lcp.asm` の `pppLcpParseFrame` は、FCS検証後に所有権が固定された `pppFrameBuffer` を直接読みます。非圧縮のAddress・Control・Protocolを確認した後、LCPのCode、Identifier、network byte orderのLengthを抽出します。LengthがPPP Informationより短い場合のpaddingは無視し、Configure-Request/Ack/Nak/Rejectでは各optionのLengthもpacket境界内で検証します。Terminate-Request/Ackは同じ共通header検査を通り、終了応答では受信Dataを反映せずLength 4の空packetを生成します。
+`src/ppp/lcp.asm` の `pppLcpParseFrame` は、FCS検証後に所有権が固定された `pppFrameBuffer` を直接読みます。非圧縮のAddress・Control・Protocolを確認した後、LCPのCode、Identifier、network byte orderのLengthを抽出します。LengthがPPP Informationより短い場合のpaddingは無視し、Configure-Request/Ack/Nak/Rejectでは各optionのLengthもpacket境界内で検証します。Terminate-Request/AckとEchoは同じ共通header検査を通り、終了応答では受信Dataを反映せずLength 4の空packetを生成します。
 
 parserの最終Code、Identifier、Length、error、呼出回数は現在のPPP診断ABIへ公開します。診断blockを拡張しても、frame bufferや低レベルNDM24転送用WRAMの配置は変わりません。`ppp-self-test` の失敗step `$20`～`$27` はLCP parser fixtureを表します。
 
@@ -318,7 +319,7 @@ parserの最終Code、Identifier、Length、error、呼出回数は現在のPPP�
 
 `src/ppp/lcpNegotiation.asm` は、Rust参照実装から `Request-Sent`、`Ack-Received`、`Ack-Sent`、`Opened` の基本遷移を移植しています。local Configure-Requestは既定MRU 1500と既定ACCM `$FFFFFFFF` を維持する空optionです。Identifierは有効なNak/Rejectまたは重複Ack後の新しいRequestで更新し、Identifierやoption列が一致しない応答は状態を変えません。
 
-交渉コアは共有送信encoderを直接上書きせず、`pppLcpPendingAction` にConfigure-Request/Ack/Nak/Reject、Terminate-Ack、Protocol-Reject、Code-Rejectのいずれかを保持します。`pppLcpBuildPending` はencoderがidleのときだけ `pppTransmitBuffer` を構築します。Configure-Ackは受信packetのIdentifierとoption列をLength境界までそのまま複製し、Nakは置換が必要なoptionだけを元の順序で返し、Rejectは対象optionのbyte列だけを変更せず返します。Terminate-Ackは受信Terminate-RequestのIdentifierを引き継ぐ空packetです。Protocol-Rejectは独立したIdentifierを使い、未知Protocolの非圧縮2byte fieldとInformationを受信順のまま複製します。Code-Rejectは同じReject Identifier系列を使い、未知Codeを持つLCP packetだけをLength境界まで複製してPPP paddingを除外します。どちらもpeer MRUまたは実装上限1500byteを超えるRejected-Informationは末尾を切り詰めます。
+交渉コアは共有送信encoderを直接上書きせず、`pppLcpPendingAction` にConfigure-Request/Ack/Nak/Reject、Terminate-Ack、Protocol-Reject、Code-Reject、Echo-Replyのいずれかを保持します。`pppLcpBuildPending` はencoderがidleのときだけ `pppTransmitBuffer` を構築します。Configure-Ackは受信packetのIdentifierとoption列をLength境界までそのまま複製し、Nakは置換が必要なoptionだけを元の順序で返し、Rejectは対象optionのbyte列だけを変更せず返します。Terminate-Ackは受信Terminate-RequestのIdentifierを引き継ぐ空packetです。Protocol-Rejectは独立したIdentifierを使い、未知Protocolの非圧縮2byte fieldとInformationを受信順のまま複製します。Code-Rejectは同じReject Identifier系列を使い、未知Codeを持つLCP packetだけをLength境界まで複製してPPP paddingを除外します。どちらもpeer MRUまたは実装上限1500byteを超えるRejected-Informationは末尾を切り詰めます。Echo-ReplyはRequestのIdentifierと任意Dataを保持し、Magicを0へ置換してpeer MRUまでに切り詰めます。
 
 `src/ppp/lcpOptions.asm` はMRU、ACCM、PAP、Magic-Numberを選別して受理します。CHAPなどPAP以外の認証方式はPAPへNakし、PFC、ACFC、Quality-Protocol、未知option、重複した全optionはRejectします。同じRequestにReject対象とNak対象があればRejectを優先します。
 
@@ -336,16 +337,24 @@ Max-Configureは初回送信を含む10回です。初回Requestの後に9回ま
 
 `src/ppp/lcpPoll.asm` は `pppReceivePoll` の後、`pppTransmitPoll` の前に毎main-loop呼び出されます。PPP受信所有権が有効でNDM24が `CONNECTED` のときだけ、ClosedからLCPを開始します。未接続時や所有権無効時はLCPをlower-downし、保持frameと送信中frameを破棄するため、AT sessionやraw binary試験へ状態を持ち越しません。
 
-完成したLCP frameにAck/Nak/RejectまたはTerminate-Ackが必要な場合、その応答が共有encoderへ受理されるまで `pppFrameReady` を保持します。encoderがbusyでも受信bufferを上書きせず、受理後にだけ `pppReleaseFrame` します。受信AckやNak後の新しいlocal Requestは受信frameのbyte列に依存しないため、frameを解放してからpending送信として待機できます。
+完成したLCP frameにAck/Nak/Reject、Terminate-Ack、Echo-Replyのいずれかが必要な場合、その応答が共有encoderへ受理されるまで `pppFrameReady` を保持します。encoderがbusyでも受信bufferを上書きせず、受理後にだけ `pppReleaseFrame` します。受信AckやNak後の新しいlocal Requestは受信frameのbyte列に依存しないため、frameを解放してからpending送信として待機できます。
 
 LCPが`Opened`の間、LCP `$C021`、PAP `$C023`、IPCP `$8021`、IPv4 `$0021`以外のProtocolは上位層へ渡さず、LCP Protocol-Rejectで応答します。共有encoderがbusyなら未知frameを保持し、Protocol-Rejectが受理された後だけ解放します。LCPが`Opened`でない間の未知Protocolは応答せず破棄します。常設セルフテストのstep `$65`には、未知Protocol `$8057`と3byteのInformationからCode 8、Length 9のProtocol-Rejectを構築し、backpressure中のframe保持、Identifier、複製byte列、診断countを検査するfixtureを含みます。
 
 LCP packetのCode 1～11は既知として扱い、その範囲外のCodeにはCode-Rejectで
-応答します。Code-Reject自身、Protocol-Reject、Echo、Discardは未実装でも
+応答します。Code-Reject自身、Protocol-Reject、Echo-Reply、Discard-Requestは
 既知Codeなので再Rejectしません。常設セルフテストのstep `$66`は未知Code
 `$7F`、Identifier `$42`、Length 6のpacketにPPP paddingを付け、Code 7、
 Length 10のCode-Rejectへ宣言範囲だけが複製されること、TX backpressure中の
 frame保持、共有Reject Identifier、診断countを検査します。
+
+Echo-RequestはLCP `Opened`時だけ受理し、Magic-Number optionを合意したpeerでは
+受信Magicが保存済みpeer Magicと一致することを要求します。合意していないpeer
+では0だけを受理します。Length 8未満、phase不一致、Magic不一致は応答せず破棄し、
+理由とdrop countを診断へ残します。step `$67`はTX backpressure中のframe保持、
+同じIdentifierとData、送信Magic 0、送受信count、Magic不一致の無応答破棄を検査
+します。ABI version 18ではこれらのcountと最後のIdentifier/Magicを末尾へ追加
+しました。MesenCEの通常ROM自動セルフテストはこのfixtureを含めて合格しています。
 
 2026-07-30にABI version 17のnormal ROMをrevision AのFXPAK PROへ転送し、
 QUsb2Snes mailboxの`ppp-self-test`（command 10、sequence 1）が合格しました。
@@ -432,12 +441,13 @@ deferred slotへ保持します。lower-downでは交渉済みIP/DNS address、t
 
 restart intervalは180 frame、Max-Configureは初回を含む10回です。timeout再送は
 同じIdentifierとoption列を使い、送信器が受理した時点から次の期限を数えます。
-公開診断ABI version 17はIPCP state、最後のCode/Identifier/error、local/peer
+公開診断ABI version 18はIPCP state、最後のCode/Identifier/error、local/peer
 address、Primary/Secondary DNS addressと各valid flag、再送状態、送受信count
 に加え、後段のIPv4・ICMP・UDP/NTP/DNS診断を公開します。DNS addressは既存
 fieldのoffsetを変えないよう追加し、version 15ではLCP終了カウンター、version 16では
 LCP Protocol-Rejectのcount、Protocol、Identifier、version 17ではLCP
-Code-RejectのcountとCodeをABI末尾へ追加しています。
+Code-RejectのcountとCode、version 18ではLCP Echoのcountと最後の
+Identifier/MagicをABI末尾へ追加しています。
 
 常設セルフテストのstep `$70`～`$76`は、3つの`0.0.0.0`要求、peer
 `10.24.0.1`のAck、local `10.24.0.2`と2つのDNSのNak提案、再要求、
@@ -474,7 +484,7 @@ checksum error、同一headerの送信生成、共有encoder受理を検査し�
 `$85`～`$87`はlocal宛先の受理、宛先不一致の破棄、IPCP phase gateを検査します。
 2026-07-30にFXPAK PRO実機で起動完了後3回連続合格し、当時のABI version 7の
 snapshot取得も確認しました。この試験は電話回線へ発信せず、固定fixtureだけを
-使います。ICMPとUDP診断はABI version 9で末尾へ追加され、現行version 17でも
+使います。ICMPとUDP診断はABI version 9で末尾へ追加され、現行version 18でも
 同じoffsetを維持しています。
 
 ## 65816 ICMP Echo

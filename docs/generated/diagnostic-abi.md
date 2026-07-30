@@ -44,7 +44,7 @@ ABI version: `2`. Block size: `128` bytes.
 
 ## PPP Diagnostic ABI
 
-ABI version: `17`. Block size: `451` bytes.
+ABI version: `18`. Block size: `468` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|
@@ -237,6 +237,11 @@ ABI version: `17`. Block size: `451` bytes.
 | `0x1BD` | 1 | `u8` | `lcp_reject_identifier` | Identifier used by the most recent LCP Code-Reject or Protocol-Reject |
 | `0x1BE` | 4 | `u32` | `lcp_code_reject_count` | Code-Reject packets accepted by the shared PPP transmitter |
 | `0x1C2` | 1 | `u8` | `lcp_last_rejected_code` | Most recent unknown LCP Code rejected by LCP |
+| `0x1C3` | 4 | `u32` | `lcp_echo_request_count` | Valid peer Echo-Requests accepted while LCP is Opened |
+| `0x1C7` | 4 | `u32` | `lcp_echo_reply_count` | Echo-Replies accepted by the shared PPP transmitter |
+| `0x1CB` | 4 | `u32` | `lcp_echo_drop_count` | Echo-Requests discarded for phase, length, or Magic-Number validation |
+| `0x1CF` | 1 | `u8` | `lcp_last_echo_identifier` | Identifier of the most recent valid peer Echo-Request |
+| `0x1D0` | 4 | `u32` | `lcp_last_echo_magic` | Magic-Number of the most recent valid peer Echo-Request |
 
 ## Mailbox ABI
 

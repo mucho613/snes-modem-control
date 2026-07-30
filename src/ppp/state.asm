@@ -83,6 +83,8 @@
 .export pppLcpProtocolRejectCount, pppLcpLastRejectedProtocol
 .export pppLcpRejectIdentifier
 .export pppLcpCodeRejectCount, pppLcpLastRejectedCode
+.export pppLcpEchoRequestCount, pppLcpEchoReplyCount, pppLcpEchoDropCount
+.export pppLcpLastEchoIdentifier, pppLcpLastEchoMagic
 
 pppDiagnosticState:
 pppDiagnosticMagic: .res $4
@@ -274,6 +276,11 @@ pppLcpLastRejectedProtocol: .res $2
 pppLcpRejectIdentifier: .res $1
 pppLcpCodeRejectCount: .res $4
 pppLcpLastRejectedCode: .res $1
+pppLcpEchoRequestCount: .res $4
+pppLcpEchoReplyCount: .res $4
+pppLcpEchoDropCount: .res $4
+pppLcpLastEchoIdentifier: .res $1
+pppLcpLastEchoMagic: .res $4
 pppDiagnosticStateEnd:
 
 .assert pppDiagnosticMagic - pppDiagnosticState = PPP_DIAG_MAGIC, error, "PPP diagnostic magic offset"
@@ -465,6 +472,11 @@ pppDiagnosticStateEnd:
 .assert pppLcpRejectIdentifier - pppDiagnosticState = PPP_DIAG_LCP_REJECT_IDENTIFIER, error, "PPP LCP reject identifier offset"
 .assert pppLcpCodeRejectCount - pppDiagnosticState = PPP_DIAG_LCP_CODE_REJECT_COUNT, error, "PPP LCP code reject count offset"
 .assert pppLcpLastRejectedCode - pppDiagnosticState = PPP_DIAG_LCP_LAST_REJECTED_CODE, error, "PPP LCP last rejected code offset"
+.assert pppLcpEchoRequestCount - pppDiagnosticState = PPP_DIAG_LCP_ECHO_REQUEST_COUNT, error, "PPP LCP echo request count offset"
+.assert pppLcpEchoReplyCount - pppDiagnosticState = PPP_DIAG_LCP_ECHO_REPLY_COUNT, error, "PPP LCP echo reply count offset"
+.assert pppLcpEchoDropCount - pppDiagnosticState = PPP_DIAG_LCP_ECHO_DROP_COUNT, error, "PPP LCP echo drop count offset"
+.assert pppLcpLastEchoIdentifier - pppDiagnosticState = PPP_DIAG_LCP_LAST_ECHO_IDENTIFIER, error, "PPP LCP echo identifier offset"
+.assert pppLcpLastEchoMagic - pppDiagnosticState = PPP_DIAG_LCP_LAST_ECHO_MAGIC, error, "PPP LCP echo magic offset"
 .assert pppDiagnosticStateEnd - pppDiagnosticState = PPP_DIAGNOSTIC_SIZE, error, "PPP diagnostic ABI size"
 
 ; Decoder and pump scratch fields are private and intentionally excluded from
