@@ -357,4 +357,17 @@ zero peer要求へのNakに使う設定済みfixture値であり、交渉結果�
 ありません。試験後にPPP serverを停止し、DFM-56UがCOM5へ戻ることも確認
 しました。
 
+同日、DFM-56Uを実アナログ回線へ単独接続し、Niftyアクセスポイントへの
+`pppd` client基準試験を1回行いました。NiftyはMRU 1524、ACCM 0、
+CHAP-MD5、PFC、ACFCを要求しました。PFC/ACFCのConfigure-Reject後は
+圧縮optionなしでLCPが成立し、16byte Challengeに対するResponse、
+CHAP Success、IPCP `Opened`へ到達しました。割当local/peer public IPは
+Git管理文書へ保存せず、Primary DNS `61.207.9.37`、Secondary DNS
+`61.207.9.5`だけを記録します。30秒観測後にTerminate-Request/Ack、
+Connection terminatedまで進み、DTR drop後にDFM-56UがCOM5へ戻りました。
+保存前に@nifty ID、password、CHAP payloadをredactした完全ログは、
+Git対象外の`build/hardware-tests/nifty-reference/`だけに保持しています。
+PAP fallbackは観測されなかったため、NDM24による実回線発信は行わず、
+CHAP-MD5 client実装まで保留しました。
+
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。

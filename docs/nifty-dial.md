@@ -2,9 +2,9 @@
 
 ## 状態
 
-実回線試験用のSFC側PAP資格情報経路とWindows CLIは実装済みですが、
-まだ発信していません。最初にDFM-56Uを同じアナログ電話ポートへ単独接続し、
-WSL2の`pppd` clientでLCPが提示する認証方式とIPCP/DNSを記録します。
+実回線試験用のSFC側PAP資格情報経路とWindows CLIは実装済みです。
+2026-07-31にDFM-56Uをアナログ電話ポートへ単独接続し、WSL2の`pppd`
+clientで基準試験を行いました。NDM24によるNiftyへの発信はまだ行っていません。
 NDM24とDFM-56Uを同じ回線へ同時接続しません。
 
 DFM-56Uをアナログ電話ポートへ単独接続し、USB bus IDを`usbipd list`で確認した
@@ -21,9 +21,21 @@ option streamへ渡し、引数や一時設定ファイルには置きません�
 全体120秒で終了してDTRを落とします。
 
 SFC側は現在PAP clientを実装し、CHAP要求にはPAPをConfigure-Nakします。
-DFM-56U基準試験でCHAP-MD5からPAPへの収束を確認できた場合だけ、NDM24で
-次段階へ進みます。MS-CHAP、EAPなど別方式が必須なら発信試験を止め、
-先に対応方針を決めます。
+DFM-56U基準試験ではNiftyがCHAP-MD5を要求し、そのままChallenge、
+Response、Successへ進みました。PAPへのfallbackは観測されていません。
+合意した停止条件に従い、NDM24の実回線試験はCHAP-MD5 clientを実装・検証
+するまで保留します。
+
+基準試験で観測した条件は次のとおりです。
+
+- Niftyの初回LCP Request: MRU 1524、ACCM 0、CHAP-MD5、PFC、ACFC
+- `pppd`がPFC/ACFCをRejectすると、次のRequestから両optionが除外された
+- CHAP Challengeは16byte、Success Messageは空
+- IPCPはlocal/peer IPv4とPrimary/Secondary DNSまで成立した
+- 割当local/peer public IPはGit管理文書では非公開
+- Primary DNS `61.207.9.37`、Secondary DNS `61.207.9.5`
+- 30秒の観測後、同一IdentifierのTerminate-Request/Ackで終了
+- DTR drop後、DFM-56UはWindowsのCOM5へ復帰
 
 ## 接続条件
 
@@ -62,7 +74,7 @@ OSやUSB stack内部の一時コピーを完全に消去できる保証までは
 
 ## 実行ガード
 
-次のコマンドは実際に通話料金が発生するため、DFM-56U基準試験、MesenCE、
+次のコマンドは実際に通話料金が発生するため、CHAP-MD5実装、MesenCE、
 FXPAK PRO、疑似PSTN回帰試験、物理配線の再確認がすべて済むまで実行しません。
 
 ```powershell
