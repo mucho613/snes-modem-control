@@ -4,7 +4,7 @@
 
 最初のPPPマイルストーンは、NDM24から受け取る任意位置で分割されたbyte列を、FCS検証済みのPPPフレームへ復元する層です。`crates/ndm24-ppp` を仕様の参照実装とし、同じ状態遷移と試験ベクトルを65816へ移植しています。
 
-現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP、PAP client、IPCPまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ackまで確認しました。IPCPはRust参照実装、65816移植、SFC常設セルフテストまで完了し、実対向試験を残しています。IPv4、UDP、TCP、NTPはまだSFC上で動作しません。
+現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP、PAP client、IPCPまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ack、IPCP `Opened`まで確認し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。IPv4 packet、UDP、TCP、NTPはまだSFC上で動作しません。
 
 PPP接続は次の順序で進みます。
 
@@ -145,7 +145,7 @@ cargo run -p ndm24-tools -- ppp-monitor --once
 cargo run -p ndm24-tools -- ppp-monitor
 ```
 
-診断blockはsequence lock方式です。SFCは公開状態を変更する前後に32bitの `snapshot_sequence` を更新し、PC側は偶数の同じsequenceで2回読めたblockだけを採用します。入れ子更新も深さを管理するため、常設セルフテストの途中状態を安定したsnapshotとして誤認しません。
+診断blockはsequence lock方式です。SFCは公開状態を変更する前後に32bitの `snapshot_sequence` を更新し、PC側はsequence、本体、sequenceの順で読み、3か所が同じ偶数値だったblockだけを採用します。入れ子更新も深さを管理するため、常設セルフテストの途中状態を安定したsnapshotとして誤認しません。この読み方は高頻度で更新される接続中も、公開block全体を2回読む方式より短い安定区間で取得できます。
 
 公開する内容は次の通りです。
 
@@ -354,9 +354,8 @@ PAP `Opened`による起動、共有encoder backpressure中のframe保持、応�
 
 ## 次の実装
 
-オフラインで確定できるLCP処理と、実対向での`Opened`到達まで完了しました。
-raw `NO CARRIER`による自動lower-downも実対向で合格しました。PAP clientは
-Rust参照実装、65816常設セルフテスト、revision A実機とWSL2 `pppd`による
-Authenticate-Request/Ackまで合格しました。IPCPはRust参照codec、65816 client、
-常設セルフテストまで完了しました。次はrevision AとWSL2 `pppd`の実対向で
-IPCP `Opened`とlocal `10.24.0.2`、peer `10.24.0.1`の確定を確認します。
+LCP、PAP、IPCPはRust参照実装、65816常設セルフテスト、revision A実機と
+WSL2 `pppd`による実対向まで合格しました。IPCP `Opened`時のlocalは
+`10.24.0.2`、peerは`10.24.0.1`で、raw `NO CARRIER`後の自動lower-downも
+確認済みです。次はIPCPが確定したlocal/peer addressを利用するIPv4 packet層を
+実装し、その上にUDPとICMP checksum、NTP clientを構築します。

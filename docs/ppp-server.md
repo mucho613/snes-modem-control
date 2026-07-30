@@ -3,10 +3,10 @@
 ## 目的
 
 疑似PSTNの相手側モデムとしてI/O DATA DFM-56Uを使い、WSL2上の
-`pppd`をNTT DATA NDM24の対向にします。revision AではLCP `Opened`と、
-閉じたfixture資格情報によるPAP Authenticate-Request/Ackまで確認済みです。
-IPCPはSFC常設セルフテストまで合格しており、同じ対向環境でlocal
-`10.24.0.2`、peer `10.24.0.1`を確定することが次の合格条件です。
+`pppd`をNTT DATA NDM24の対向にします。revision AではLCP `Opened`、
+閉じたfixture資格情報によるPAP Authenticate-Request/Ack、IPCP `Opened`
+まで確認済みです。SFC側local `10.24.0.2`、peer `10.24.0.1`の確定と、
+切断後の各層の初期化も合格しています。
 
 ```mermaid
 flowchart LR
@@ -96,7 +96,7 @@ WindowsやWSLの再起動、USBの抜き差し後に必要です。
 古い導入状態から直接実行して安全に移行できるよう同じ無効化を行います。
 設定ファイルは削除しません。
 
-## LCP接続試験
+## PPP接続試験
 
 疑似電話交換機と両モデムの準備後、最初に対向serverを待受状態にします。
 
@@ -146,15 +146,19 @@ Ubuntuの`pppd`はpeer profileより前に`/etc/ppp/options`も読みます。�
 9. PAP payloadやpasswordが通常ログへ出ない。
 10. 切断後にSFC側LCPとIPCPが`Closed`、PAPが`Inactive`へ戻り、timerとpending送信を残さない。
 
-SFC側の発信と切断結果待ちは、期待するresult codeを明示します。
+PPP受信は発信前に有効化します。`CONNECT`後に有効化すると、対向が先に送った
+LCP frameの途中からdecoderへ渡され、FCS errorやRX ring overflowを生じる
+可能性があります。
 
 ```powershell
+cargo run -p ndm24-tools -- mailbox ppp-receive-start
 cargo run -p ndm24-tools -- at ATDT0 --expect connect --timeout-frames 3900 --timeout-seconds 75
-cargo run -p ndm24-tools -- at "" --expect no-carrier --timeout-frames 900 --timeout-seconds 20
 ```
 
 `timeout-frames`はSFC側のVBlank基準、`timeout-seconds`はPC側メールボックス
-待機の上限です。前者が必ず先に成立するようPC側を長く設定します。
+待機の上限です。前者が必ず先に成立するようPC側を長く設定します。切断時は
+`Stop`で対向を停止し、PPP受信層がpeerのTerminate-Requestとraw
+`NO CARRIER`を処理した後、診断と`pending-rx`を確認します。
 
 SFCの診断は別のPowerShellで取得します。
 
@@ -230,6 +234,30 @@ pending action、peer optionは初期化されました。`carrier_loss_count`�
 同じRX burstの末尾12byteも従来どおり消費され、RX read/write indexは
 210/210、`pending-rx`は空配列でした。FCS errorとinvalidは最後まで0です。
 DFM-56UはWindowsのCOM5へ正常に戻っています。
+
+## 2026-07-30 revision A IPCP結果
+
+PPP受信を発信前に有効化し、revision AのNDM24とDFM-56UをV.22bis
+2400 bit/sで再接続しました。SFC診断ABI version 6、`pppd`ログ、
+WSL2の`ppp0`を照合し、次を確認しました。
+
+- LCPはpeer Request/Ackを各1回受信して`Opened`となり、PAPは
+  Authenticate-Request/Ack各1回で`Opened`となった。
+- SFCはIPCP Configure-Request Identifier 1で`0.0.0.0`を要求し、
+  `pppd`のConfigure-Nakで提案された`10.24.0.2`を採用した。
+- SFCはIdentifier 2で`10.24.0.2`を再要求し、Configure-Ackを受信した。
+- `pppd`の`10.24.0.1`要求へSFCがConfigure-Ackを返し、SFC側IPCPは
+  `Opened`、local `10.24.0.2`、peer `10.24.0.1`となった。
+- WSL2の`ppp0`はlocal `10.24.0.1`、peer `10.24.0.2`で`UP`となった。
+- IPCP送受信数は各3、PPP受信frame数は6だった。FCS error、invalid、
+  overflow、drain budget yield、TX backpressure、TX abortはすべて0だった。
+- `pppd`ログのPAP passwordは従来どおり`<hidden>`だった。
+
+`Stop`後はpeerのTerminate-Requestを2回受信し、raw `NO CARRIER`を1回検出
+しました。LCPとIPCPは`Closed`、PAPは`Inactive`へ戻り、local address、
+timer、pending/deferred送信は初期化されました。切断後のFCS error、
+invalid、overflowは0、同じRX burstの末尾12byteは既存仕様どおり消費され、
+`pending-rx`は空でした。DFM-56UもWindowsのCOM5へ正常に戻っています。
 
 試験終了時は必ず停止します。
 
