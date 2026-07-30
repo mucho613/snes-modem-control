@@ -355,6 +355,9 @@ Echo-RequestはLCP `Opened`時だけ受理し、Magic-Number optionを合意し�
 同じIdentifierとData、送信Magic 0、送受信count、Magic不一致の無応答破棄を検査
 します。ABI version 18ではこれらのcountと最後のIdentifier/Magicを末尾へ追加
 しました。MesenCEの通常ROM自動セルフテストはこのfixtureを含めて合格しています。
+同日のrevision AとDFM-56UによるV.22bis実対向では、`pppd`が5秒間隔で送った
+Identifier 0～8のEcho-Requestへ9回すべて応答し、診断countはRequest/Reply
+`9/9`、drop 0、最後のpeer Magic `0x71D800F7`でした。
 
 2026-07-30にABI version 17のnormal ROMをrevision AのFXPAK PROへ転送し、
 QUsb2Snes mailboxの`ppp-self-test`（command 10、sequence 1）が合格しました。

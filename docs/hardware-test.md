@@ -316,4 +316,13 @@ RX/TX overflow、timeoutはいずれも0で、`ATM0`までの初期化応答も�
 8.020秒の測定で`frameCounter`は482進み、60.099Hzでした。ソフトウェア時計は
 未同期のためUnix秒とsubsecondが0のままなのが期待値です。
 
+同日、LCP Echo対応の診断ABI version 18 smoke ROMをrevision AのFXPAK PROへ
+転送し、mailbox `ppp-self-test`とMesenCE常設セルフテストに合格しました。
+DFM-56UとV.22bis 2400 bit/sで接続後、`pppd`から5秒間隔で送信したpeer Magic
+`0x71D800F7`のEcho-Requestへ、SFCは同じIdentifierとlocal Magic 0で応答しました。
+接続中にIdentifier 0～6、停止までに0～8の全往復が成立し、最終診断はEcho
+Request/Reply `9/9`、drop 0でした。FCS error、invalid、overflow、
+backpressure、abortはすべて0で、停止時のTerminate-Request/Ackも各1回成立し、
+DFM-56UはCOM5へ戻りました。
+
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。

@@ -124,7 +124,8 @@ DFM-56Uは次の条件へ固定します。
 - `ATS0=0`: chat scriptから`ATA`を送る手動応答
 
 `pppd`はPAPを要求し、CHAP、MS-CHAP、EAP、PFC、ACFC、VJ、CCP、
-BSD-Compress、Deflate、IPv6を無効にします。LCP Echo-Requestも無効です。
+BSD-Compress、Deflate、IPv6を無効にします。LCP `Opened`後は5秒間隔で
+Echo-Requestを送り、3回連続で応答がなければlink failureとして扱います。
 IPCPではRFC 1877のPrimary DNS Server Addressとして`1.1.1.1`、
 Secondary DNS Server Addressとして`1.0.0.1`をSFCへ提案します。
 SFC側のLCP診断と切断試験を行う時間を確保するため、PAP Authenticate-Request
@@ -137,8 +138,8 @@ Ubuntuの`pppd`はpeer profileより前に`/etc/ppp/options`も読みます。�
 3秒間隔の再送には影響しません。既存の用途を壊さないためglobal fileは変更
 せず、試験終了時に`Stop`を必ず実行します。globalの`crtscts`、`proxyarp`、
 30秒のLCP echoはpeer profileの`nocrtscts`、`noproxyarp`、
-`lcp-echo-interval 0`で上書きします。DNS指定はglobal設定に依存させず、
-peer profileの2つの`ms-dns`で固定します。
+`lcp-echo-interval 5`と`lcp-echo-failure 3`で上書きします。DNS指定はglobal
+設定に依存させず、peer profileの2つの`ms-dns`で固定します。
 
 初回試験ではSFC側が次を満たすことを確認します。
 
@@ -449,6 +450,25 @@ TX frame数10、TX abort 0でした。FCS error、invalid、overflow、backpress
 0です。Terminate-Ack受理後はLCPを`Stopped`へ移し、続くraw `NO CARRIER`検出で
 LCP/IPCP `Closed`、PAP `Inactive`へ戻りました。local IP、Primary DNS、
 Secondary DNSもzeroへ初期化され、DFM-56UはWindowsのCOM5へ正常に返却されました。
+
+## 2026-07-30 revision A LCP Echo結果
+
+peer profileを`lcp-echo-interval 5`、`lcp-echo-failure 3`へ変更し、診断ABI
+version 18のsmoke ROM、revision AのNDM24、DFM-56UをV.22bis 2400 bit/sで
+再接続しました。`pppd`はLCP `Opened`直後からMagic `0x71D800F7`を持つ
+Echo-Requestを5秒間隔で送信し、SFCは各RequestのIdentifierを保持しながら、
+local側ではMagic-Numberを交渉していないためMagic 0のEcho-Replyを返しました。
+
+接続維持中のSFC診断はLCP、PAP、IPCPがすべて`Opened`、Echo Request/Reply
+countが`7/7`、drop countが0、最後のIdentifierが6、最後のpeer Magicが
+`0x71D800F7`でした。`pppd` journalでもIdentifier 0～6の全往復を確認しました。
+IPCP local/peerは`10.24.0.2`/`10.24.0.1`、Primary/Secondary DNSは
+`1.1.1.1`/`1.0.0.1`です。FCS error、invalid、overflow、TX backpressure、
+TX abortはいずれも0でした。
+
+server停止までにEcho Request/Reply countは`9/9`、最後のIdentifierは8まで進み、
+dropは0のままでした。その後のTerminate-Request/Ackも各1回成立し、DFM-56Uは
+WindowsのCOM5へ正常に戻りました。
 
 試験終了時は必ず停止します。
 
