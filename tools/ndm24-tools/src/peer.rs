@@ -130,6 +130,10 @@ impl PeerModem {
     pub fn transcript(&self) -> &[String] {
         &self.transcript
     }
+
+    pub fn clone_port(&self) -> Result<Box<dyn serialport::SerialPort>> {
+        self.port.try_clone().context("clone peer serial port")
+    }
 }
 
 fn wait_for_result_recorded(

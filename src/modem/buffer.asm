@@ -27,6 +27,7 @@
 .export modemSnapshotBeginI8, modemSnapshotEndI8
 .export modemStoreReceivedByte, modemRecordDiscard
 .export modemReadByte, modemQueueByte
+.export modemReadByteLong, modemQueueByteLong
 .export modemPeekTransmitByte, modemConsumeTransmitByte
 .export modemRecordPollBudgetYield
 
@@ -237,6 +238,15 @@ empty:
   rts
 .endproc
 
+; Long-call ABI wrappers for consumers placed outside bank $c0.
+.proc modemReadByteLong
+  .a8
+  .i8
+
+  jsr modemReadByte
+  rtl
+.endproc
+
 ; Public TX producer. Input A is the byte to queue.
 .proc modemQueueByte
   .a8
@@ -276,6 +286,14 @@ overflow:
   plb
   sec
   rts
+.endproc
+
+.proc modemQueueByteLong
+  .a8
+  .i8
+
+  jsr modemQueueByte
+  rtl
 .endproc
 
 ; Internal TX consumer helpers. They assume DBR=$7e.

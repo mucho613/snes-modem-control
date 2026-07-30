@@ -244,6 +244,7 @@ modemAtTimeoutFrames: .res $2
 .export modemSpeedTestLfsr, modemSpeedTestMismatchCount
 .export modemSpeedTestFirstMismatch, modemSpeedTestExpected, modemSpeedTestActual
 .export modemSpeedTestStartFrame, modemSpeedTestEndFrame
+.export modemSpeedTestLastFrame, modemSpeedTestFrameQuota
 modemSpeedTestMode: .res $1
 modemSpeedTestRemaining: .res $4
 modemSpeedTestProcessed: .res $4
@@ -254,3 +255,5 @@ modemSpeedTestExpected: .res $1
 modemSpeedTestActual: .res $1
 modemSpeedTestStartFrame: .res $4
 modemSpeedTestEndFrame: .res $4
+modemSpeedTestLastFrame: .res $2
+modemSpeedTestFrameQuota: .res $1

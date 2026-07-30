@@ -9,13 +9,14 @@ mod ppp_dial;
 mod prbs;
 mod qusb2snes;
 mod speed_probe;
+mod speed_test;
 mod trace;
 
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use anyhow::{Result, ensure};
+use anyhow::{Context, Result, ensure};
 use clap::{Parser, Subcommand, ValueEnum};
 use ndm24_protocol::{
     MODEM_MAILBOX_COMMAND_AT_TRANSACTION, MODEM_MAILBOX_COMMAND_CLEAR_TRACE,
@@ -51,6 +52,23 @@ enum Command {
     SpeedProbe {
         #[arg(long)]
         revision: String,
+        #[arg(long, default_value = "COM5")]
+        port: String,
+        #[arg(long, default_value = "ws://localhost:23074")]
+        websocket: String,
+        #[arg(long, default_value = "build/normal/modem-control.lbl")]
+        labels: PathBuf,
+        #[arg(long, default_value = "build/hardware-tests")]
+        output: PathBuf,
+    },
+    /// Dial the controlled peer at one exact speed and run bidirectional PRBS.
+    SpeedTest {
+        #[arg(long)]
+        revision: String,
+        #[arg(long)]
+        speed: u32,
+        #[arg(long, default_value_t = 4_096)]
+        length: u32,
         #[arg(long, default_value = "COM5")]
         port: String,
         #[arg(long, default_value = "ws://localhost:23074")]
@@ -315,8 +333,23 @@ impl MailboxCommand {
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
+    std::thread::Builder::new()
+        .name("ndm24-tools-runtime".to_owned())
+        .stack_size(8 * 1024 * 1024)
+        .spawn(|| {
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .context("build Tokio runtime")?
+                .block_on(async_main())
+        })
+        .context("start ndm24-tools runtime thread")?
+        .join()
+        .map_err(|_| anyhow::anyhow!("ndm24-tools runtime thread panicked"))?
+}
+
+async fn async_main() -> Result<()> {
     match Cli::parse().command {
         Command::Identify {
             revision,
@@ -337,6 +370,22 @@ async fn main() -> Result<()> {
         } => {
             let report = speed_probe::run(&websocket, &labels, &port, &revision, &output).await?;
             println!("speed capability report saved at {}", report.display());
+            Ok(())
+        }
+        Command::SpeedTest {
+            revision,
+            speed,
+            length,
+            port,
+            websocket,
+            labels,
+            output,
+        } => {
+            let report = Box::pin(speed_test::run(
+                &websocket, &labels, &port, &revision, speed, length, &output,
+            ))
+            .await?;
+            println!("speed test report saved at {}", report.display());
             Ok(())
         }
         Command::BinaryTest {

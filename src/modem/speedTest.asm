@@ -12,7 +12,8 @@
 .import modemSpeedTestLfsr, modemSpeedTestMismatchCount
 .import modemSpeedTestFirstMismatch, modemSpeedTestExpected, modemSpeedTestActual
 .import modemSpeedTestStartFrame, modemSpeedTestEndFrame
-.import modemQueueByte, modemReadByte
+.import modemSpeedTestLastFrame, modemSpeedTestFrameQuota
+.import modemQueueByteLong, modemReadByteLong
 
 .export modemSpeedTestInitialize
 .export modemSpeedTestBeginTransmit, modemSpeedTestBeginReceive
@@ -74,6 +75,8 @@
   lda modemMailboxArguments + MODEM_PRBS_ARGUMENT_SEED
   ora modemMailboxArguments + MODEM_PRBS_ARGUMENT_SEED + 1
   beq @invalid
+  lda modemMailboxArguments + MODEM_PRBS_ARGUMENT_BYTES_PER_FRAME
+  beq @invalid
 
   m16
   lda modemMailboxArguments + MODEM_PRBS_ARGUMENT_LENGTH
@@ -91,11 +94,14 @@
   sta modemSpeedTestFirstMismatch + 2
   lda frameCounter
   sta modemSpeedTestStartFrame
+  sta modemSpeedTestLastFrame
   lda frameCounter + 2
   sta modemSpeedTestStartFrame + 2
   m8
   stz modemSpeedTestExpected
   stz modemSpeedTestActual
+  lda modemMailboxArguments + MODEM_PRBS_ARGUMENT_BYTES_PER_FRAME
+  sta modemSpeedTestFrameQuota
   pla
   sta modemSpeedTestMode
   clc
@@ -141,10 +147,18 @@
 @transmit:
   jsr modemSpeedTestHasRemaining
   bcc @transmitDrain
+  jsr modemSpeedTestRefreshQuota
+  lda modemSpeedTestFrameQuota
+  beq @done
+  ldy modemTransmitWriteIndex
+  iny
+  cpy modemTransmitReadIndex
+  beq @done
   lda modemSpeedTestLfsr
-  jsr modemQueueByte
+  jsl modemQueueByteLong
   bcs @done
   jsr modemSpeedTestAdvance
+  dec modemSpeedTestFrameQuota
   bra @transmit
 
 @transmitDrain:
@@ -157,7 +171,7 @@
 @receive:
   jsr modemSpeedTestHasRemaining
   bcc @receiveComplete
-  jsr modemReadByte
+  jsl modemReadByteLong
   bcs @done
   sta modemSpeedTestActual
   lda modemSpeedTestLfsr
@@ -179,6 +193,24 @@
   plb
   pla
   rtl
+.endproc
+
+.proc modemSpeedTestRefreshQuota
+  .a8
+  .i8
+
+  m16
+  lda frameCounter
+  cmp modemSpeedTestLastFrame
+  beq @sameFrame
+  sta modemSpeedTestLastFrame
+  m8
+  lda modemMailboxArguments + MODEM_PRBS_ARGUMENT_BYTES_PER_FRAME
+  sta modemSpeedTestFrameQuota
+  rts
+@sameFrame:
+  m8
+  rts
 .endproc
 
 ; Carry set when at least one requested byte remains.

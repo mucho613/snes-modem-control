@@ -31,6 +31,36 @@ trace、snapshotとともに保存します。
 送り、不揮発保存コマンドは使用しません。DFM-56Uも`ATZ`で既知状態へ戻します。
 結果は`build/hardware-tests/<test-id>/speed-probe.json`へ保存します。
 
+2026-07-31のrevision A probeでは6候補すべてが`OK`でした。DFM-56U
+（CX93001）は`V22B`、`V32`、`V32B`と送受信別のexact speed指定に対応して
+いました。これはコマンド受理結果であり、各速度の接続認定とは区別します。
+
+## 単一速度試験
+
+疑似PSTNを接続した状態で、指定した速度だけを試験できます。
+
+```powershell
+cargo run -p ndm24-tools -- speed-test --revision A --speed 2400
+```
+
+既定では双方向4 KiBのPRBS16を転送します。64 KiB認定試験では
+`--length 65536`を指定します。DFM-56Uは速度に応じて`V22B`、`V32`、
+`V32B`をfallbackなしで指定し、`ATW2`のDCE速度結果を検査します。
+NDM24は`AT&F`直後に`ATM0`を適用し、圧縮無効、誤り訂正有効、`AT%B<speed>`
+の順で構成します。不揮発メモリには保存しません。
+
+NDM24とDFM-56UはいずれもDTEから電話回線より速く一括投入すると内部バッファを
+溢れさせるため、送信は回線速度に合わせてpaced transferにします。SFC側は
+フレーム単位のtoken bucket、Windows側は64 byte単位のpaced writeを使います。
+これは測定対象の回線速度を変える処理ではなく、RS-232CのRTS/CTSを利用できない
+構成での送信フロー制御です。
+
+2026-07-31にrevision Aの2400 bit/s基準試験が合格しました。DFM-56Uは
+`CONNECT 2400`を報告し、双方向4096 byteが不一致、overflowとも0でした。
+実効payload速度はSFC→DFMが約1898 bit/s、DFM→SFCが約1859 bit/sでした。
+終了後はNDM24が`READY`へ戻ったことを確認し、`AT&F`、`ATM0`、
+`AT%B2400`を再適用しています。
+
 ## 認定条件
 
 探索段階は各速度で双方向4 KiBの疑似ランダム列を完全一致させます。初回失敗時は
