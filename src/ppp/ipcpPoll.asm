@@ -63,10 +63,11 @@
   lda pppLastProtocol
   cmp #PPP_PROTOCOL_IPCP
   beq @receiveIpcp
+  cmp #PPP_PROTOCOL_IP
+  beq @done
   sep #$20
   .a8
-  ; IPv4 and other network protocols are released until their consumers are
-  ; implemented. IPCP itself has already had the opportunity to consume.
+  ; Unknown network protocols have no later consumer.
   jsr pppReleaseFrame
   bra @timer
 

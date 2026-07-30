@@ -230,6 +230,24 @@ pub struct PppDiagnosticSnapshot {
     pub ipcp_peer_address: [u8; 4],
     pub ipcp_flags: u8,
     pub ipcp_deferred_request: bool,
+    pub ipv4_last_error: u8,
+    pub ipv4_header_length: u8,
+    pub ipv4_protocol: u8,
+    pub ipv4_ttl: u8,
+    pub ipv4_total_length: u16,
+    pub ipv4_payload_length: u16,
+    pub ipv4_identification: u16,
+    pub ipv4_flags_fragment_offset: u16,
+    pub ipv4_header_checksum: u16,
+    pub ipv4_source_address: [u8; 4],
+    pub ipv4_destination_address: [u8; 4],
+    pub ipv4_receive_count: u32,
+    pub ipv4_accepted_count: u32,
+    pub ipv4_checksum_error_count: u32,
+    pub ipv4_drop_count: u32,
+    pub ipv4_transmit_count: u32,
+    pub ipv4_next_identification: u16,
+    pub ipv4_flags: u8,
 }
 
 impl PppDiagnosticSnapshot {
@@ -339,6 +357,24 @@ impl PppDiagnosticSnapshot {
             ipcp_peer_address: read_array(data, PPP_DIAG_IPCP_PEER_ADDRESS)?,
             ipcp_flags: data[PPP_DIAG_IPCP_FLAGS],
             ipcp_deferred_request: data[PPP_DIAG_IPCP_DEFERRED_REQUEST] != 0,
+            ipv4_last_error: data[PPP_DIAG_IPV4_LAST_ERROR],
+            ipv4_header_length: data[PPP_DIAG_IPV4_HEADER_LENGTH],
+            ipv4_protocol: data[PPP_DIAG_IPV4_PROTOCOL],
+            ipv4_ttl: data[PPP_DIAG_IPV4_TTL],
+            ipv4_total_length: read_u16(data, PPP_DIAG_IPV4_TOTAL_LENGTH)?,
+            ipv4_payload_length: read_u16(data, PPP_DIAG_IPV4_PAYLOAD_LENGTH)?,
+            ipv4_identification: read_u16(data, PPP_DIAG_IPV4_IDENTIFICATION)?,
+            ipv4_flags_fragment_offset: read_u16(data, PPP_DIAG_IPV4_FLAGS_FRAGMENT_OFFSET)?,
+            ipv4_header_checksum: read_u16(data, PPP_DIAG_IPV4_HEADER_CHECKSUM)?,
+            ipv4_source_address: read_array(data, PPP_DIAG_IPV4_SOURCE_ADDRESS)?,
+            ipv4_destination_address: read_array(data, PPP_DIAG_IPV4_DESTINATION_ADDRESS)?,
+            ipv4_receive_count: read_u32(data, PPP_DIAG_IPV4_RECEIVE_COUNT)?,
+            ipv4_accepted_count: read_u32(data, PPP_DIAG_IPV4_ACCEPTED_COUNT)?,
+            ipv4_checksum_error_count: read_u32(data, PPP_DIAG_IPV4_CHECKSUM_ERROR_COUNT)?,
+            ipv4_drop_count: read_u32(data, PPP_DIAG_IPV4_DROP_COUNT)?,
+            ipv4_transmit_count: read_u32(data, PPP_DIAG_IPV4_TRANSMIT_COUNT)?,
+            ipv4_next_identification: read_u16(data, PPP_DIAG_IPV4_NEXT_IDENTIFICATION)?,
+            ipv4_flags: data[PPP_DIAG_IPV4_FLAGS],
         })
     }
 }
@@ -579,6 +615,37 @@ mod tests {
             .copy_from_slice(&[10, 24, 0, 1]);
         data[PPP_DIAG_IPCP_FLAGS] = 7;
         data[PPP_DIAG_IPCP_DEFERRED_REQUEST] = 1;
+        data[PPP_DIAG_IPV4_LAST_ERROR] = 10;
+        data[PPP_DIAG_IPV4_HEADER_LENGTH] = 20;
+        data[PPP_DIAG_IPV4_PROTOCOL] = 17;
+        data[PPP_DIAG_IPV4_TTL] = 64;
+        data[PPP_DIAG_IPV4_TOTAL_LENGTH..PPP_DIAG_IPV4_TOTAL_LENGTH + 2]
+            .copy_from_slice(&48_u16.to_le_bytes());
+        data[PPP_DIAG_IPV4_PAYLOAD_LENGTH..PPP_DIAG_IPV4_PAYLOAD_LENGTH + 2]
+            .copy_from_slice(&28_u16.to_le_bytes());
+        data[PPP_DIAG_IPV4_IDENTIFICATION..PPP_DIAG_IPV4_IDENTIFICATION + 2]
+            .copy_from_slice(&0x1234_u16.to_le_bytes());
+        data[PPP_DIAG_IPV4_FLAGS_FRAGMENT_OFFSET..PPP_DIAG_IPV4_FLAGS_FRAGMENT_OFFSET + 2]
+            .copy_from_slice(&0x4000_u16.to_le_bytes());
+        data[PPP_DIAG_IPV4_HEADER_CHECKSUM..PPP_DIAG_IPV4_HEADER_CHECKSUM + 2]
+            .copy_from_slice(&0xabcd_u16.to_le_bytes());
+        data[PPP_DIAG_IPV4_SOURCE_ADDRESS..PPP_DIAG_IPV4_SOURCE_ADDRESS + 4]
+            .copy_from_slice(&[10, 24, 0, 1]);
+        data[PPP_DIAG_IPV4_DESTINATION_ADDRESS..PPP_DIAG_IPV4_DESTINATION_ADDRESS + 4]
+            .copy_from_slice(&[10, 24, 0, 2]);
+        data[PPP_DIAG_IPV4_RECEIVE_COUNT..PPP_DIAG_IPV4_RECEIVE_COUNT + 4]
+            .copy_from_slice(&11_u32.to_le_bytes());
+        data[PPP_DIAG_IPV4_ACCEPTED_COUNT..PPP_DIAG_IPV4_ACCEPTED_COUNT + 4]
+            .copy_from_slice(&7_u32.to_le_bytes());
+        data[PPP_DIAG_IPV4_CHECKSUM_ERROR_COUNT..PPP_DIAG_IPV4_CHECKSUM_ERROR_COUNT + 4]
+            .copy_from_slice(&2_u32.to_le_bytes());
+        data[PPP_DIAG_IPV4_DROP_COUNT..PPP_DIAG_IPV4_DROP_COUNT + 4]
+            .copy_from_slice(&4_u32.to_le_bytes());
+        data[PPP_DIAG_IPV4_TRANSMIT_COUNT..PPP_DIAG_IPV4_TRANSMIT_COUNT + 4]
+            .copy_from_slice(&9_u32.to_le_bytes());
+        data[PPP_DIAG_IPV4_NEXT_IDENTIFICATION..PPP_DIAG_IPV4_NEXT_IDENTIFICATION + 2]
+            .copy_from_slice(&0x3456_u16.to_le_bytes());
+        data[PPP_DIAG_IPV4_FLAGS] = 5;
 
         let snapshot = PppDiagnosticSnapshot::decode(&data).unwrap();
         assert_eq!(snapshot.snapshot_sequence, 8);
@@ -622,6 +689,24 @@ mod tests {
         assert_eq!(snapshot.ipcp_peer_address, [10, 24, 0, 1]);
         assert_eq!(snapshot.ipcp_flags, 7);
         assert!(snapshot.ipcp_deferred_request);
+        assert_eq!(snapshot.ipv4_last_error, 10);
+        assert_eq!(snapshot.ipv4_header_length, 20);
+        assert_eq!(snapshot.ipv4_protocol, 17);
+        assert_eq!(snapshot.ipv4_ttl, 64);
+        assert_eq!(snapshot.ipv4_total_length, 48);
+        assert_eq!(snapshot.ipv4_payload_length, 28);
+        assert_eq!(snapshot.ipv4_identification, 0x1234);
+        assert_eq!(snapshot.ipv4_flags_fragment_offset, 0x4000);
+        assert_eq!(snapshot.ipv4_header_checksum, 0xabcd);
+        assert_eq!(snapshot.ipv4_source_address, [10, 24, 0, 1]);
+        assert_eq!(snapshot.ipv4_destination_address, [10, 24, 0, 2]);
+        assert_eq!(snapshot.ipv4_receive_count, 11);
+        assert_eq!(snapshot.ipv4_accepted_count, 7);
+        assert_eq!(snapshot.ipv4_checksum_error_count, 2);
+        assert_eq!(snapshot.ipv4_drop_count, 4);
+        assert_eq!(snapshot.ipv4_transmit_count, 9);
+        assert_eq!(snapshot.ipv4_next_identification, 0x3456);
+        assert_eq!(snapshot.ipv4_flags, 5);
     }
 
     #[test]

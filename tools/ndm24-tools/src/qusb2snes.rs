@@ -296,10 +296,16 @@ pub async fn mailbox_command_with_arguments(
             });
         }
         completion_candidate = None;
-        ensure!(
-            started.elapsed() < timeout,
-            "timed out waiting for mailbox command {command}"
-        );
+        if started.elapsed() >= timeout {
+            let host = read_u32(&mailbox, MODEM_MAILBOX_OFFSET_HOST_SEQUENCE)?;
+            let result = read_u16(&mailbox, MODEM_MAILBOX_OFFSET_RESULT)?;
+            bail!(
+                "timed out waiting for mailbox command {command}: \
+                 host_sequence={host}, processed_sequence={processed}, \
+                 observed_command={}, status={status}, result=0x{result:04x}",
+                mailbox[MODEM_MAILBOX_OFFSET_COMMAND]
+            );
+        }
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
 }

@@ -44,7 +44,7 @@ ABI version: `2`. Block size: `128` bytes.
 
 ## PPP Diagnostic ABI
 
-ABI version: `6`. Block size: `164` bytes.
+ABI version: `7`. Block size: `209` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|
@@ -127,6 +127,24 @@ ABI version: `6`. Block size: `164` bytes.
 | `0x9E` | 4 | `ipv4` | `ipcp_peer_address` | Negotiated peer IPv4 address in network byte order |
 | `0xA2` | 1 | `u8` | `ipcp_flags` | IPCP address-option and validity flags |
 | `0xA3` | 1 | `u8` | `ipcp_deferred_request` | Non-zero while Opened renegotiation owes a local Configure-Request |
+| `0xA4` | 1 | `u8` | `ipv4_last_error` | Most recent IPv4 parser or receive-policy error |
+| `0xA5` | 1 | `u8` | `ipv4_header_length` | IPv4 header length in bytes |
+| `0xA6` | 1 | `u8` | `ipv4_protocol` | Protocol field of the most recently parsed IPv4 packet |
+| `0xA7` | 1 | `u8` | `ipv4_ttl` | TTL field of the most recently parsed IPv4 packet |
+| `0xA8` | 2 | `u16` | `ipv4_total_length` | Total Length of the most recently parsed IPv4 packet |
+| `0xAA` | 2 | `u16` | `ipv4_payload_length` | Payload length after the variable IPv4 header |
+| `0xAC` | 2 | `u16` | `ipv4_identification` | Identification field of the most recently parsed IPv4 packet |
+| `0xAE` | 2 | `u16` | `ipv4_flags_fragment_offset` | IPv4 flags and fragment offset in host byte order |
+| `0xB0` | 2 | `u16` | `ipv4_header_checksum` | IPv4 header checksum in host byte order |
+| `0xB2` | 4 | `ipv4` | `ipv4_source_address` | Source address of the most recently parsed IPv4 packet |
+| `0xB6` | 4 | `ipv4` | `ipv4_destination_address` | Destination address of the most recently parsed IPv4 packet |
+| `0xBA` | 4 | `u32` | `ipv4_receive_count` | IPv4 packets presented to the parser |
+| `0xBE` | 4 | `u32` | `ipv4_accepted_count` | Valid unfragmented IPv4 packets addressed to the local endpoint |
+| `0xC2` | 4 | `u32` | `ipv4_checksum_error_count` | IPv4 packets rejected for an invalid header checksum |
+| `0xC6` | 4 | `u32` | `ipv4_drop_count` | IPv4 packets rejected by parser or receive policy |
+| `0xCA` | 4 | `u32` | `ipv4_transmit_count` | IPv4 packets accepted by the shared PPP encoder |
+| `0xCE` | 2 | `u16` | `ipv4_next_identification` | Identification value reserved for the next local IPv4 packet |
+| `0xD0` | 1 | `u8` | `ipv4_flags` | IPv4 header-valid, destination-local, and fragmentation flags |
 
 ## Mailbox ABI
 

@@ -22,6 +22,8 @@
 .import pppPapRunSelfTest
 .import pppIpcpRunSelfTest
 .import pppIpcpPollRunSelfTest
+.import pppIpv4RunSelfTest
+.import pppIpv4PollRunSelfTest
 .import pppCarrierLossRunSelfTest
 
 .export pppRunSelfTest
@@ -382,14 +384,22 @@
   .a16
   lda pppTransmitWireByteCount
   cmp #(pppSelfTestEncodedEnd - pppSelfTestEncoded)
-  bne @fail17_16
+  beq :+
+  jmp @fail17_16
+:
   lda pppTransmitWireByteCount + 2
-  bne @fail17_16
+  beq :+
+  jmp @fail17_16
+:
   lda pppTransmitFrameCount
   cmp #$0001
-  bne @fail17_16
+  beq :+
+  jmp @fail17_16
+:
   lda pppTransmitFrameCount + 2
-  bne @fail17_16
+  beq :+
+  jmp @fail17_16
+:
   sep #$20
   .a8
 
@@ -426,6 +436,14 @@
   jmp @fail
 :
   jsr pppIpcpPollRunSelfTest
+  bcc :+
+  jmp @fail
+:
+  jsr pppIpv4RunSelfTest
+  bcc :+
+  jmp @fail
+:
+  jsr pppIpv4PollRunSelfTest
   bcc :+
   jmp @fail
 :

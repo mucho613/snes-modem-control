@@ -289,8 +289,8 @@ description = "Frame at which the current generic AT transaction started"
 
 [ppp_diagnostic]
 magic = [0x50, 0x50, 0x50, 0x31]
-version = 6
-size = 164
+version = 7
+size = 209
 
 [[ppp_diagnostic.fields]]
 name = "magic"
@@ -844,6 +844,132 @@ offset = 163
 size = 1
 type = "u8"
 description = "Non-zero while Opened renegotiation owes a local Configure-Request"
+
+[[ppp_diagnostic.fields]]
+name = "ipv4_last_error"
+offset = 164
+size = 1
+type = "u8"
+description = "Most recent IPv4 parser or receive-policy error"
+
+[[ppp_diagnostic.fields]]
+name = "ipv4_header_length"
+offset = 165
+size = 1
+type = "u8"
+description = "IPv4 header length in bytes"
+
+[[ppp_diagnostic.fields]]
+name = "ipv4_protocol"
+offset = 166
+size = 1
+type = "u8"
+description = "Protocol field of the most recently parsed IPv4 packet"
+
+[[ppp_diagnostic.fields]]
+name = "ipv4_ttl"
+offset = 167
+size = 1
+type = "u8"
+description = "TTL field of the most recently parsed IPv4 packet"
+
+[[ppp_diagnostic.fields]]
+name = "ipv4_total_length"
+offset = 168
+size = 2
+type = "u16"
+description = "Total Length of the most recently parsed IPv4 packet"
+
+[[ppp_diagnostic.fields]]
+name = "ipv4_payload_length"
+offset = 170
+size = 2
+type = "u16"
+description = "Payload length after the variable IPv4 header"
+
+[[ppp_diagnostic.fields]]
+name = "ipv4_identification"
+offset = 172
+size = 2
+type = "u16"
+description = "Identification field of the most recently parsed IPv4 packet"
+
+[[ppp_diagnostic.fields]]
+name = "ipv4_flags_fragment_offset"
+offset = 174
+size = 2
+type = "u16"
+description = "IPv4 flags and fragment offset in host byte order"
+
+[[ppp_diagnostic.fields]]
+name = "ipv4_header_checksum"
+offset = 176
+size = 2
+type = "u16"
+description = "IPv4 header checksum in host byte order"
+
+[[ppp_diagnostic.fields]]
+name = "ipv4_source_address"
+offset = 178
+size = 4
+type = "ipv4"
+description = "Source address of the most recently parsed IPv4 packet"
+
+[[ppp_diagnostic.fields]]
+name = "ipv4_destination_address"
+offset = 182
+size = 4
+type = "ipv4"
+description = "Destination address of the most recently parsed IPv4 packet"
+
+[[ppp_diagnostic.fields]]
+name = "ipv4_receive_count"
+offset = 186
+size = 4
+type = "u32"
+description = "IPv4 packets presented to the parser"
+
+[[ppp_diagnostic.fields]]
+name = "ipv4_accepted_count"
+offset = 190
+size = 4
+type = "u32"
+description = "Valid unfragmented IPv4 packets addressed to the local endpoint"
+
+[[ppp_diagnostic.fields]]
+name = "ipv4_checksum_error_count"
+offset = 194
+size = 4
+type = "u32"
+description = "IPv4 packets rejected for an invalid header checksum"
+
+[[ppp_diagnostic.fields]]
+name = "ipv4_drop_count"
+offset = 198
+size = 4
+type = "u32"
+description = "IPv4 packets rejected by parser or receive policy"
+
+[[ppp_diagnostic.fields]]
+name = "ipv4_transmit_count"
+offset = 202
+size = 4
+type = "u32"
+description = "IPv4 packets accepted by the shared PPP encoder"
+
+[[ppp_diagnostic.fields]]
+name = "ipv4_next_identification"
+offset = 206
+size = 2
+type = "u16"
+description = "Identification value reserved for the next local IPv4 packet"
+
+[[ppp_diagnostic.fields]]
+name = "ipv4_flags"
+offset = 208
+size = 1
+type = "u8"
+description = "IPv4 header-valid, destination-local, and fragmentation flags"
 
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]

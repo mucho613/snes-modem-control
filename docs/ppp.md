@@ -4,7 +4,7 @@
 
 最初のPPPマイルストーンは、NDM24から受け取る任意位置で分割されたbyte列を、FCS検証済みのPPPフレームへ復元する層です。`crates/ndm24-ppp` を仕様の参照実装とし、同じ状態遷移と試験ベクトルを65816へ移植しています。
 
-現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP、PAP client、IPCPまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ack、IPCP `Opened`まで確認し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。IPv4 packet、UDP、TCP、NTPはまだSFC上で動作しません。
+現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP、PAP client、IPCP、IPv4 packet層まで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ack、IPCP `Opened`まで確認し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。同日にIPv4 parser、header checksum、local宛先選別、送信header生成をFXPAK PRO実機の常設セルフテストで確認しました。実回線上のIPv4送受信、UDP、TCP、NTPはまだ動作しません。
 
 PPP接続は次の順序で進みます。
 
@@ -73,6 +73,8 @@ Rust参照実装は全入力分割位置、破損FCSからの再同期、Flag直
 - `src/ppp/papPoll.asm`: LCP/PAP frame振り分け、共有送信器との直列化
 - `src/ppp/ipcp.asm`: IPCP parser、address交渉、restart timer
 - `src/ppp/ipcpPoll.asm`: PAP/IPCP frame所有権、共有送信器との直列化
+- `src/ppp/ipv4.asm`: IPv4 parser、header checksum、送信header生成
+- `src/ppp/ipv4Poll.asm`: IPCP/IPv4 frame所有権、local宛先とfragmentの選別
 - `src/ppp/selfTest.asm`: 固定fixtureによる常設セルフテスト
 
 `pppDecoderPush` はraw byteを1byteずつ受け取り、次のeventを返します。
@@ -136,7 +138,7 @@ Address 1 + Control 1 + Protocol 2 + Information 1500 + FCS 2
 
 ## 常設PPP診断
 
-`pppDiagnosticState` はmagic `PPP1`、ABI version 6、164byteの公開診断blockです。レイアウトの正本は `spec/ndm24.toml` で、AssemblyとRustのoffset定数および[生成済みABI表](generated/diagnostic-abi.md)を同時に生成します。
+`pppDiagnosticState` はmagic `PPP1`、ABI version 7、209byteの公開診断blockです。レイアウトの正本は `spec/ndm24.toml` で、AssemblyとRustのoffset定数および[生成済みABI表](generated/diagnostic-abi.md)を同時に生成します。
 
 PC側では次のコマンドでJSON Linesとして読み取れます。
 
@@ -167,6 +169,9 @@ cargo run -p ndm24-tools -- ppp-monitor
 - IPCP state、Code、Identifier、Length、error、pending/deferred送信
 - IPCP restart残数、timer有効状態と期限、packet送受信回数
 - local/peer IPv4 addressとIP-Address optionの有効状態
+- IPv4 header長、Protocol、TTL、Total Length、payload長、Identification
+- IPv4 flags/fragment offset、header checksum、source/destination address
+- IPv4受信、受理、checksum error、破棄、送信の各countと次のIdentification
 
 認証frameには利用者IDやpasswordが含まれ得るため、常設traceへpayload全体は保存しません。protocol、code、identifier、length、エラー理由までを診断対象とし、credential byte列は記録対象外とします。
 
@@ -355,8 +360,8 @@ deferred slotへ保持します。lower-downでは交渉済みaddress、timer、
 
 restart intervalは180 frame、Max-Configureは初回を含む10回です。timeout再送は
 同じIdentifierとoption列を使い、送信器が受理した時点から次の期限を数えます。
-公開診断ABI version 6はIPCP state、最後のCode/Identifier/error、local/peer
-address、再送状態、送受信countを公開します。
+公開診断ABI version 7はIPCP state、最後のCode/Identifier/error、local/peer
+address、再送状態、送受信countに加え、後段のIPv4診断を公開します。
 
 常設セルフテストのstep `$70`～`$76`は、`0.0.0.0`要求、peer `10.24.0.1`の
 Ack、local `10.24.0.2`のNak提案、再要求、双方Ackによる`Opened`、zero peer
@@ -366,10 +371,38 @@ PAP `Opened`による起動、共有encoder backpressure中のframe保持、応�
 2026-07-30にFXPAK PRO実機へnormal ROMを転送し、mailbox
 `ppp-self-test`の合格を確認しました。
 
+## 65816 IPv4 packet層
+
+`src/ppp/ipv4.asm`はFCS検証済みProtocol `$0021` frameを直接解析します。
+version 4、20～60byteの可変IHL、Total Lengthとframe内の利用可能長、
+header全体のone's-complement checksumを検証します。Total Lengthより後ろの
+PPP paddingはpacketへ含めません。header fields、source/destination address、
+受信・checksum error・破棄countは公開診断ABI version 7へ残します。
+
+`src/ppp/ipv4Poll.asm`はLCP、PAP、IPCPがすべて`Opened`のときだけIPv4 frameを
+解析します。最初の受信policyはIPCPで確定したlocal addressへの完全一致だけを
+受理し、broadcast、multicast、他宛先を受理しません。fragment再構成は未実装
+なのでMore Fragmentsまたは0以外のfragment offsetを持つpacketは理由を記録して
+破棄します。IPCPが閉じているときに到着したIPv4 frameは解析せず解放し、次の
+接続へ持ち越しません。
+
+送信側はpayloadを`pppTransmitBuffer + 24`へ置き、Protocolとpayload長、
+destinationを指定します。IPCPのlocal addressをsourceに使い、IHL 5、TTL 64、
+Don't Fragment、順次増加するIdentificationとheader checksumを生成して共有PPP
+encoderへ渡します。encoderがbusyまたはIPCPが閉じている場合は受理せず、
+Identificationと送信countも進めません。
+
+常設セルフテストのstep `$80`～`$84`は既知header `$B861`の解析、TTL破損時の
+checksum error、同一headerの送信生成、共有encoder受理を検査します。step
+`$85`～`$87`はlocal宛先の受理、宛先不一致の破棄、IPCP phase gateを検査します。
+2026-07-30にFXPAK PRO実機で起動完了後3回連続合格し、ABI version 7のsnapshot
+取得も確認しました。この試験は電話回線へ発信せず、固定fixtureだけを使います。
+
 ## 次の実装
 
 LCP、PAP、IPCPはRust参照実装、65816常設セルフテスト、revision A実機と
-WSL2 `pppd`による実対向まで合格しました。IPCP `Opened`時のlocalは
-`10.24.0.2`、peerは`10.24.0.1`で、raw `NO CARRIER`後の自動lower-downも
-確認済みです。次はIPCPが確定したlocal/peer addressを利用するIPv4 packet層を
-実装し、その上にUDPとICMP checksum、NTP clientを構築します。
+WSL2 `pppd`による実対向まで合格しました。IPv4 packet層もRustと65816へ実装し、
+固定fixtureのSFC実機試験まで合格しています。IPCP `Opened`時のlocalは
+`10.24.0.2`、peerは`10.24.0.1`です。次はUDP datagram層とICMP Echoを実装し、
+実対向でIPv4の送受信を確認した後、UDP上のNTP clientへ進みます。TCPとHTTPは
+その後の独立したマイルストーンとします。

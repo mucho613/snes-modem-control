@@ -38,6 +38,13 @@
 .export pppIpcpRestartDeadline, pppIpcpReceiveCount, pppIpcpTransmitCount
 .export pppIpcpLocalAddress, pppIpcpPeerAddress, pppIpcpFlags
 .export pppIpcpDeferredRequest
+.export pppIpv4LastError, pppIpv4HeaderLength, pppIpv4Protocol, pppIpv4Ttl
+.export pppIpv4TotalLength, pppIpv4PayloadLength, pppIpv4Identification
+.export pppIpv4FlagsFragmentOffset, pppIpv4HeaderChecksum
+.export pppIpv4SourceAddress, pppIpv4DestinationAddress
+.export pppIpv4ReceiveCount, pppIpv4AcceptedCount
+.export pppIpv4ChecksumErrorCount, pppIpv4DropCount, pppIpv4TransmitCount
+.export pppIpv4NextIdentification, pppIpv4Flags
 
 pppDiagnosticState:
 pppDiagnosticMagic: .res $4
@@ -119,6 +126,24 @@ pppIpcpLocalAddress: .res $4
 pppIpcpPeerAddress: .res $4
 pppIpcpFlags: .res $1
 pppIpcpDeferredRequest: .res $1
+pppIpv4LastError: .res $1
+pppIpv4HeaderLength: .res $1
+pppIpv4Protocol: .res $1
+pppIpv4Ttl: .res $1
+pppIpv4TotalLength: .res $2
+pppIpv4PayloadLength: .res $2
+pppIpv4Identification: .res $2
+pppIpv4FlagsFragmentOffset: .res $2
+pppIpv4HeaderChecksum: .res $2
+pppIpv4SourceAddress: .res $4
+pppIpv4DestinationAddress: .res $4
+pppIpv4ReceiveCount: .res $4
+pppIpv4AcceptedCount: .res $4
+pppIpv4ChecksumErrorCount: .res $4
+pppIpv4DropCount: .res $4
+pppIpv4TransmitCount: .res $4
+pppIpv4NextIdentification: .res $2
+pppIpv4Flags: .res $1
 .res PPP_DIAGNOSTIC_SIZE - (* - pppDiagnosticState)
 pppDiagnosticStateEnd:
 
@@ -201,6 +226,24 @@ pppDiagnosticStateEnd:
 .assert pppIpcpPeerAddress - pppDiagnosticState = PPP_DIAG_IPCP_PEER_ADDRESS, error, "PPP IPCP peer address offset"
 .assert pppIpcpFlags - pppDiagnosticState = PPP_DIAG_IPCP_FLAGS, error, "PPP IPCP flags offset"
 .assert pppIpcpDeferredRequest - pppDiagnosticState = PPP_DIAG_IPCP_DEFERRED_REQUEST, error, "PPP IPCP deferred request offset"
+.assert pppIpv4LastError - pppDiagnosticState = PPP_DIAG_IPV4_LAST_ERROR, error, "PPP IPv4 error offset"
+.assert pppIpv4HeaderLength - pppDiagnosticState = PPP_DIAG_IPV4_HEADER_LENGTH, error, "PPP IPv4 header length offset"
+.assert pppIpv4Protocol - pppDiagnosticState = PPP_DIAG_IPV4_PROTOCOL, error, "PPP IPv4 protocol offset"
+.assert pppIpv4Ttl - pppDiagnosticState = PPP_DIAG_IPV4_TTL, error, "PPP IPv4 TTL offset"
+.assert pppIpv4TotalLength - pppDiagnosticState = PPP_DIAG_IPV4_TOTAL_LENGTH, error, "PPP IPv4 total length offset"
+.assert pppIpv4PayloadLength - pppDiagnosticState = PPP_DIAG_IPV4_PAYLOAD_LENGTH, error, "PPP IPv4 payload length offset"
+.assert pppIpv4Identification - pppDiagnosticState = PPP_DIAG_IPV4_IDENTIFICATION, error, "PPP IPv4 identification offset"
+.assert pppIpv4FlagsFragmentOffset - pppDiagnosticState = PPP_DIAG_IPV4_FLAGS_FRAGMENT_OFFSET, error, "PPP IPv4 fragment offset"
+.assert pppIpv4HeaderChecksum - pppDiagnosticState = PPP_DIAG_IPV4_HEADER_CHECKSUM, error, "PPP IPv4 checksum offset"
+.assert pppIpv4SourceAddress - pppDiagnosticState = PPP_DIAG_IPV4_SOURCE_ADDRESS, error, "PPP IPv4 source offset"
+.assert pppIpv4DestinationAddress - pppDiagnosticState = PPP_DIAG_IPV4_DESTINATION_ADDRESS, error, "PPP IPv4 destination offset"
+.assert pppIpv4ReceiveCount - pppDiagnosticState = PPP_DIAG_IPV4_RECEIVE_COUNT, error, "PPP IPv4 receive count offset"
+.assert pppIpv4AcceptedCount - pppDiagnosticState = PPP_DIAG_IPV4_ACCEPTED_COUNT, error, "PPP IPv4 accepted count offset"
+.assert pppIpv4ChecksumErrorCount - pppDiagnosticState = PPP_DIAG_IPV4_CHECKSUM_ERROR_COUNT, error, "PPP IPv4 checksum error count offset"
+.assert pppIpv4DropCount - pppDiagnosticState = PPP_DIAG_IPV4_DROP_COUNT, error, "PPP IPv4 drop count offset"
+.assert pppIpv4TransmitCount - pppDiagnosticState = PPP_DIAG_IPV4_TRANSMIT_COUNT, error, "PPP IPv4 transmit count offset"
+.assert pppIpv4NextIdentification - pppDiagnosticState = PPP_DIAG_IPV4_NEXT_IDENTIFICATION, error, "PPP IPv4 next identification offset"
+.assert pppIpv4Flags - pppDiagnosticState = PPP_DIAG_IPV4_FLAGS, error, "PPP IPv4 flags offset"
 .assert pppDiagnosticStateEnd - pppDiagnosticState = PPP_DIAGNOSTIC_SIZE, error, "PPP diagnostic ABI size"
 
 ; Decoder and pump scratch fields are private and intentionally excluded from
@@ -221,6 +264,9 @@ pppDiagnosticStateEnd:
 .export pppIpcpOutputCursor, pppIpcpHasReject, pppIpcpHasNak
 .export pppIpcpOptionSeen, pppIpcpOptionDuplicate, pppIpcpPollAction
 .export pppIpcpPollSavedModemState
+.export pppIpv4ChecksumAccumulator, pppIpv4AvailableLength
+.export pppIpv4TransmitDestination, pppIpv4TransmitProtocol
+.export pppIpv4TransmitPayloadLength, pppIpv4PollSavedModemState
 pppLastEvent: .res $1
 pppLastInvalidReason: .res $1
 pppDecoderScratchByte: .res $1
@@ -248,6 +294,12 @@ pppIpcpHasReject: .res $1
 pppIpcpHasNak: .res $1
 pppIpcpPollAction: .res $1
 pppIpcpPollSavedModemState: .res $1
+pppIpv4ChecksumAccumulator: .res $2
+pppIpv4AvailableLength: .res $2
+pppIpv4TransmitDestination: .res $4
+pppIpv4TransmitProtocol: .res $1
+pppIpv4TransmitPayloadLength: .res $2
+pppIpv4PollSavedModemState: .res $1
 pppLcpOptionSeen: .res $100
 pppLcpOptionDuplicate: .res $100
 pppIpcpOptionSeen: .res $100
