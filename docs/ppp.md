@@ -328,6 +328,11 @@ parserの最終Code、Identifier、Length、error、呼出回数は現在のPPP�
 
 常設セルフテストのstep `$30`～`$3F` は、Ack到着順が逆の2経路、Opened到達、不正Identifier、Nak後のIdentifier更新、同じMagicを返すNakでの32bit更新、共有encoderへのRequest/Ack構築、peer Terminate-Requestに対する空Terminate-Ack、local Terminate-Requestと一致Ackによる`Closing`から`Closed`への遷移を固定transcriptで検査します。step `$40`～`$43` は、全対応optionの受理と値の公開、MRU・CHAPのNak置換、RejectのNakに対する優先、重複optionを両方Rejectするbyte列を検査します。
 
+2026-07-31にABI version 20のnormal ROMをFXPAK PROへ転送し、QUsb2Snes
+mailboxの`ppp-self-test`（command 10、sequence 1）が合格しました。local
+Magic option、完全一致Ack、Echo-Replyへの反映、同値Nak後の提案値更新を含む
+上記fixtureを実機65816上で確認しています。実対向での交渉確認は別試験です。
+
 ## 65816 LCP restart timer
 
 `src/ppp/lcpTimer.asm` はVBlankで進む16bit frame counterを使い、Configure-RequestまたはTerminate-Requestが共有encoderに受理された時点から180frame（NTSCで約3秒）のrestart timerを開始します。期限前は状態を変えず、期限では同じIdentifierのRequestを再送待ちにします。送信encoderがbusyの場合はtimerを先に再開せず、再送packetが実際にencoderへ受理された時点から次の180frameを数えます。
