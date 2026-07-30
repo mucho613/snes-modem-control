@@ -111,6 +111,66 @@ impl Client {
 }
 
 const FXPAK_EXECUTION_SCRATCH: usize = 0x3f_0000;
+const FXPAK_EXECUTION_CAPACITY: usize = 0x100;
+
+struct PayloadEntry;
+struct PayloadA8Saved;
+
+struct ExecutionPayload<State> {
+    bytes: Vec<u8>,
+    state: std::marker::PhantomData<State>,
+}
+
+#[derive(Clone, Copy)]
+struct WramAddress([u8; 3]);
+
+impl WramAddress {
+    fn new(address: u32) -> Result<Self> {
+        ensure!(
+            (0x7e_0000..=0x7f_ffff).contains(&address),
+            "execution payload target 0x{address:06x} is outside SNES WRAM"
+        );
+        let bytes = address.to_le_bytes();
+        Ok(Self([bytes[0], bytes[1], bytes[2]]))
+    }
+}
+
+impl ExecutionPayload<PayloadEntry> {
+    fn new(write_count: usize) -> Self {
+        Self {
+            bytes: Vec::with_capacity(6 * write_count + 6),
+            state: std::marker::PhantomData,
+        }
+    }
+
+    fn preserve_status_and_accumulator_as_a8(mut self) -> ExecutionPayload<PayloadA8Saved> {
+        self.bytes.push(0x08); // PHP
+        self.bytes.extend_from_slice(&[0xe2, 0x20]); // SEP #$20
+        self.bytes.push(0x48); // PHA (8-bit low accumulator)
+        ExecutionPayload {
+            bytes: self.bytes,
+            state: std::marker::PhantomData,
+        }
+    }
+}
+
+impl ExecutionPayload<PayloadA8Saved> {
+    fn store_wram_byte(&mut self, address: WramAddress, value: u8) {
+        self.bytes.extend_from_slice(&[0xa9, value]); // LDA #value (A8)
+        self.bytes.push(0x8f); // STA long
+        self.bytes.extend_from_slice(&address.0);
+    }
+
+    fn restore_status_and_accumulator(mut self) -> Result<Vec<u8>> {
+        self.bytes.push(0x68); // PLA (A8)
+        self.bytes.push(0x28); // PLP restores the incoming M/X flags
+        ensure!(
+            self.bytes.len() <= FXPAK_EXECUTION_CAPACITY,
+            "WRAM execution payload exceeds the FXPAK PRO 256-byte execution area"
+        );
+        Ok(self.bytes)
+    }
+}
 
 pub async fn input_monitor(
     websocket: &str,
@@ -943,22 +1003,12 @@ async fn write_binary_request_with_flags(
 
 fn build_wram_write_payload(writes: &[(u32, u8)]) -> Result<Vec<u8>> {
     ensure!(!writes.is_empty(), "WRAM execution payload has no writes");
-    let mut payload = Vec::with_capacity(6 * writes.len() + 6);
-    payload.extend_from_slice(&[0x08, 0xe2, 0x20, 0x48]); // PHP; SEP #$20; PHA
+    let mut payload =
+        ExecutionPayload::<PayloadEntry>::new(writes.len()).preserve_status_and_accumulator_as_a8();
     for &(address, value) in writes {
-        ensure!(
-            (0x7e_0000..=0x7f_ffff).contains(&address),
-            "execution payload target 0x{address:06x} is outside SNES WRAM"
-        );
-        payload.extend_from_slice(&[0xa9, value, 0x8f]); // LDA #value; STA long
-        payload.extend_from_slice(&address.to_le_bytes()[..3]);
+        payload.store_wram_byte(WramAddress::new(address)?, value);
     }
-    payload.extend_from_slice(&[0x68, 0x28]); // PLA; PLP
-    ensure!(
-        payload.len() <= 0x100,
-        "WRAM execution payload exceeds the FXPAK PRO 256-byte execution area"
-    );
-    Ok(payload)
+    payload.restore_status_and_accumulator()
 }
 
 async fn send_binary_chunks(socket: &mut Socket, data: &[u8]) -> Result<()> {
@@ -1041,6 +1091,14 @@ mod tests {
     #[test]
     fn rejects_execution_payload_outside_wram() {
         assert!(build_wram_write_payload(&[(0x00_1234, 0x56)]).is_err());
+    }
+
+    #[test]
+    fn rejects_execution_payload_larger_than_the_fxpak_area() {
+        let writes = (0..42)
+            .map(|index| (0x7e_1000 + index, index as u8))
+            .collect::<Vec<_>>();
+        assert!(build_wram_write_payload(&writes).is_err());
     }
 
     #[test]
