@@ -78,6 +78,7 @@
 .export pppIcmpInboundSource
 .export pppIcmpInboundIdentifier, pppIcmpInboundSequence, pppIcmpInboundPayloadLength
 .export pppIcmpInboundReplyCount, pppIcmpInboundDropCount
+.export pppIpcpPrimaryDnsAddress, pppIpcpSecondaryDnsAddress
 
 pppDiagnosticState:
 pppDiagnosticMagic: .res $4
@@ -260,7 +261,8 @@ pppIcmpInboundSequence: .res $2
 pppIcmpInboundPayloadLength: .res $2
 pppIcmpInboundReplyCount: .res $4
 pppIcmpInboundDropCount: .res $4
-.res PPP_DIAGNOSTIC_SIZE - (* - pppDiagnosticState)
+pppIpcpPrimaryDnsAddress: .res $4
+pppIpcpSecondaryDnsAddress: .res $4
 pppDiagnosticStateEnd:
 
 .assert pppDiagnosticMagic - pppDiagnosticState = PPP_DIAG_MAGIC, error, "PPP diagnostic magic offset"
@@ -443,6 +445,8 @@ pppDiagnosticStateEnd:
 .assert pppIcmpInboundPayloadLength - pppDiagnosticState = PPP_DIAG_ICMP_INBOUND_PAYLOAD_LENGTH, error, "PPP inbound ICMP payload offset"
 .assert pppIcmpInboundReplyCount - pppDiagnosticState = PPP_DIAG_ICMP_INBOUND_REPLY_COUNT, error, "PPP inbound ICMP reply count offset"
 .assert pppIcmpInboundDropCount - pppDiagnosticState = PPP_DIAG_ICMP_INBOUND_DROP_COUNT, error, "PPP inbound ICMP drop count offset"
+.assert pppIpcpPrimaryDnsAddress - pppDiagnosticState = PPP_DIAG_IPCP_PRIMARY_DNS_ADDRESS, error, "PPP IPCP primary DNS offset"
+.assert pppIpcpSecondaryDnsAddress - pppDiagnosticState = PPP_DIAG_IPCP_SECONDARY_DNS_ADDRESS, error, "PPP IPCP secondary DNS offset"
 .assert pppDiagnosticStateEnd - pppDiagnosticState = PPP_DIAGNOSTIC_SIZE, error, "PPP diagnostic ABI size"
 
 ; Decoder and pump scratch fields are private and intentionally excluded from

@@ -92,6 +92,7 @@ NETWORK_COUNTER_COLUMN = 10
 .import pppDnsAnswerAddress, pppDnsRttFrames
 .import pppDnsQueryCount, pppDnsResponseCount, pppDnsDropCount
 .import pppDnsTimeoutCount, pppDnsQueryName, pppDnsQueryNameLength
+.import pppIpcpFlags, pppIpcpPrimaryDnsAddress, pppIpcpSecondaryDnsAddress
 
 .import pppIcmpRequestState, pppIcmpRequestLastError, pppIcmpRequestFlags
 .import pppIcmpRequestDestination, pppIcmpRequestIdentifier
@@ -167,6 +168,8 @@ NETWORK_COUNTER_COLUMN = 10
   networkWriteImmediate 12, 0, "RESPONSES"
   networkWriteImmediate 13, 0, "DROPS    "
   networkWriteImmediate 14, 0, "TIMEOUTS "
+  networkWriteImmediate 16, 0, "PRIMARY"
+  networkWriteImmediate 17, 0, "SECOND "
   rtl
 .endproc
 
@@ -342,6 +345,30 @@ NETWORK_COUNTER_COLUMN = 10
   ldy #.loword(pppDnsTimeoutCount)
   ldx #(14 * TERMINAL_COLUMNS) + NETWORK_COUNTER_COLUMN
   jsr @writeCounter32
+
+  networkClearFrom 16, NETWORK_LONG_VALUE_COLUMN
+  lda pppIpcpFlags
+  and #PPP_IPCP_FLAG_PRIMARY_DNS_VALID
+  beq @primaryDnsUnavailable
+  ldy #.loword(pppIpcpPrimaryDnsAddress)
+  ldx #(16 * TERMINAL_COLUMNS) + NETWORK_LONG_VALUE_COLUMN
+  jsr @writeIpv4
+  bra @primaryDnsDone
+@primaryDnsUnavailable:
+  networkWriteImmediate 16, NETWORK_LONG_VALUE_COLUMN, "---.---.---.---"
+@primaryDnsDone:
+
+  networkClearFrom 17, NETWORK_LONG_VALUE_COLUMN
+  lda pppIpcpFlags
+  and #PPP_IPCP_FLAG_SECONDARY_DNS_VALID
+  beq @secondaryDnsUnavailable
+  ldy #.loword(pppIpcpSecondaryDnsAddress)
+  ldx #(17 * TERMINAL_COLUMNS) + NETWORK_LONG_VALUE_COLUMN
+  jsr @writeIpv4
+  bra @secondaryDnsDone
+@secondaryDnsUnavailable:
+  networkWriteImmediate 17, NETWORK_LONG_VALUE_COLUMN, "---.---.---.---"
+@secondaryDnsDone:
   rtl
 
 @icmp:

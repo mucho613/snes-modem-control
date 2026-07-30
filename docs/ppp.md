@@ -216,25 +216,34 @@ cargo run -p ndm24-tools -- ppp-monitor
 
 `crates/ndm24-ppp/src/ipcp.rs` は [RFC 1332](https://www.rfc-editor.org/rfc/rfc1332.html)
 のIPCP packetとConfiguration Optionをcopyせず解析する参照codecです。
-Protocol `$8021`、Configure-Request/Ack/Nak/Reject、IP-Address optionを扱い、
+Protocol `$8021`、Configure-Request/Ack/Nak/Reject、IP-Address optionに加え、
+[RFC 1877](https://www.rfc-editor.org/rfc/rfc1877.html)のPrimary DNS Server
+Address（Type 129）とSecondary DNS Server Address（Type 131）を扱い、
 packet Lengthより後ろのpaddingを除外します。短いheader、不正なpacket Length、
 長さ2未満またはpacket境界を越えるoptionは個別のerrorにします。
 
 `crates/ndm24-ppp/src/ipcp/client.rs` はLCP/PAP完了後に動くConfigure交渉の
-参照状態機械です。SFCの最初のConfigure-RequestはIP-Address `0.0.0.0`を含み、
+参照状態機械です。SFCの最初のConfigure-RequestはIP-Address、Primary DNS、
+Secondary DNSをこの順で含み、いずれも`0.0.0.0`として割り当てを要求します。
 対向のConfigure-Nakが非zeroのアドレスを提案した場合は、その値へ置き換えて
 新しいIdentifierで再要求します。WSL2 fixtureではlocal `10.24.0.2`、peer
-`10.24.0.1`が確定します。
+`10.24.0.1`、Primary DNS `1.1.1.1`、Secondary DNS `1.0.0.1`が確定します。
 
 peer Configure-Requestについては、正しい長さの非zero IP-AddressをAckします。
 zeroアドレスにはfixtureのpeer address `10.24.0.1`をNak提案し、
-IP-Compression-Protocol、廃止されたIP-Addresses、未知option、重複optionは
+SFCはDNS serverを提供しないため、peer Configure-Request内のDNS optionは
+Rejectします。IP-Compression-Protocol、廃止されたIP-Addresses、未知option、
+重複optionも
 Rejectします。Configure-AckはIdentifierと送信option列の完全一致を要求します。
 restart intervalは3秒、Max-Configureは初回を含む10回で、lower-down時には
-交渉済みアドレス、timer、再送回数を初期値へ戻します。
+交渉済みIP/DNSアドレス、timer、再送回数を初期値へ戻します。DNS optionは
+任意であり、片方または両方がConfigure-RejectされてもIPCPは継続します。
+AckされたDNSアドレスがzeroの場合も収束できますが、valid flagは立ちません。
 
-固定transcript試験は、`pppd`がSFCの`0.0.0.0`要求へ`10.24.0.2`をNak提案し、
+固定transcript試験は、`pppd`がSFCの3つの`0.0.0.0`要求へ
+`10.24.0.2`、`1.1.1.1`、`1.0.0.1`を1つのNakで提案し、
 SFCが再要求した後に双方のConfigure-Ackが成立する経路を検査します。加えて、
+DNS optionごとの独立Reject、zero DNS Nakの拒否、zero DNS Ackの収束、
 zero peer addressへのNak、圧縮・未知・重複optionのReject、不一致Ackの無視、
 同一Identifierでのtimeout再送と上限到達を検査します。
 
@@ -376,30 +385,37 @@ fixtureで検査します。
 ## 65816 IPCP client
 
 `src/ppp/ipcp.asm`はProtocol `$8021`のConfigure packetを解析し、RFC 1332の
-IP-Address optionでlocal/peer addressを交渉します。最初はlocal `0.0.0.0`を
-要求し、peer Configure-Nakの非zero提案を受理して新しいIdentifierで再要求
-します。WSL2 fixtureの期待値はlocal `10.24.0.2`、peer `10.24.0.1`です。
+IP-Address optionとRFC 1877のPrimary/Secondary DNS Server Address optionを
+交渉します。最初はlocal IPと2つのDNSを`0.0.0.0`で要求し、peer
+Configure-Nakの非zero提案を原子的に検証してから、新しいIdentifierで再要求
+します。WSL2 fixtureの期待値はlocal `10.24.0.2`、peer `10.24.0.1`、
+Primary DNS `1.1.1.1`、Secondary DNS `1.0.0.1`です。
 
 peerからの正しい非zero IP-AddressはAckします。zero addressは`10.24.0.1`へ
-Nakし、IP-Compression-Protocol、旧IP-Addresses、未知option、重複optionは
+Nakします。peerがDNS optionを要求した場合はSFCがDNS serverではないため
+Rejectし、IP-Compression-Protocol、旧IP-Addresses、未知option、重複optionも
 Rejectします。Rejectは元のoption byte列を変更せず返し、RejectとNakが同じ
 Requestにある場合はRejectを優先します。Configure-AckはIdentifierと現在の
-local option列が完全一致した場合だけ状態へ反映します。
+local option列が完全一致した場合だけ状態へ反映します。対向がDNS optionを
+Rejectした場合はそのoptionだけを次のRequestから外し、IPCPの成立は妨げません。
 
 `src/ppp/ipcpPoll.asm`はLCPとPAPがともに`Opened`の間だけIPCPを稼働させます。
 共有encoderがbusyならpeer応答と受信frame所有権を保持し、受理後に解放します。
 Opened中の再交渉ではpeer応答を先に送り、local Configure-Requestを1件だけ
-deferred slotへ保持します。lower-downでは交渉済みaddress、timer、pending
+deferred slotへ保持します。lower-downでは交渉済みIP/DNS address、timer、pending
 送信を初期値へ戻します。
 
 restart intervalは180 frame、Max-Configureは初回を含む10回です。timeout再送は
 同じIdentifierとoption列を使い、送信器が受理した時点から次の期限を数えます。
-公開診断ABI version 9はIPCP state、最後のCode/Identifier/error、local/peer
-address、再送状態、送受信countに加え、後段のIPv4・ICMP・UDP診断を公開します。
+公開診断ABI version 14はIPCP state、最後のCode/Identifier/error、local/peer
+address、Primary/Secondary DNS addressと各valid flag、再送状態、送受信count
+に加え、後段のIPv4・ICMP・UDP/NTP/DNS診断を公開します。DNS addressは既存
+fieldのoffsetを変えないようABI末尾へ追加しています。
 
-常設セルフテストのstep `$70`～`$76`は、`0.0.0.0`要求、peer `10.24.0.1`の
-Ack、local `10.24.0.2`のNak提案、再要求、双方Ackによる`Opened`、zero peer
-addressへのNak、IP圧縮のRejectをSFC上で検査します。step `$77`～`$79`は
+常設セルフテストのstep `$70`～`$76`は、3つの`0.0.0.0`要求、peer
+`10.24.0.1`のAck、local `10.24.0.2`と2つのDNSのNak提案、再要求、
+完全一致Ackによる`Opened`とDNS valid flag、zero peer addressへのNak、
+IP圧縮のRejectをSFC上で検査します。step `$77`～`$79`は
 PAP `Opened`による起動、共有encoder backpressure中のframe保持、応答後の
 解放、PAP lower-downによるIPCP初期化をmain-loop順で検査します。
 2026-07-30にFXPAK PRO実機へnormal ROMを転送し、mailbox
@@ -449,7 +465,7 @@ source addressへEcho Replyを返します。奇数byte長のpayloadでは末尾
 Type/Code/checksum、Identifier/Sequence、各種count、pending状態は公開診断ABI
 version 9から取得できます。
 
-公開診断ABI version 13、423byteでは、画面表示とhost側診断が同じ意味を持つよう、
+公開診断ABI version 14、431byteでは、画面表示とhost側診断が同じ意味を持つよう、
 最後に検証へ合格した外向きEcho Requestとは独立の受信snapshotを末尾へ追加
 しました。source address、Identifier、Sequence Number、payload長は次の有効な
 Echo Requestまたは再起動まで保持します。壊れたrequestはこのsnapshotを維持した

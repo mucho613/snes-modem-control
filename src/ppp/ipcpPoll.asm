@@ -216,7 +216,7 @@
   lda #$11
   sta pppFrameBuffer + 5
   stz pppFrameBuffer + 6
-  lda #PPP_IPCP_CONFIGURE_PACKET_LENGTH
+  lda #PPP_IPCP_ADDRESS_CONFIGURE_PACKET_LENGTH
   sta pppFrameBuffer + 7
   lda #PPP_IPCP_OPTION_IP_ADDRESS
   sta pppFrameBuffer + 8
@@ -234,7 +234,7 @@
   .a16
   lda #PPP_PROTOCOL_IPCP
   sta pppLastProtocol
-  lda #PPP_IPCP_CONFIGURE_FRAME_LENGTH
+  lda #PPP_IPCP_ADDRESS_CONFIGURE_FRAME_LENGTH
   sta pppLastFrameLength
   sep #$20
   .a8

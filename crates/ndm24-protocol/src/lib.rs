@@ -331,6 +331,8 @@ pub struct PppDiagnosticSnapshot {
     pub icmp_inbound_payload_length: u16,
     pub icmp_inbound_reply_count: u32,
     pub icmp_inbound_drop_count: u32,
+    pub ipcp_primary_dns_address: [u8; 4],
+    pub ipcp_secondary_dns_address: [u8; 4],
 }
 
 impl PppDiagnosticSnapshot {
@@ -541,6 +543,8 @@ impl PppDiagnosticSnapshot {
             icmp_inbound_payload_length: read_u16(data, PPP_DIAG_ICMP_INBOUND_PAYLOAD_LENGTH)?,
             icmp_inbound_reply_count: read_u32(data, PPP_DIAG_ICMP_INBOUND_REPLY_COUNT)?,
             icmp_inbound_drop_count: read_u32(data, PPP_DIAG_ICMP_INBOUND_DROP_COUNT)?,
+            ipcp_primary_dns_address: read_array(data, PPP_DIAG_IPCP_PRIMARY_DNS_ADDRESS)?,
+            ipcp_secondary_dns_address: read_array(data, PPP_DIAG_IPCP_SECONDARY_DNS_ADDRESS)?,
         })
     }
 }
@@ -951,6 +955,10 @@ mod tests {
             .copy_from_slice(&8_u32.to_le_bytes());
         data[PPP_DIAG_ICMP_INBOUND_DROP_COUNT..PPP_DIAG_ICMP_INBOUND_DROP_COUNT + 4]
             .copy_from_slice(&1_u32.to_le_bytes());
+        data[PPP_DIAG_IPCP_PRIMARY_DNS_ADDRESS..PPP_DIAG_IPCP_PRIMARY_DNS_ADDRESS + 4]
+            .copy_from_slice(&[1, 1, 1, 1]);
+        data[PPP_DIAG_IPCP_SECONDARY_DNS_ADDRESS..PPP_DIAG_IPCP_SECONDARY_DNS_ADDRESS + 4]
+            .copy_from_slice(&[1, 0, 0, 1]);
 
         let snapshot = PppDiagnosticSnapshot::decode(&data).unwrap();
         assert_eq!(snapshot.snapshot_sequence, 8);
@@ -1094,6 +1102,8 @@ mod tests {
         assert_eq!(snapshot.icmp_inbound_payload_length, 56);
         assert_eq!(snapshot.icmp_inbound_reply_count, 8);
         assert_eq!(snapshot.icmp_inbound_drop_count, 1);
+        assert_eq!(snapshot.ipcp_primary_dns_address, [1, 1, 1, 1]);
+        assert_eq!(snapshot.ipcp_secondary_dns_address, [1, 0, 0, 1]);
     }
 
     #[test]

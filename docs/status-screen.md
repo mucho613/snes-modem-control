@@ -50,7 +50,10 @@ TIMEOUTS  0
 ## DNS
 
 STATE、HOST、RESOLVR、A、ANSWERS、TX ID、RTT、ERRORと要求・応答・破棄・
-timeout countを表示します。HOSTは表示領域25文字を超える場合、先頭24文字と
+timeout countに加え、IPCPで取得した`PRIMARY`と`SECOND` DNS serverを表示します。
+未取得またはpeerにRejectされたDNS serverは`---.---.---.---`です。`RESOLVR`は
+IPCPの設定値ではなく、最後のDNS queryが実際に送信されたresolverを表します。
+HOSTは表示領域25文字を超える場合、先頭24文字と
 末尾`>`へ短縮します。新しい要求を開始した時点で前回結果とRTTを消し、完了した
 結果は次の要求または再起動まで残します。
 

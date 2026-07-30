@@ -13,6 +13,7 @@
 .import pppIpcpPendingAction, pppIpcpTimerActive, pppIpcpPacketLength
 .import pppIpcpRestartDeadline, pppIpcpReceiveCount, pppIpcpTransmitCount
 .import pppIpcpLocalAddress, pppIpcpPeerAddress, pppIpcpFlags
+.import pppIpcpPrimaryDnsAddress, pppIpcpSecondaryDnsAddress
 .import pppIpcpDeferredRequest
 .import pppIpcpPacketEnd, pppIpcpOptionLength, pppIpcpOptionOffset
 .import pppIpcpOutputCursor, pppIpcpHasReject, pppIpcpHasNak
@@ -54,12 +55,13 @@
   stz pppIpcpPendingAction
   stz pppIpcpTimerActive
   stz pppIpcpDeferredRequest
-  lda #(PPP_IPCP_FLAG_REQUEST_ADDRESS | PPP_IPCP_FLAG_PEER_VALID)
+  lda #(PPP_IPCP_FLAG_REQUEST_ADDRESS | PPP_IPCP_FLAG_PEER_VALID | PPP_IPCP_FLAG_REQUEST_PRIMARY_DNS | PPP_IPCP_FLAG_REQUEST_SECONDARY_DNS)
   sta pppIpcpFlags
   stz pppIpcpLocalAddress + 0
   stz pppIpcpLocalAddress + 1
   stz pppIpcpLocalAddress + 2
   stz pppIpcpLocalAddress + 3
+  jsr @clearDns
   jsr @setDefaultPeer
   rep #$20
   .a16
@@ -84,6 +86,17 @@
   sta pppIpcpPeerAddress + 2
   lda #PPP_IPCP_PEER_ADDRESS_3
   sta pppIpcpPeerAddress + 3
+  rts
+
+@clearDns:
+  stz pppIpcpPrimaryDnsAddress + 0
+  stz pppIpcpPrimaryDnsAddress + 1
+  stz pppIpcpPrimaryDnsAddress + 2
+  stz pppIpcpPrimaryDnsAddress + 3
+  stz pppIpcpSecondaryDnsAddress + 0
+  stz pppIpcpSecondaryDnsAddress + 1
+  stz pppIpcpSecondaryDnsAddress + 2
+  stz pppIpcpSecondaryDnsAddress + 3
   rts
 .endproc
 
@@ -114,7 +127,15 @@
   stz pppIpcpLocalAddress + 1
   stz pppIpcpLocalAddress + 2
   stz pppIpcpLocalAddress + 3
-  lda #(PPP_IPCP_FLAG_REQUEST_ADDRESS | PPP_IPCP_FLAG_PEER_VALID)
+  stz pppIpcpPrimaryDnsAddress + 0
+  stz pppIpcpPrimaryDnsAddress + 1
+  stz pppIpcpPrimaryDnsAddress + 2
+  stz pppIpcpPrimaryDnsAddress + 3
+  stz pppIpcpSecondaryDnsAddress + 0
+  stz pppIpcpSecondaryDnsAddress + 1
+  stz pppIpcpSecondaryDnsAddress + 2
+  stz pppIpcpSecondaryDnsAddress + 3
+  lda #(PPP_IPCP_FLAG_REQUEST_ADDRESS | PPP_IPCP_FLAG_PEER_VALID | PPP_IPCP_FLAG_REQUEST_PRIMARY_DNS | PPP_IPCP_FLAG_REQUEST_SECONDARY_DNS)
   sta pppIpcpFlags
   lda #PPP_IPCP_PEER_ADDRESS_0
   sta pppIpcpPeerAddress + 0
@@ -151,6 +172,14 @@
   stz pppIpcpLocalAddress + 1
   stz pppIpcpLocalAddress + 2
   stz pppIpcpLocalAddress + 3
+  stz pppIpcpPrimaryDnsAddress + 0
+  stz pppIpcpPrimaryDnsAddress + 1
+  stz pppIpcpPrimaryDnsAddress + 2
+  stz pppIpcpPrimaryDnsAddress + 3
+  stz pppIpcpSecondaryDnsAddress + 0
+  stz pppIpcpSecondaryDnsAddress + 1
+  stz pppIpcpSecondaryDnsAddress + 2
+  stz pppIpcpSecondaryDnsAddress + 3
   lda #PPP_IPCP_PEER_ADDRESS_0
   sta pppIpcpPeerAddress + 0
   lda #PPP_IPCP_PEER_ADDRESS_1
@@ -159,7 +188,7 @@
   sta pppIpcpPeerAddress + 2
   lda #PPP_IPCP_PEER_ADDRESS_3
   sta pppIpcpPeerAddress + 3
-  lda #(PPP_IPCP_FLAG_REQUEST_ADDRESS | PPP_IPCP_FLAG_PEER_VALID)
+  lda #(PPP_IPCP_FLAG_REQUEST_ADDRESS | PPP_IPCP_FLAG_PEER_VALID | PPP_IPCP_FLAG_REQUEST_PRIMARY_DNS | PPP_IPCP_FLAG_REQUEST_SECONDARY_DNS)
   sta pppIpcpFlags
   jsr pppSnapshotEnd
   plb
@@ -396,51 +425,9 @@
   beq :+
   jmp @invalidResponse
 :
-  lda pppIpcpFlags
-  and #PPP_IPCP_FLAG_REQUEST_ADDRESS
-  beq @ackWithoutAddress
-  rep #$20
-  .a16
-  lda pppIpcpPacketLength
-  cmp #PPP_IPCP_CONFIGURE_PACKET_LENGTH
-  beq :+
-  jmp @invalidResponse16
-:
-  sep #$20
-  .a8
-  lda pppFrameBuffer + 8
-  cmp #PPP_IPCP_OPTION_IP_ADDRESS
-  beq :+
-  jmp @invalidResponse
-:
-  lda pppFrameBuffer + 9
-  cmp #PPP_IPCP_IP_ADDRESS_OPTION_LENGTH
-  beq :+
-  jmp @invalidResponse
-:
-  ldx #$0000
-@ackAddressLoop:
-  lda pppFrameBuffer + 10, x
-  cmp pppIpcpLocalAddress, x
-  beq :+
-  jmp @invalidResponse
-:
-  inx
-  cpx #$0004
-  bne @ackAddressLoop
-  bra @applyAck
-
-@ackWithoutAddress:
-  .a8
-  rep #$20
-  .a16
-  lda pppIpcpPacketLength
-  cmp #PPP_IPCP_HEADER_LENGTH
-  beq :+
-  jmp @invalidResponse16
-:
-  sep #$20
-  .a8
+  jsr @validateAckOptions
+  bcs @invalidResponse
+  jsr @publishDnsValidity
 
 @applyAck:
   .a8
@@ -480,7 +467,7 @@
   lda pppIpcpLastIdentifier
   cmp pppIpcpRequestIdentifier
   bne @invalidResponse
-  jsr @acceptAddressNak
+  jsr @acceptNakOptions
   bcs @invalidResponse
   jsr @negativeResponse
   jmp @success
@@ -490,40 +477,11 @@
   lda pppIpcpLastIdentifier
   cmp pppIpcpRequestIdentifier
   bne @invalidResponse
-  lda pppIpcpFlags
-  and #PPP_IPCP_FLAG_REQUEST_ADDRESS
-  beq @invalidResponse
-  rep #$20
-  .a16
-  lda pppIpcpPacketLength
-  cmp #PPP_IPCP_CONFIGURE_PACKET_LENGTH
-  bne @invalidResponse16
-  sep #$20
-  .a8
-  lda pppFrameBuffer + 8
-  cmp #PPP_IPCP_OPTION_IP_ADDRESS
-  bne @invalidResponse
-  lda pppFrameBuffer + 9
-  cmp #PPP_IPCP_IP_ADDRESS_OPTION_LENGTH
-  bne @invalidResponse
-  ldx #$0000
-@rejectAddressLoop:
-  lda pppFrameBuffer + 10, x
-  cmp pppIpcpLocalAddress, x
-  bne @invalidResponse
-  inx
-  cpx #$0004
-  bne @rejectAddressLoop
-  lda pppIpcpFlags
-  and #($ff ^ PPP_IPCP_FLAG_REQUEST_ADDRESS)
-  sta pppIpcpFlags
+  jsr @acceptRejectOptions
+  bcs @invalidResponse
   jsr @negativeResponse
   jmp @success
 
-@invalidResponse16:
-  .a16
-  sep #$20
-  .a8
 @invalidResponse:
   .a8
   pppIpcpReturnError PPP_IPCP_ERROR_INVALID_RESPONSE
@@ -538,63 +496,297 @@
   clc
   rts
 
-; Accept exactly one non-zero IP-Address suggestion from Configure-Nak.
-@acceptAddressNak:
+; Ack must reproduce every currently requested option in fixed 3/129/131 order.
+@validateAckOptions:
+  .a8
+  ldy #PPP_IPCP_FRAME_OFFSET + PPP_IPCP_HEADER_LENGTH
+  lda pppIpcpFlags
+  and #PPP_IPCP_FLAG_REQUEST_ADDRESS
+  beq :+
+  jsr @matchLocalAddress
+  bcs @ackInvalid
+:
+  lda pppIpcpFlags
+  and #PPP_IPCP_FLAG_REQUEST_PRIMARY_DNS
+  beq :+
+  jsr @matchPrimaryDns
+  bcs @ackInvalid
+:
+  lda pppIpcpFlags
+  and #PPP_IPCP_FLAG_REQUEST_SECONDARY_DNS
+  beq :+
+  jsr @matchSecondaryDns
+  bcs @ackInvalid
+:
+  cpy pppIpcpPacketEnd
+  bne @ackInvalid
+  clc
+  rts
+
+@matchLocalAddress:
+  lda #PPP_IPCP_OPTION_IP_ADDRESS
+  ldx #.loword(pppIpcpLocalAddress)
+  bra @matchAddressOption
+@matchPrimaryDns:
+  lda #PPP_IPCP_OPTION_PRIMARY_DNS_SERVER_ADDRESS
+  ldx #.loword(pppIpcpPrimaryDnsAddress)
+  bra @matchAddressOption
+@matchSecondaryDns:
+  lda #PPP_IPCP_OPTION_SECONDARY_DNS_SERVER_ADDRESS
+  ldx #.loword(pppIpcpSecondaryDnsAddress)
+@matchAddressOption:
+  cmp pppFrameBuffer, y
+  bne @ackInvalid
+  lda pppFrameBuffer + 1, y
+  cmp #PPP_IPCP_IP_ADDRESS_OPTION_LENGTH
+  bne @ackInvalid
+  lda pppFrameBuffer + 2, y
+  cmp a:$0000, x
+  bne @ackInvalid
+  lda pppFrameBuffer + 3, y
+  cmp a:$0001, x
+  bne @ackInvalid
+  lda pppFrameBuffer + 4, y
+  cmp a:$0002, x
+  bne @ackInvalid
+  lda pppFrameBuffer + 5, y
+  cmp a:$0003, x
+  bne @ackInvalid
+  rep #$20
+  .a16
+  tya
+  clc
+  adc #PPP_IPCP_IP_ADDRESS_OPTION_LENGTH
+  tay
+  sep #$20
+  .a8
+  clc
+  rts
+@ackInvalid:
+  sec
+  rts
+
+@publishDnsValidity:
+  lda pppIpcpFlags
+  and #($ff ^ (PPP_IPCP_FLAG_PRIMARY_DNS_VALID | PPP_IPCP_FLAG_SECONDARY_DNS_VALID))
+  sta pppIpcpFlags
+  lda pppIpcpFlags
+  and #PPP_IPCP_FLAG_REQUEST_PRIMARY_DNS
+  beq :+
+  lda pppIpcpPrimaryDnsAddress + 0
+  ora pppIpcpPrimaryDnsAddress + 1
+  ora pppIpcpPrimaryDnsAddress + 2
+  ora pppIpcpPrimaryDnsAddress + 3
+  beq :+
+  lda pppIpcpFlags
+  ora #PPP_IPCP_FLAG_PRIMARY_DNS_VALID
+  sta pppIpcpFlags
+:
+  lda pppIpcpFlags
+  and #PPP_IPCP_FLAG_REQUEST_SECONDARY_DNS
+  beq :+
+  lda pppIpcpSecondaryDnsAddress + 0
+  ora pppIpcpSecondaryDnsAddress + 1
+  ora pppIpcpSecondaryDnsAddress + 2
+  ora pppIpcpSecondaryDnsAddress + 3
+  beq :+
+  lda pppIpcpFlags
+  ora #PPP_IPCP_FLAG_SECONDARY_DNS_VALID
+  sta pppIpcpFlags
+:
+  rts
+
+; Validate all Nak options before applying any of them.
+@acceptNakOptions:
   .a8
   ldy #PPP_IPCP_FRAME_OFFSET + PPP_IPCP_HEADER_LENGTH
   stz pppIpcpHasNak
 @nakLoop:
   cpy pppIpcpPacketEnd
-  beq @nakDone
+  beq @nakValidated
   lda pppFrameBuffer, y
   cmp #PPP_IPCP_OPTION_IP_ADDRESS
-  bne @nakAdvance
-  lda pppIpcpHasNak
-  bne @nakInvalid
+  beq @nakLocal
+  cmp #PPP_IPCP_OPTION_PRIMARY_DNS_SERVER_ADDRESS
+  beq @nakPrimary
+  cmp #PPP_IPCP_OPTION_SECONDARY_DNS_SERVER_ADDRESS
+  beq @nakSecondary
+  jmp @nakInvalid
+@nakLocal:
+  lda #PPP_IPCP_FLAG_REQUEST_ADDRESS
+  ldx #$0001
+  bra @validateNakAddress
+@nakPrimary:
+  lda #PPP_IPCP_FLAG_REQUEST_PRIMARY_DNS
+  ldx #$0002
+  bra @validateNakAddress
+@nakSecondary:
+  lda #PPP_IPCP_FLAG_REQUEST_SECONDARY_DNS
+  ldx #$0004
+@validateNakAddress:
+  bit pppIpcpFlags
+  beq @nakValidationInvalid
+  txa
+  bit pppIpcpHasNak
+  bne @nakValidationInvalid
+  txa
+  ora pppIpcpHasNak
+  sta pppIpcpHasNak
   lda pppFrameBuffer + 1, y
   cmp #PPP_IPCP_IP_ADDRESS_OPTION_LENGTH
-  bne @nakInvalid
+  bne @nakValidationInvalid
   lda pppFrameBuffer + 2, y
   ora pppFrameBuffer + 3, y
   ora pppFrameBuffer + 4, y
   ora pppFrameBuffer + 5, y
-  beq @nakInvalid
-  lda #$01
-  sta pppIpcpHasNak
-  ldx #$0000
-@copyNakAddress:
-  lda pppFrameBuffer + 2, y
-  sta pppIpcpLocalAddress, x
-  iny
-  inx
-  cpx #$0004
-  bne @copyNakAddress
-  dey
-  dey
-  dey
-  dey
+  beq @nakValidationInvalid
 @nakAdvance:
-  lda pppFrameBuffer + 1, y
-  sta pppIpcpOptionLength
-  stz pppIpcpOptionLength + 1
   rep #$20
   .a16
   tya
   clc
-  adc pppIpcpOptionLength
+  adc #PPP_IPCP_IP_ADDRESS_OPTION_LENGTH
   tay
   sep #$20
   .a8
   bra @nakLoop
-@nakDone:
+@nakValidationInvalid:
+  jmp @nakInvalid
+@nakValidated:
   lda pppIpcpHasNak
   beq @nakInvalid
+  ldy #PPP_IPCP_FRAME_OFFSET + PPP_IPCP_HEADER_LENGTH
+@applyNakLoop:
+  cpy pppIpcpPacketEnd
+  beq @nakValid
+  lda pppFrameBuffer, y
+  cmp #PPP_IPCP_OPTION_IP_ADDRESS
+  beq @applyNakLocal
+  cmp #PPP_IPCP_OPTION_PRIMARY_DNS_SERVER_ADDRESS
+  beq @applyNakPrimary
+  ldx #.loword(pppIpcpSecondaryDnsAddress)
+  lda #PPP_IPCP_FLAG_SECONDARY_DNS_VALID
+  bra @applyNakAddress
+@applyNakLocal:
+  ldx #.loword(pppIpcpLocalAddress)
+  lda #$00
+  bra @applyNakAddress
+@applyNakPrimary:
+  ldx #.loword(pppIpcpPrimaryDnsAddress)
+  lda #PPP_IPCP_FLAG_PRIMARY_DNS_VALID
+@applyNakAddress:
+  eor #$ff
+  and pppIpcpFlags
+  sta pppIpcpFlags
+  lda pppFrameBuffer + 2, y
+  sta a:$0000, x
+  lda pppFrameBuffer + 3, y
+  sta a:$0001, x
+  lda pppFrameBuffer + 4, y
+  sta a:$0002, x
+  lda pppFrameBuffer + 5, y
+  sta a:$0003, x
+  lda pppFrameBuffer, y
+  cmp #PPP_IPCP_OPTION_IP_ADDRESS
+  bne @applyNakAdvance
   lda pppIpcpFlags
   ora #(PPP_IPCP_FLAG_REQUEST_ADDRESS | PPP_IPCP_FLAG_LOCAL_VALID)
   sta pppIpcpFlags
+@applyNakAdvance:
+  rep #$20
+  .a16
+  tya
+  clc
+  adc #PPP_IPCP_IP_ADDRESS_OPTION_LENGTH
+  tay
+  sep #$20
+  .a8
+  bra @applyNakLoop
+@nakValid:
   clc
   rts
 @nakInvalid:
+  sec
+  rts
+
+; Reject may independently remove any exact subset of our current request.
+@acceptRejectOptions:
+  .a8
+  ldy #PPP_IPCP_FRAME_OFFSET + PPP_IPCP_HEADER_LENGTH
+  stz pppIpcpHasReject
+@rejectLoop:
+  cpy pppIpcpPacketEnd
+  beq @rejectValidated
+  lda pppFrameBuffer, y
+  cmp #PPP_IPCP_OPTION_IP_ADDRESS
+  beq @rejectLocal
+  cmp #PPP_IPCP_OPTION_PRIMARY_DNS_SERVER_ADDRESS
+  beq @rejectPrimary
+  cmp #PPP_IPCP_OPTION_SECONDARY_DNS_SERVER_ADDRESS
+  beq @rejectSecondary
+  bra @responseInvalid
+@rejectLocal:
+  lda #PPP_IPCP_FLAG_REQUEST_ADDRESS
+  ldx #$0001
+  bra @validateRejectAddress
+@rejectPrimary:
+  lda #PPP_IPCP_FLAG_REQUEST_PRIMARY_DNS
+  ldx #$0002
+  bra @validateRejectAddress
+@rejectSecondary:
+  lda #PPP_IPCP_FLAG_REQUEST_SECONDARY_DNS
+  ldx #$0004
+@validateRejectAddress:
+  bit pppIpcpFlags
+  beq @responseInvalid
+  txa
+  bit pppIpcpHasReject
+  bne @responseInvalid
+  txa
+  ora pppIpcpHasReject
+  sta pppIpcpHasReject
+  lda pppFrameBuffer, y
+  cmp #PPP_IPCP_OPTION_IP_ADDRESS
+  beq :+
+  cmp #PPP_IPCP_OPTION_PRIMARY_DNS_SERVER_ADDRESS
+  beq @rejectMatchPrimary
+  jsr @matchSecondaryDns
+  bcs @responseInvalid
+  bra @rejectLoop
+:
+  jsr @matchLocalAddress
+  bcs @responseInvalid
+  bra @rejectLoop
+@rejectMatchPrimary:
+  jsr @matchPrimaryDns
+  bcs @responseInvalid
+  bra @rejectLoop
+@rejectValidated:
+  lda pppIpcpHasReject
+  beq @responseInvalid
+  bit #$01
+  beq :+
+  lda pppIpcpFlags
+  and #($ff ^ (PPP_IPCP_FLAG_REQUEST_ADDRESS | PPP_IPCP_FLAG_LOCAL_VALID))
+  sta pppIpcpFlags
+:
+  lda pppIpcpHasReject
+  bit #$02
+  beq :+
+  lda pppIpcpFlags
+  and #($ff ^ (PPP_IPCP_FLAG_REQUEST_PRIMARY_DNS | PPP_IPCP_FLAG_PRIMARY_DNS_VALID))
+  sta pppIpcpFlags
+:
+  lda pppIpcpHasReject
+  bit #$04
+  beq @responseValid
+  lda pppIpcpFlags
+  and #($ff ^ (PPP_IPCP_FLAG_REQUEST_SECONDARY_DNS | PPP_IPCP_FLAG_SECONDARY_DNS_VALID))
+  sta pppIpcpFlags
+@responseValid:
+  clc
+  rts
+@responseInvalid:
   sec
   rts
 
@@ -932,11 +1124,17 @@
   cmp #PPP_IPCP_ACTION_CONFIGURE_REQUEST
   beq @request
   cmp #PPP_IPCP_ACTION_CONFIGURE_ACK
-  beq @ack
+  bne :+
+  jmp @ack
+:
   cmp #PPP_IPCP_ACTION_CONFIGURE_NAK
-  beq @selective
+  bne :+
+  jmp @selective
+:
   cmp #PPP_IPCP_ACTION_CONFIGURE_REJECT
-  beq @selective
+  bne :+
+  jmp @selective
+:
   jmp busyReturn
 
 @request:
@@ -944,35 +1142,83 @@
   sta pppTransmitBuffer + 4
   lda pppIpcpRequestIdentifier
   sta pppTransmitBuffer + 5
+  ldx #PPP_IPCP_FRAME_OFFSET + PPP_IPCP_HEADER_LENGTH
   lda pppIpcpFlags
   and #PPP_IPCP_FLAG_REQUEST_ADDRESS
-  beq @emptyRequest
-  stz pppTransmitBuffer + 6
-  lda #PPP_IPCP_CONFIGURE_PACKET_LENGTH
-  sta pppTransmitBuffer + 7
+  beq @requestPrimary
   lda #PPP_IPCP_OPTION_IP_ADDRESS
-  sta pppTransmitBuffer + 8
+  sta pppTransmitBuffer, x
   lda #PPP_IPCP_IP_ADDRESS_OPTION_LENGTH
-  sta pppTransmitBuffer + 9
-  ldx #$0000
-@requestAddress:
-  lda pppIpcpLocalAddress, x
-  sta pppTransmitBuffer + 10, x
-  inx
-  cpx #$0004
-  bne @requestAddress
+  sta pppTransmitBuffer + 1, x
+  lda pppIpcpLocalAddress + 0
+  sta pppTransmitBuffer + 2, x
+  lda pppIpcpLocalAddress + 1
+  sta pppTransmitBuffer + 3, x
+  lda pppIpcpLocalAddress + 2
+  sta pppTransmitBuffer + 4, x
+  lda pppIpcpLocalAddress + 3
+  sta pppTransmitBuffer + 5, x
   rep #$20
   .a16
-  lda #PPP_IPCP_CONFIGURE_FRAME_LENGTH
-  bra @begin
-@emptyRequest:
-  stz pppTransmitBuffer + 6
-  lda #PPP_IPCP_HEADER_LENGTH
+  txa
+  clc
+  adc #PPP_IPCP_IP_ADDRESS_OPTION_LENGTH
+  tax
+  sep #$20
+  .a8
+@requestPrimary:
+  lda pppIpcpFlags
+  and #PPP_IPCP_FLAG_REQUEST_PRIMARY_DNS
+  beq @requestSecondary
+  lda #PPP_IPCP_OPTION_PRIMARY_DNS_SERVER_ADDRESS
+  ldy #.loword(pppIpcpPrimaryDnsAddress)
+  jsr @writeRequestAddressOption
+@requestSecondary:
+  lda pppIpcpFlags
+  and #PPP_IPCP_FLAG_REQUEST_SECONDARY_DNS
+  beq @finishRequest
+  lda #PPP_IPCP_OPTION_SECONDARY_DNS_SERVER_ADDRESS
+  ldy #.loword(pppIpcpSecondaryDnsAddress)
+  jsr @writeRequestAddressOption
+@finishRequest:
+  rep #$20
+  .a16
+  txa
+  sec
+  sbc #PPP_IPCP_FRAME_OFFSET
+  xba
+  sep #$20
+  .a8
+  sta pppTransmitBuffer + 6
+  xba
   sta pppTransmitBuffer + 7
   rep #$20
   .a16
-  lda #PPP_IPCP_MINIMUM_FRAME_LENGTH
+  txa
   bra @begin
+
+@writeRequestAddressOption:
+  .a8
+  sta pppTransmitBuffer, x
+  lda #PPP_IPCP_IP_ADDRESS_OPTION_LENGTH
+  sta pppTransmitBuffer + 1, x
+  lda a:$0000, y
+  sta pppTransmitBuffer + 2, x
+  lda a:$0001, y
+  sta pppTransmitBuffer + 3, x
+  lda a:$0002, y
+  sta pppTransmitBuffer + 4, x
+  lda a:$0003, y
+  sta pppTransmitBuffer + 5, x
+  rep #$20
+  .a16
+  txa
+  clc
+  adc #PPP_IPCP_IP_ADDRESS_OPTION_LENGTH
+  tax
+  sep #$20
+  .a8
+  rts
 
 @ack:
   rep #$20
@@ -1134,7 +1380,16 @@ busyReturn:
   cmp #$01
   pppIpcpRequireEqual @fail70
   lda pppTransmitBuffer + 7
-  cmp #PPP_IPCP_CONFIGURE_PACKET_LENGTH
+  cmp #PPP_IPCP_FULL_CONFIGURE_PACKET_LENGTH
+  pppIpcpRequireEqual @fail70
+  lda pppTransmitBuffer + 8
+  cmp #PPP_IPCP_OPTION_IP_ADDRESS
+  pppIpcpRequireEqual @fail70
+  lda pppTransmitBuffer + 14
+  cmp #PPP_IPCP_OPTION_PRIMARY_DNS_SERVER_ADDRESS
+  pppIpcpRequireEqual @fail70
+  lda pppTransmitBuffer + 20
+  cmp #PPP_IPCP_OPTION_SECONDARY_DNS_SERVER_ADDRESS
   pppIpcpRequireEqual @fail70
 
   ; Peer proposes 10.24.0.1 and is acknowledged.
@@ -1168,11 +1423,11 @@ busyReturn:
   cmp #PPP_IPCP_CODE_CONFIGURE_ACK
   pppIpcpRequireEqual @fail71
 
-  ; Server Naks 0.0.0.0 to the assigned SFC address 10.24.0.2.
+  ; Server assigns the SFC address and both RFC 1877 DNS addresses in one Nak.
   jsr pppTransmitInitialize
   lda #PPP_IPCP_CODE_CONFIGURE_NAK
   ldx #$0001
-  jsr @writeAddressPacket
+  jsr @writeFullPacket
   lda #10
   sta pppFrameBuffer + 10
   lda #24
@@ -1180,6 +1435,17 @@ busyReturn:
   stz pppFrameBuffer + 12
   lda #2
   sta pppFrameBuffer + 13
+  lda #1
+  sta pppFrameBuffer + 16
+  sta pppFrameBuffer + 17
+  sta pppFrameBuffer + 18
+  sta pppFrameBuffer + 19
+  lda #1
+  sta pppFrameBuffer + 22
+  stz pppFrameBuffer + 23
+  stz pppFrameBuffer + 24
+  lda #1
+  sta pppFrameBuffer + 25
   jsr pppIpcpReceiveFrame
   bcc :+
   jmp @fail72
@@ -1196,6 +1462,11 @@ busyReturn:
   lda pppIpcpLocalAddress + 3
   cmp #2
   pppIpcpRequireEqual @fail72
+  lda pppIpcpPrimaryDnsAddress + 0
+  cmp #1
+  pppIpcpRequireEqual @fail72
+  lda pppIpcpSecondaryDnsAddress + 1
+  pppIpcpRequireEqual @fail72
 
   jsr pppIpcpBuildPending
   bcc :+
@@ -1207,19 +1478,18 @@ busyReturn:
   lda pppTransmitBuffer + 13
   cmp #$02
   pppIpcpRequireEqual @fail73
+  lda pppTransmitBuffer + 16
+  cmp #$01
+  pppIpcpRequireEqual @fail73
+  lda pppTransmitBuffer + 22
+  cmp #$01
+  pppIpcpRequireEqual @fail73
 
   ; Matching Ack completes the crossed negotiation.
   jsr pppTransmitInitialize
   lda #PPP_IPCP_CODE_CONFIGURE_ACK
   ldx #$0002
-  jsr @writeAddressPacket
-  lda #10
-  sta pppFrameBuffer + 10
-  lda #24
-  sta pppFrameBuffer + 11
-  stz pppFrameBuffer + 12
-  lda #2
-  sta pppFrameBuffer + 13
+  jsr @writeFullPacket
   jsr pppIpcpReceiveFrame
   bcc :+
   jmp @fail74
@@ -1229,6 +1499,10 @@ busyReturn:
   pppIpcpRequireEqual @fail74
   lda pppIpcpTimerActive
   ora pppIpcpPendingAction
+  pppIpcpRequireEqual @fail74
+  lda pppIpcpFlags
+  and #(PPP_IPCP_FLAG_PRIMARY_DNS_VALID | PPP_IPCP_FLAG_SECONDARY_DNS_VALID)
+  cmp #(PPP_IPCP_FLAG_PRIMARY_DNS_VALID | PPP_IPCP_FLAG_SECONDARY_DNS_VALID)
   pppIpcpRequireEqual @fail74
 
   ; Zero peer address is Naked to 10.24.0.1.
@@ -1329,7 +1603,7 @@ busyReturn:
   txa
   sta pppFrameBuffer + 5
   stz pppFrameBuffer + 6
-  lda #PPP_IPCP_CONFIGURE_PACKET_LENGTH
+  lda #PPP_IPCP_ADDRESS_CONFIGURE_PACKET_LENGTH
   sta pppFrameBuffer + 7
   lda #PPP_IPCP_OPTION_IP_ADDRESS
   sta pppFrameBuffer + 8
@@ -1339,7 +1613,48 @@ busyReturn:
   .a16
   lda #PPP_PROTOCOL_IPCP
   sta pppLastProtocol
-  lda #PPP_IPCP_CONFIGURE_FRAME_LENGTH
+  lda #PPP_IPCP_ADDRESS_CONFIGURE_FRAME_LENGTH
+  sta pppLastFrameLength
+  sep #$20
+  .a8
+  rts
+
+; Input A=Code, X low byte=Identifier. Uses the current local/DNS proposal.
+@writeFullPacket:
+  sta pppFrameBuffer + 4
+  txa
+  sta pppFrameBuffer + 5
+  stz pppFrameBuffer + 6
+  lda #PPP_IPCP_FULL_CONFIGURE_PACKET_LENGTH
+  sta pppFrameBuffer + 7
+  lda #PPP_IPCP_OPTION_IP_ADDRESS
+  sta pppFrameBuffer + 8
+  lda #PPP_IPCP_IP_ADDRESS_OPTION_LENGTH
+  sta pppFrameBuffer + 9
+  lda #PPP_IPCP_OPTION_PRIMARY_DNS_SERVER_ADDRESS
+  sta pppFrameBuffer + 14
+  lda #PPP_IPCP_IP_ADDRESS_OPTION_LENGTH
+  sta pppFrameBuffer + 15
+  lda #PPP_IPCP_OPTION_SECONDARY_DNS_SERVER_ADDRESS
+  sta pppFrameBuffer + 20
+  lda #PPP_IPCP_IP_ADDRESS_OPTION_LENGTH
+  sta pppFrameBuffer + 21
+  ldx #$0000
+@copyFullAddresses:
+  lda pppIpcpLocalAddress, x
+  sta pppFrameBuffer + 10, x
+  lda pppIpcpPrimaryDnsAddress, x
+  sta pppFrameBuffer + 16, x
+  lda pppIpcpSecondaryDnsAddress, x
+  sta pppFrameBuffer + 22, x
+  inx
+  cpx #$0004
+  bne @copyFullAddresses
+  rep #$20
+  .a16
+  lda #PPP_PROTOCOL_IPCP
+  sta pppLastProtocol
+  lda #PPP_IPCP_FULL_CONFIGURE_FRAME_LENGTH
   sta pppLastFrameLength
   sep #$20
   .a8
