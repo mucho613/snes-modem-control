@@ -45,6 +45,11 @@
 .export pppIpv4ReceiveCount, pppIpv4AcceptedCount
 .export pppIpv4ChecksumErrorCount, pppIpv4DropCount, pppIpv4TransmitCount
 .export pppIpv4NextIdentification, pppIpv4Flags
+.export pppIcmpLastError, pppIcmpLastType, pppIcmpLastCode, pppIcmpFlags
+.export pppIcmpIdentifier, pppIcmpSequence, pppIcmpPayloadLength
+.export pppIcmpChecksum, pppIcmpReceiveCount, pppIcmpEchoRequestCount
+.export pppIcmpEchoReplyCount, pppIcmpChecksumErrorCount
+.export pppIcmpDropCount, pppIcmpTransmitCount
 
 pppDiagnosticState:
 pppDiagnosticMagic: .res $4
@@ -144,6 +149,20 @@ pppIpv4DropCount: .res $4
 pppIpv4TransmitCount: .res $4
 pppIpv4NextIdentification: .res $2
 pppIpv4Flags: .res $1
+pppIcmpLastError: .res $1
+pppIcmpLastType: .res $1
+pppIcmpLastCode: .res $1
+pppIcmpFlags: .res $1
+pppIcmpIdentifier: .res $2
+pppIcmpSequence: .res $2
+pppIcmpPayloadLength: .res $2
+pppIcmpChecksum: .res $2
+pppIcmpReceiveCount: .res $4
+pppIcmpEchoRequestCount: .res $4
+pppIcmpEchoReplyCount: .res $4
+pppIcmpChecksumErrorCount: .res $4
+pppIcmpDropCount: .res $4
+pppIcmpTransmitCount: .res $4
 .res PPP_DIAGNOSTIC_SIZE - (* - pppDiagnosticState)
 pppDiagnosticStateEnd:
 
@@ -244,6 +263,20 @@ pppDiagnosticStateEnd:
 .assert pppIpv4TransmitCount - pppDiagnosticState = PPP_DIAG_IPV4_TRANSMIT_COUNT, error, "PPP IPv4 transmit count offset"
 .assert pppIpv4NextIdentification - pppDiagnosticState = PPP_DIAG_IPV4_NEXT_IDENTIFICATION, error, "PPP IPv4 next identification offset"
 .assert pppIpv4Flags - pppDiagnosticState = PPP_DIAG_IPV4_FLAGS, error, "PPP IPv4 flags offset"
+.assert pppIcmpLastError - pppDiagnosticState = PPP_DIAG_ICMP_LAST_ERROR, error, "PPP ICMP error offset"
+.assert pppIcmpLastType - pppDiagnosticState = PPP_DIAG_ICMP_LAST_TYPE, error, "PPP ICMP type offset"
+.assert pppIcmpLastCode - pppDiagnosticState = PPP_DIAG_ICMP_LAST_CODE, error, "PPP ICMP code offset"
+.assert pppIcmpFlags - pppDiagnosticState = PPP_DIAG_ICMP_FLAGS, error, "PPP ICMP flags offset"
+.assert pppIcmpIdentifier - pppDiagnosticState = PPP_DIAG_ICMP_IDENTIFIER, error, "PPP ICMP identifier offset"
+.assert pppIcmpSequence - pppDiagnosticState = PPP_DIAG_ICMP_SEQUENCE, error, "PPP ICMP sequence offset"
+.assert pppIcmpPayloadLength - pppDiagnosticState = PPP_DIAG_ICMP_PAYLOAD_LENGTH, error, "PPP ICMP payload length offset"
+.assert pppIcmpChecksum - pppDiagnosticState = PPP_DIAG_ICMP_CHECKSUM, error, "PPP ICMP checksum offset"
+.assert pppIcmpReceiveCount - pppDiagnosticState = PPP_DIAG_ICMP_RECEIVE_COUNT, error, "PPP ICMP receive count offset"
+.assert pppIcmpEchoRequestCount - pppDiagnosticState = PPP_DIAG_ICMP_ECHO_REQUEST_COUNT, error, "PPP ICMP request count offset"
+.assert pppIcmpEchoReplyCount - pppDiagnosticState = PPP_DIAG_ICMP_ECHO_REPLY_COUNT, error, "PPP ICMP reply count offset"
+.assert pppIcmpChecksumErrorCount - pppDiagnosticState = PPP_DIAG_ICMP_CHECKSUM_ERROR_COUNT, error, "PPP ICMP checksum error count offset"
+.assert pppIcmpDropCount - pppDiagnosticState = PPP_DIAG_ICMP_DROP_COUNT, error, "PPP ICMP drop count offset"
+.assert pppIcmpTransmitCount - pppDiagnosticState = PPP_DIAG_ICMP_TRANSMIT_COUNT, error, "PPP ICMP transmit count offset"
 .assert pppDiagnosticStateEnd - pppDiagnosticState = PPP_DIAGNOSTIC_SIZE, error, "PPP diagnostic ABI size"
 
 ; Decoder and pump scratch fields are private and intentionally excluded from
@@ -267,6 +300,7 @@ pppDiagnosticStateEnd:
 .export pppIpv4ChecksumAccumulator, pppIpv4AvailableLength
 .export pppIpv4TransmitDestination, pppIpv4TransmitProtocol
 .export pppIpv4TransmitPayloadLength, pppIpv4PollSavedModemState
+.export pppIcmpPacketOffset, pppIcmpChecksumAccumulator
 pppLastEvent: .res $1
 pppLastInvalidReason: .res $1
 pppDecoderScratchByte: .res $1
@@ -300,6 +334,8 @@ pppIpv4TransmitDestination: .res $4
 pppIpv4TransmitProtocol: .res $1
 pppIpv4TransmitPayloadLength: .res $2
 pppIpv4PollSavedModemState: .res $1
+pppIcmpPacketOffset: .res $2
+pppIcmpChecksumAccumulator: .res $2
 pppLcpOptionSeen: .res $100
 pppLcpOptionDuplicate: .res $100
 pppIpcpOptionSeen: .res $100

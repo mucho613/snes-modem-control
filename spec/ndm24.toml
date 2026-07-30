@@ -289,8 +289,8 @@ description = "Frame at which the current generic AT transaction started"
 
 [ppp_diagnostic]
 magic = [0x50, 0x50, 0x50, 0x31]
-version = 7
-size = 209
+version = 8
+size = 245
 
 [[ppp_diagnostic.fields]]
 name = "magic"
@@ -970,6 +970,104 @@ offset = 208
 size = 1
 type = "u8"
 description = "IPv4 header-valid, destination-local, and fragmentation flags"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_last_error"
+offset = 209
+size = 1
+type = "u8"
+description = "Most recent ICMP Echo parser or transmit error"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_last_type"
+offset = 210
+size = 1
+type = "u8"
+description = "Type of the most recently parsed ICMP Echo message"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_last_code"
+offset = 211
+size = 1
+type = "u8"
+description = "Code of the most recently parsed ICMP Echo message"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_flags"
+offset = 212
+size = 1
+type = "u8"
+description = "ICMP message-valid, request, reply, and pending-response flags"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_identifier"
+offset = 213
+size = 2
+type = "u16"
+description = "Identifier of the most recently parsed ICMP Echo message"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_sequence"
+offset = 215
+size = 2
+type = "u16"
+description = "Sequence number of the most recently parsed ICMP Echo message"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_payload_length"
+offset = 217
+size = 2
+type = "u16"
+description = "Payload length after the ICMP Echo header"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_checksum"
+offset = 219
+size = 2
+type = "u16"
+description = "Checksum of the most recently parsed ICMP Echo message"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_receive_count"
+offset = 221
+size = 4
+type = "u32"
+description = "ICMP messages presented to the Echo parser"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_echo_request_count"
+offset = 225
+size = 4
+type = "u32"
+description = "Valid ICMP Echo Requests received"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_echo_reply_count"
+offset = 229
+size = 4
+type = "u32"
+description = "Valid ICMP Echo Replies received"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_checksum_error_count"
+offset = 233
+size = 4
+type = "u32"
+description = "ICMP Echo messages rejected for an invalid checksum"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_drop_count"
+offset = 237
+size = 4
+type = "u32"
+description = "ICMP messages rejected by parser or transmit handling"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_transmit_count"
+offset = 241
+size = 4
+type = "u32"
+description = "ICMP Echo Replies accepted by the IPv4 transmitter"
 
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]

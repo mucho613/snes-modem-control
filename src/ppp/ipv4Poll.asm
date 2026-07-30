@@ -14,15 +14,17 @@
 .import pppLastProtocol, pppLastFrameLength, pppFrameBuffer
 .import pppIpcpLocalAddress, pppIpcpFlags
 .import pppIpv4LastError, pppIpv4FlagsFragmentOffset
-.import pppIpv4DestinationAddress, pppIpv4Flags
+.import pppIpv4Protocol, pppIpv4DestinationAddress, pppIpv4Flags
 .import pppIpv4ReceiveCount, pppIpv4AcceptedCount, pppIpv4DropCount
 .import pppIpv4PollSavedModemState
 .import pppIpv4Initialize, pppIpv4ReceiveFrame
+.import pppIcmpFlags, pppIcmpInitialize, pppIcmpReceive
+.import pppIcmpRetryPending, pppIcmpCancelPending
 
 .export pppIpv4Poll, pppIpv4PollRunSelfTest
 
-; Consume protocol $0021 only after IPCP is Opened. Valid packets are currently
-; counted and released; UDP/ICMP dispatch will attach at the accepted branch.
+; Consume protocol $0021 only after IPCP is Opened. A valid local ICMP Echo
+; Request is retained until its automatic reply enters the shared transmitter.
 .proc pppIpv4Poll
   .a16
   .i16
@@ -74,6 +76,16 @@
   sep #$20
   .a8
 
+  lda pppIcmpFlags
+  and #PPP_ICMP_FLAG_REPLY_PENDING
+  beq parse
+  jsr pppIcmpRetryPending
+  bcc :+
+  jmp done
+:
+  jmp release
+
+parse:
   jsr pppIpv4ReceiveFrame
   bcs release
   jsr pppSnapshotBegin
@@ -112,18 +124,25 @@ accepted:
   .a8
   stz pppIpv4LastError
   pppIncrement32 pppIpv4AcceptedCount
-  bra policyDone
-
-destinationMismatch:
-  lda #PPP_IPV4_ERROR_DESTINATION_MISMATCH
-  sta pppIpv4LastError
-  pppIncrement32 pppIpv4DropCount
+  lda pppIpv4Protocol
+  cmp #PPP_IPV4_PROTOCOL_ICMP
+  bne policyDone
+  jsr pppIcmpReceive
+  bcc policyDone
+  jsr pppSnapshotEnd
+  bra done
 
 policyDone:
   jsr pppSnapshotEnd
 release:
   jsr pppReleaseFrame
   bra done
+
+destinationMismatch:
+  lda #PPP_IPV4_ERROR_DESTINATION_MISMATCH
+  sta pppIpv4LastError
+  pppIncrement32 pppIpv4DropCount
+  bra policyDone
 
 releaseIfOwned:
   lda pppFrameReady
@@ -135,6 +154,7 @@ releaseIfOwned:
   bne done
   sep #$20
   .a8
+  jsr pppIcmpCancelPending
   jsr pppReleaseFrame
 
 done:
@@ -174,6 +194,7 @@ done:
   jsr pppPapInitialize
   jsr pppIpcpInitialize
   jsr pppIpv4Initialize
+  jsr pppIcmpInitialize
   lda #MODEM_STATE_CONNECTED
   sta modemDriverState
   lda #$01
@@ -333,6 +354,7 @@ done:
   jsr pppPapInitialize
   jsr pppIpcpInitialize
   jsr pppIpv4Initialize
+  jsr pppIcmpInitialize
   rts
 .endproc
 

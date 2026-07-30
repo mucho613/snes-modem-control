@@ -248,6 +248,20 @@ pub struct PppDiagnosticSnapshot {
     pub ipv4_transmit_count: u32,
     pub ipv4_next_identification: u16,
     pub ipv4_flags: u8,
+    pub icmp_last_error: u8,
+    pub icmp_last_type: u8,
+    pub icmp_last_code: u8,
+    pub icmp_flags: u8,
+    pub icmp_identifier: u16,
+    pub icmp_sequence: u16,
+    pub icmp_payload_length: u16,
+    pub icmp_checksum: u16,
+    pub icmp_receive_count: u32,
+    pub icmp_echo_request_count: u32,
+    pub icmp_echo_reply_count: u32,
+    pub icmp_checksum_error_count: u32,
+    pub icmp_drop_count: u32,
+    pub icmp_transmit_count: u32,
 }
 
 impl PppDiagnosticSnapshot {
@@ -375,6 +389,20 @@ impl PppDiagnosticSnapshot {
             ipv4_transmit_count: read_u32(data, PPP_DIAG_IPV4_TRANSMIT_COUNT)?,
             ipv4_next_identification: read_u16(data, PPP_DIAG_IPV4_NEXT_IDENTIFICATION)?,
             ipv4_flags: data[PPP_DIAG_IPV4_FLAGS],
+            icmp_last_error: data[PPP_DIAG_ICMP_LAST_ERROR],
+            icmp_last_type: data[PPP_DIAG_ICMP_LAST_TYPE],
+            icmp_last_code: data[PPP_DIAG_ICMP_LAST_CODE],
+            icmp_flags: data[PPP_DIAG_ICMP_FLAGS],
+            icmp_identifier: read_u16(data, PPP_DIAG_ICMP_IDENTIFIER)?,
+            icmp_sequence: read_u16(data, PPP_DIAG_ICMP_SEQUENCE)?,
+            icmp_payload_length: read_u16(data, PPP_DIAG_ICMP_PAYLOAD_LENGTH)?,
+            icmp_checksum: read_u16(data, PPP_DIAG_ICMP_CHECKSUM)?,
+            icmp_receive_count: read_u32(data, PPP_DIAG_ICMP_RECEIVE_COUNT)?,
+            icmp_echo_request_count: read_u32(data, PPP_DIAG_ICMP_ECHO_REQUEST_COUNT)?,
+            icmp_echo_reply_count: read_u32(data, PPP_DIAG_ICMP_ECHO_REPLY_COUNT)?,
+            icmp_checksum_error_count: read_u32(data, PPP_DIAG_ICMP_CHECKSUM_ERROR_COUNT)?,
+            icmp_drop_count: read_u32(data, PPP_DIAG_ICMP_DROP_COUNT)?,
+            icmp_transmit_count: read_u32(data, PPP_DIAG_ICMP_TRANSMIT_COUNT)?,
         })
     }
 }
@@ -646,6 +674,30 @@ mod tests {
         data[PPP_DIAG_IPV4_NEXT_IDENTIFICATION..PPP_DIAG_IPV4_NEXT_IDENTIFICATION + 2]
             .copy_from_slice(&0x3456_u16.to_le_bytes());
         data[PPP_DIAG_IPV4_FLAGS] = 5;
+        data[PPP_DIAG_ICMP_LAST_ERROR] = 4;
+        data[PPP_DIAG_ICMP_LAST_TYPE] = 8;
+        data[PPP_DIAG_ICMP_LAST_CODE] = 0;
+        data[PPP_DIAG_ICMP_FLAGS] = 3;
+        data[PPP_DIAG_ICMP_IDENTIFIER..PPP_DIAG_ICMP_IDENTIFIER + 2]
+            .copy_from_slice(&0x1234_u16.to_le_bytes());
+        data[PPP_DIAG_ICMP_SEQUENCE..PPP_DIAG_ICMP_SEQUENCE + 2]
+            .copy_from_slice(&7_u16.to_le_bytes());
+        data[PPP_DIAG_ICMP_PAYLOAD_LENGTH..PPP_DIAG_ICMP_PAYLOAD_LENGTH + 2]
+            .copy_from_slice(&5_u16.to_le_bytes());
+        data[PPP_DIAG_ICMP_CHECKSUM..PPP_DIAG_ICMP_CHECKSUM + 2]
+            .copy_from_slice(&0x1654_u16.to_le_bytes());
+        data[PPP_DIAG_ICMP_RECEIVE_COUNT..PPP_DIAG_ICMP_RECEIVE_COUNT + 4]
+            .copy_from_slice(&12_u32.to_le_bytes());
+        data[PPP_DIAG_ICMP_ECHO_REQUEST_COUNT..PPP_DIAG_ICMP_ECHO_REQUEST_COUNT + 4]
+            .copy_from_slice(&8_u32.to_le_bytes());
+        data[PPP_DIAG_ICMP_ECHO_REPLY_COUNT..PPP_DIAG_ICMP_ECHO_REPLY_COUNT + 4]
+            .copy_from_slice(&3_u32.to_le_bytes());
+        data[PPP_DIAG_ICMP_CHECKSUM_ERROR_COUNT..PPP_DIAG_ICMP_CHECKSUM_ERROR_COUNT + 4]
+            .copy_from_slice(&1_u32.to_le_bytes());
+        data[PPP_DIAG_ICMP_DROP_COUNT..PPP_DIAG_ICMP_DROP_COUNT + 4]
+            .copy_from_slice(&2_u32.to_le_bytes());
+        data[PPP_DIAG_ICMP_TRANSMIT_COUNT..PPP_DIAG_ICMP_TRANSMIT_COUNT + 4]
+            .copy_from_slice(&7_u32.to_le_bytes());
 
         let snapshot = PppDiagnosticSnapshot::decode(&data).unwrap();
         assert_eq!(snapshot.snapshot_sequence, 8);
@@ -707,6 +759,19 @@ mod tests {
         assert_eq!(snapshot.ipv4_transmit_count, 9);
         assert_eq!(snapshot.ipv4_next_identification, 0x3456);
         assert_eq!(snapshot.ipv4_flags, 5);
+        assert_eq!(snapshot.icmp_last_error, 4);
+        assert_eq!(snapshot.icmp_last_type, 8);
+        assert_eq!(snapshot.icmp_flags, 3);
+        assert_eq!(snapshot.icmp_identifier, 0x1234);
+        assert_eq!(snapshot.icmp_sequence, 7);
+        assert_eq!(snapshot.icmp_payload_length, 5);
+        assert_eq!(snapshot.icmp_checksum, 0x1654);
+        assert_eq!(snapshot.icmp_receive_count, 12);
+        assert_eq!(snapshot.icmp_echo_request_count, 8);
+        assert_eq!(snapshot.icmp_echo_reply_count, 3);
+        assert_eq!(snapshot.icmp_checksum_error_count, 1);
+        assert_eq!(snapshot.icmp_drop_count, 2);
+        assert_eq!(snapshot.icmp_transmit_count, 7);
     }
 
     #[test]

@@ -44,7 +44,7 @@ ABI version: `2`. Block size: `128` bytes.
 
 ## PPP Diagnostic ABI
 
-ABI version: `7`. Block size: `209` bytes.
+ABI version: `8`. Block size: `245` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|
@@ -145,6 +145,20 @@ ABI version: `7`. Block size: `209` bytes.
 | `0xCA` | 4 | `u32` | `ipv4_transmit_count` | IPv4 packets accepted by the shared PPP encoder |
 | `0xCE` | 2 | `u16` | `ipv4_next_identification` | Identification value reserved for the next local IPv4 packet |
 | `0xD0` | 1 | `u8` | `ipv4_flags` | IPv4 header-valid, destination-local, and fragmentation flags |
+| `0xD1` | 1 | `u8` | `icmp_last_error` | Most recent ICMP Echo parser or transmit error |
+| `0xD2` | 1 | `u8` | `icmp_last_type` | Type of the most recently parsed ICMP Echo message |
+| `0xD3` | 1 | `u8` | `icmp_last_code` | Code of the most recently parsed ICMP Echo message |
+| `0xD4` | 1 | `u8` | `icmp_flags` | ICMP message-valid, request, reply, and pending-response flags |
+| `0xD5` | 2 | `u16` | `icmp_identifier` | Identifier of the most recently parsed ICMP Echo message |
+| `0xD7` | 2 | `u16` | `icmp_sequence` | Sequence number of the most recently parsed ICMP Echo message |
+| `0xD9` | 2 | `u16` | `icmp_payload_length` | Payload length after the ICMP Echo header |
+| `0xDB` | 2 | `u16` | `icmp_checksum` | Checksum of the most recently parsed ICMP Echo message |
+| `0xDD` | 4 | `u32` | `icmp_receive_count` | ICMP messages presented to the Echo parser |
+| `0xE1` | 4 | `u32` | `icmp_echo_request_count` | Valid ICMP Echo Requests received |
+| `0xE5` | 4 | `u32` | `icmp_echo_reply_count` | Valid ICMP Echo Replies received |
+| `0xE9` | 4 | `u32` | `icmp_checksum_error_count` | ICMP Echo messages rejected for an invalid checksum |
+| `0xED` | 4 | `u32` | `icmp_drop_count` | ICMP messages rejected by parser or transmit handling |
+| `0xF1` | 4 | `u32` | `icmp_transmit_count` | ICMP Echo Replies accepted by the IPv4 transmitter |
 
 ## Mailbox ABI
 

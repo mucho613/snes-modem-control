@@ -4,7 +4,7 @@
 
 最初のPPPマイルストーンは、NDM24から受け取る任意位置で分割されたbyte列を、FCS検証済みのPPPフレームへ復元する層です。`crates/ndm24-ppp` を仕様の参照実装とし、同じ状態遷移と試験ベクトルを65816へ移植しています。
 
-現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP、PAP client、IPCP、IPv4 packet層まで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ack、IPCP `Opened`まで確認し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。同日にIPv4 parser、header checksum、local宛先選別、送信header生成をFXPAK PRO実機の常設セルフテストで確認しました。実回線上のIPv4送受信、UDP、TCP、NTPはまだ動作しません。
+現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP、PAP client、IPCP、IPv4 packet層、ICMP Echo responderまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ack、IPCP `Opened`まで確認し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。同日にIPv4 parser、header checksum、local宛先選別、送信header生成をFXPAK PRO実機の常設セルフテストで確認しました。ICMP EchoはMesenCEの常設セルフテストまで確認済みで、実回線上のIPv4/ICMP送受信、UDP、TCP、NTPはまだ動作確認していません。
 
 PPP接続は次の順序で進みます。
 
@@ -15,6 +15,7 @@ flowchart LR
     L --> A["PAP / CHAP authentication"]
     A --> I["IPCP negotiation"]
     I --> V["IPv4"]
+    V --> E["ICMP Echo"]
     V --> U["UDP → NTP"]
     V --> T["TCP"]
 ```
@@ -75,6 +76,7 @@ Rust参照実装は全入力分割位置、破損FCSからの再同期、Flag直
 - `src/ppp/ipcpPoll.asm`: PAP/IPCP frame所有権、共有送信器との直列化
 - `src/ppp/ipv4.asm`: IPv4 parser、header checksum、送信header生成
 - `src/ppp/ipv4Poll.asm`: IPCP/IPv4 frame所有権、local宛先とfragmentの選別
+- `src/ppp/icmp.asm`: ICMP Echo parser、checksum、Echo Reply生成、送信待ち
 - `src/ppp/selfTest.asm`: 固定fixtureによる常設セルフテスト
 
 `pppDecoderPush` はraw byteを1byteずつ受け取り、次のeventを返します。
@@ -138,7 +140,7 @@ Address 1 + Control 1 + Protocol 2 + Information 1500 + FCS 2
 
 ## 常設PPP診断
 
-`pppDiagnosticState` はmagic `PPP1`、ABI version 7、209byteの公開診断blockです。レイアウトの正本は `spec/ndm24.toml` で、AssemblyとRustのoffset定数および[生成済みABI表](generated/diagnostic-abi.md)を同時に生成します。
+`pppDiagnosticState` はmagic `PPP1`、ABI version 8、245byteの公開診断blockです。レイアウトの正本は `spec/ndm24.toml` で、AssemblyとRustのoffset定数および[生成済みABI表](generated/diagnostic-abi.md)を同時に生成します。
 
 PC側では次のコマンドでJSON Linesとして読み取れます。
 
@@ -360,8 +362,8 @@ deferred slotへ保持します。lower-downでは交渉済みaddress、timer、
 
 restart intervalは180 frame、Max-Configureは初回を含む10回です。timeout再送は
 同じIdentifierとoption列を使い、送信器が受理した時点から次の期限を数えます。
-公開診断ABI version 7はIPCP state、最後のCode/Identifier/error、local/peer
-address、再送状態、送受信countに加え、後段のIPv4診断を公開します。
+公開診断ABI version 8はIPCP state、最後のCode/Identifier/error、local/peer
+address、再送状態、送受信countに加え、後段のIPv4・ICMP診断を公開します。
 
 常設セルフテストのstep `$70`～`$76`は、`0.0.0.0`要求、peer `10.24.0.1`の
 Ack、local `10.24.0.2`のNak提案、再要求、双方Ackによる`Opened`、zero peer
@@ -377,7 +379,7 @@ PAP `Opened`による起動、共有encoder backpressure中のframe保持、応�
 version 4、20～60byteの可変IHL、Total Lengthとframe内の利用可能長、
 header全体のone's-complement checksumを検証します。Total Lengthより後ろの
 PPP paddingはpacketへ含めません。header fields、source/destination address、
-受信・checksum error・破棄countは公開診断ABI version 7へ残します。
+受信・checksum error・破棄countは公開診断ABI version 8へ残します。
 
 `src/ppp/ipv4Poll.asm`はLCP、PAP、IPCPがすべて`Opened`のときだけIPv4 frameを
 解析します。最初の受信policyはIPCPで確定したlocal addressへの完全一致だけを
@@ -395,14 +397,36 @@ Identificationと送信countも進めません。
 常設セルフテストのstep `$80`～`$84`は既知header `$B861`の解析、TTL破損時の
 checksum error、同一headerの送信生成、共有encoder受理を検査します。step
 `$85`～`$87`はlocal宛先の受理、宛先不一致の破棄、IPCP phase gateを検査します。
-2026-07-30にFXPAK PRO実機で起動完了後3回連続合格し、ABI version 7のsnapshot
-取得も確認しました。この試験は電話回線へ発信せず、固定fixtureだけを使います。
+2026-07-30にFXPAK PRO実機で起動完了後3回連続合格し、当時のABI version 7の
+snapshot取得も確認しました。この試験は電話回線へ発信せず、固定fixtureだけを
+使います。現在のABI version 8は末尾へICMP診断を追加したものです。
+
+## 65816 ICMP Echo
+
+`src/ppp/icmp.asm`は、local宛てでfragmentされていないIPv4 packetのProtocol 1を
+受け取り、8byteのEcho header、Type 8または0、Code 0、message全体の
+one's-complement checksumを検証します。Identifier、Sequence Number、payloadは
+そのまま保持し、Echo RequestのTypeだけを0へ変更してchecksumを再計算し、IPv4
+source addressへEcho Replyを返します。奇数byte長のpayloadでは末尾をzero padding
+した16bit wordとしてchecksumへ加えます。
+
+共有PPP encoderが使用中なら、完成済みreceive frameとreply pending flagを保持し、
+送信器が空いたmain-loopで同じrequestを再集計せずに応答します。PPP phaseが閉じた
+場合は保留を取り消してframeを解放するため、次の接続へpacketを持ち越しません。
+Type/Code/checksum、Identifier/Sequence、各種count、pending状態は公開診断ABI
+version 8から取得できます。
+
+常設セルフテストのstep `$88`～`$8C`は、5byte payload `NDM24`を持つ既知checksum
+`$1654`のEcho Request、checksum `$1E54`のEcho Reply、送信busy時の保留と再試行、
+破損checksumの拒否を検査します。2026-07-30にMesenCE 2.2.1のheadless runnerで
+合格しました。NDM24とWSL2 `pppd`を通した実対向Echoは次の試験項目です。
 
 ## 次の実装
 
 LCP、PAP、IPCPはRust参照実装、65816常設セルフテスト、revision A実機と
-WSL2 `pppd`による実対向まで合格しました。IPv4 packet層もRustと65816へ実装し、
-固定fixtureのSFC実機試験まで合格しています。IPCP `Opened`時のlocalは
-`10.24.0.2`、peerは`10.24.0.1`です。次はUDP datagram層とICMP Echoを実装し、
-実対向でIPv4の送受信を確認した後、UDP上のNTP clientへ進みます。TCPとHTTPは
-その後の独立したマイルストーンとします。
+WSL2 `pppd`による実対向まで合格しました。IPv4 packet層とICMP Echo responderも
+Rustと65816へ実装し、固定fixtureのセルフテストまで合格しています。IPCP
+`Opened`時のlocalは`10.24.0.2`、peerは`10.24.0.1`です。次は実対向からSFCへ
+ICMP Echo Requestを送り、最初のIPv4 packet往復を確認します。その後UDP datagram
+層を実装してUDP上のNTP clientへ進みます。TCPとHTTPはその後の独立した
+マイルストーンとします。
