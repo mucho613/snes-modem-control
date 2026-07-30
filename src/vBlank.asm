@@ -8,6 +8,7 @@
 .import frameCounter
 .import controllerPollTick, modemPollTick
 .import terminalRenderVBlank
+.import statusRenderVBlank, screenApplyVBlank
 
 .export VBlank
 .proc VBlank
@@ -34,6 +35,8 @@
   sep #$20
   .a8
   jsr terminalRenderVBlank
+  jsr statusRenderVBlank
+  jsr screenApplyVBlank
 
   lda #$01
   sta controllerPollTick

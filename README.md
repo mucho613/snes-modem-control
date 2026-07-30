@@ -4,7 +4,7 @@
 
 スーパーファミコンと NTT DATA NDM24 をコントローラーポート経由で通信させるための、実験用ドライバと Windows 向け開発ツールです。JRA PAT の実通信をロジックアナライザで観測した結果を基準に、初期化、非同期送受信、状態管理、常設診断機能を整理しています。
 
-現時点の到達点は、NDM24 固有の `R` 初期化、`ATM0` による応答確認とスピーカー無効化、256 バイトの送受信リング、32文字幅ターミナル、QUsb2Snes 経由の監視・テスト・ROM 転送です。PPPはRFC 1662非同期フレーミング、LCP、PAP client、IPCP、IPv4 packet層、ICMP Echo responder、UDP datagram層、NTP clientをRust参照実装と65816へ実装し、NDM24のRX/TXリングへ中断・再開可能な形で接続済みです。revision AとDFM-56Uを使うWSL2対向環境ではLCP、PAP認証、IPCPまで実対向で合格し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。IPv4、ICMP Echo、UDP/NTPはMesenCEおよびFXPAK PRO実機の常設セルフテストに加え、疑似PSTNのV.22bis 2400 bit/s回線上でも送受信に合格しています。NTPでは相関済み応答からUnix秒を取得済みです。TCPは未実装です。
+現時点の到達点は、NDM24 固有の `R` 初期化、`ATM0` による応答確認とスピーカー無効化、256 バイトの送受信リング、L/Rで切り替える人間向けステータス画面と32文字幅生ログ、QUsb2Snes 経由の監視・テスト・ROM 転送です。PPPはRFC 1662非同期フレーミング、LCP、PAP client、IPCP、IPv4 packet層、ICMP Echo responder、UDP datagram層、NTP clientをRust参照実装と65816へ実装し、NDM24のRX/TXリングへ中断・再開可能な形で接続済みです。revision AとDFM-56Uを使うWSL2対向環境ではLCP、PAP認証、IPCPまで実対向で合格し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。IPv4、ICMP Echo、UDP/NTPはMesenCEおよびFXPAK PRO実機の常設セルフテストに加え、疑似PSTNのV.22bis 2400 bit/s回線上でも送受信に合格しています。NTPで取得したJST時刻はSFCのフレーム進行を基準に表示します。TCPは未実装です。
 
 ## Windows での開始
 
@@ -65,6 +65,7 @@ cargo xtask check
 - [NDM24 ドライバ設計](docs/ndm24-driver.md)
 - [NDM24 AT識別情報](docs/ndm24-hardware-identification.md)
 - [32文字幅ターミナル](docs/terminal.md)
+- [ステータス画面とアプリケーション・アダプター](docs/status-screen.md)
 - [font8x8の出所・生成・確認手順](docs/font.md)
 - [Windows 開発環境](docs/windows-development.md)
 - [WSL2 PPPサーバー](docs/ppp-server.md)

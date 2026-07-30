@@ -167,7 +167,46 @@ terminalQueueScratchByte: .res $1
 terminalRenderScratchByte: .res $1
 .assert terminalDisplayBufferEnd - terminalDisplayBuffer = TERMINAL_QUEUE_STORAGE_SIZE, error, "terminal queue storage size"
 
+; Human-facing status screen. The screen owns only presentation state; the
+; selected application adapter publishes three fixed-width rows without
+; coupling the renderer to NTP, HTTP, or another protocol.
+.segment "DISPLAY_BSS"
+
+.export screenMode
+.export statusTileBuffer, statusRenderRow, statusLastUpdateFrame
+.export statusApplicationName, statusApplicationState, statusApplicationValue
+screenMode: .res $1
+statusRenderRow: .res $1
+statusLastUpdateFrame: .res $2
+statusTileBuffer: .res TERMINAL_COLUMNS * TERMINAL_STATUS_ROWS
+statusTileBufferEnd:
+statusApplicationName: .res TERMINAL_COLUMNS - 7
+statusApplicationState: .res TERMINAL_COLUMNS - 7
+statusApplicationValue: .res TERMINAL_COLUMNS - 7
+.assert statusTileBufferEnd - statusTileBuffer = TERMINAL_COLUMNS * TERMINAL_STATUS_ROWS, error, "status tile buffer size"
+
+; Software wall clock. Unix seconds remain UTC; the decomposed calendar is
+; JST and is advanced from the nominal NTSC frame cadence after synchronization.
+.export clockValid, clockUnixSeconds, clockSubsecond
+.export clockLastFrame, clockYear, clockMonth, clockDay
+.export clockHour, clockMinute, clockSecond, clockDisplayText
+.export clockConversionRemaining
+clockValid: .res $1
+clockUnixSeconds: .res $4
+clockSubsecond: .res $4
+clockLastFrame: .res $2
+clockYear: .res $2
+clockMonth: .res $1
+clockDay: .res $1
+clockHour: .res $1
+clockMinute: .res $1
+clockSecond: .res $1
+clockDisplayText: .res TERMINAL_COLUMNS - 7
+clockConversionRemaining: .res $4
+
 ; Driver-private scratch state; never read by host tooling.
+.segment "BSS"
+
 .export modemTransferHadTransmit
 modemTransferHadTransmit: .res $1
 .export modemBurstPending

@@ -24,6 +24,12 @@
 .import pppNtpRequestCount, pppNtpResponseCount
 .import pppNtpDropCount, pppNtpTimeoutCount
 .import pppNtpPacketOffset, pppNtpTestSavedFrameCounter
+.import pppNtpTestSavedClockValid, pppNtpTestSavedClockSeconds
+.import pppNtpTestSavedClockSubsecond
+.import clockInitialize, clockSetUnixTime
+.import clockValid, clockUnixSeconds, clockSubsecond
+.import clockYear, clockMonth, clockDay
+.import clockHour, clockMinute, clockSecond
 
 .export pppNtpInitialize, pppNtpRequest, pppNtpPoll, pppNtpReceive
 .export pppNtpRunSelfTest
@@ -541,6 +547,15 @@ convertUnix:
   lda pppNtpServerTransmitSeconds + 2
   sbc #((PPP_NTP_UNIX_EPOCH_OFFSET_SECONDS >> 16) & $ffff)
   sta pppNtpUnixSeconds + 2
+
+  ; Commit the validated UTC timestamp through the protocol-independent
+  ; clock ABI. The display clock keeps Unix seconds internally and applies
+  ; JST only while decomposing its calendar fields.
+  ldy pppNtpServerTransmitFraction + 2
+  ldx pppNtpUnixSeconds + 2
+  lda pppNtpUnixSeconds
+  jsr clockSetUnixTime
+
   sep #$20
   .a8
   lda #PPP_NTP_STATE_RECEIVED
@@ -600,8 +615,18 @@ receiveDone:
   sta pppNtpTestSavedFrameCounter
   lda frameCounter + 2
   sta pppNtpTestSavedFrameCounter + 2
+  lda clockUnixSeconds
+  sta pppNtpTestSavedClockSeconds
+  lda clockUnixSeconds + 2
+  sta pppNtpTestSavedClockSeconds + 2
+  lda clockSubsecond
+  sta pppNtpTestSavedClockSubsecond
+  lda clockSubsecond + 2
+  sta pppNtpTestSavedClockSubsecond + 2
   sep #$20
   .a8
+  lda clockValid
+  sta pppNtpTestSavedClockValid
   jsr prepareLink
 
   jsr pppNtpRequest
@@ -675,6 +700,35 @@ receiveDone:
   pppNtpRequireEqual fail9c_16
   lda pppNtpResponseCount
   cmp #$0001
+  pppNtpRequireEqual fail9c_16
+  lda clockYear
+  cmp #2023
+  pppNtpRequireEqual fail9c_16
+  lda clockSubsecond
+  cmp #$0000
+  pppNtpRequireEqual fail9c_16
+  lda clockSubsecond + 2
+  cmp #$8000
+  pppNtpRequireEqual fail9c_16
+  sep #$20
+  .a8
+  lda clockValid
+  cmp #$01
+  pppNtpRequireEqual fail9c_16
+  lda clockMonth
+  cmp #11
+  pppNtpRequireEqual fail9c_16
+  lda clockDay
+  cmp #15
+  pppNtpRequireEqual fail9c_16
+  lda clockHour
+  cmp #7
+  pppNtpRequireEqual fail9c_16
+  lda clockMinute
+  cmp #13
+  pppNtpRequireEqual fail9c_16
+  lda clockSecond
+  cmp #20
   pppNtpRequireEqual fail9c_16
 
   ; A stale or forged response cannot satisfy a new waiting request.
@@ -900,6 +954,23 @@ cleanup:
   sta frameCounter
   lda pppNtpTestSavedFrameCounter + 2
   sta frameCounter + 2
+  lda pppNtpTestSavedClockValid
+  and #$00ff
+  beq @restoreInvalidClock
+
+  ldy pppNtpTestSavedClockSubsecond + 2
+  ldx pppNtpTestSavedClockSeconds + 2
+  lda pppNtpTestSavedClockSeconds
+  jsr clockSetUnixTime
+  lda pppNtpTestSavedClockSubsecond
+  sta clockSubsecond
+  lda pppNtpTestSavedClockSubsecond + 2
+  sta clockSubsecond + 2
+  bra @clockRestored
+
+@restoreInvalidClock:
+  jsr clockInitialize
+@clockRestored:
   sep #$20
   .a8
   jsr pppTransmitInitialize

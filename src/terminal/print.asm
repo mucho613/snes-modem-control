@@ -4,7 +4,6 @@
 
 .code
 
-.import startup
 .ifdef MODEM_FONT_TEST
   .import fontTestScreen
 .endif
@@ -23,7 +22,9 @@
 .export terminalRenderVBlank
 .export print
 
-; Initialize the independent display mirror and enqueue the startup display.
+; Initialize the independent raw-log display mirror. The human-facing header
+; belongs to the status screen; only the dedicated font-test ROM enqueues a
+; static specimen here.
 ; The caller uses 16-bit accumulator and index registers.
 .proc terminalInitialize
   .a16
@@ -55,12 +56,9 @@
   .ifdef MODEM_FONT_TEST
     setDBR .bankbyte(fontTestScreen)
     pea fontTestScreen
-  .else
-    setDBR .bankbyte(startup)
-    pea startup
+    jsr print
+    pla
   .endif
-  jsr print
-  pla
 
   plx
   plb
@@ -152,7 +150,7 @@ spaceAvailable:
 .endproc
 
 ; Drain at most 32 display bytes while VRAM is safely writable. The terminal
-; is a 32x64 tilemap at VRAM $4000 and follows the cursor automatically.
+; is a 32x64 tilemap at VRAM $4800 and follows the cursor automatically.
 .proc terminalRenderVBlank
   .a8
   .i16
@@ -205,13 +203,10 @@ spaceAvailable:
   sbc #TERMINAL_SCROLL_ANCHOR
   sta terminalVerticalScroll
 
+  ; A was 8-bit when saved above. Restore that width before popping it so
+  ; this callee cannot unbalance the NMI stack.
   sep #$20
   .a8
-  lda terminalVerticalScroll
-  sta .lobyte(BG1VOFS)
-  lda terminalVerticalScroll + 1
-  sta .lobyte(BG1VOFS)
-
   rep #$10
   .i16
   ply

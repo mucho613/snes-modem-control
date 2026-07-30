@@ -6,6 +6,8 @@
 .import clearRamAll
 .import readController1
 .import terminalInitialize
+.import statusInitialize, statusPoll
+.import clockInitialize, clockPoll
 .import modemInitializeDiagnostics
 .import modemInitialize
 .import modemPoll, modemSessionPoll, modemMailboxPoll
@@ -64,6 +66,7 @@
   jsr copyPalette
   jsr copyPattern
   jsr terminalInitialize
+  jsr clockInitialize
 
   sep #$30
   .a8
@@ -81,11 +84,21 @@
   jsr pppIcmpInitialize
   jsr pppUdpInitialize
   jsr pppNtpInitialize
+
+  rep #$30
+  .a16
+  .i16
+  jsr statusInitialize
   sep #$10
   .i8
 
-  ; BG1 tilemap at VRAM $4000, 32x64 tiles.
-  lda #TERMINAL_BG1SC
+  ; The status screen is the default; the font specimen intentionally starts
+  ; on the raw terminal tilemap.
+  .ifdef MODEM_FONT_TEST
+    lda #TERMINAL_BG1SC
+  .else
+    lda #TERMINAL_STATUS_BG1SC
+  .endif
   sta BG1SC
   lda #$01
   sta TM
@@ -132,6 +145,8 @@
     jsr pppIpcpPoll
     jsr pppIpv4Poll
     jsr pppNtpPoll
+    jsr clockPoll
+    jsr statusPoll
     jsr pppTransmitPoll
   .endif
   bra @mainLoop

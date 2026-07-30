@@ -1108,6 +1108,15 @@ fn mesen_test(root: &Path, requested_mesen: Option<&Path>, timeout_seconds: u32)
         mailbox_offset <= 0x1_ffff,
         "modemMailbox is outside the 128 KiB SNES WRAM range"
     );
+    let screen_mode_offset = read_label_address(&labels, "screenMode")?
+        .checked_sub(0x7e_0000)
+        .context("screenMode is not in SNES WRAM bank 7E")?;
+    let status_tile_buffer_offset = read_label_address(&labels, "statusTileBuffer")?
+        .checked_sub(0x7e_0000)
+        .context("statusTileBuffer is not in SNES WRAM bank 7E")?;
+    let clock_valid_offset = read_label_address(&labels, "clockValid")?
+        .checked_sub(0x7e_0000)
+        .context("clockValid is not in SNES WRAM bank 7E")?;
 
     let spec = read_spec(root)?;
     let command = *spec
@@ -1131,7 +1140,19 @@ fn mesen_test(root: &Path, requested_mesen: Option<&Path>, timeout_seconds: u32)
         .replace("@MAILBOX_SIZE@", &spec.mailbox.size.to_string())
         .replace("@COMMAND_PPP_SELF_TEST@", &command.to_string())
         .replace("@STATUS_PASSED@", &passed.to_string())
-        .replace("@STATUS_FAILED@", &failed.to_string());
+        .replace("@STATUS_FAILED@", &failed.to_string())
+        .replace(
+            "@SCREEN_MODE_OFFSET@",
+            &format!("0x{screen_mode_offset:05X}"),
+        )
+        .replace(
+            "@STATUS_TILE_BUFFER_OFFSET@",
+            &format!("0x{status_tile_buffer_offset:05X}"),
+        )
+        .replace(
+            "@CLOCK_VALID_OFFSET@",
+            &format!("0x{clock_valid_offset:05X}"),
+        );
     ensure!(
         !script.contains('@'),
         "MesenCE Lua template contains an unresolved placeholder"
@@ -1158,7 +1179,16 @@ fn mesen_test(root: &Path, requested_mesen: Option<&Path>, timeout_seconds: u32)
         match status.code() {
             Some(250) => bail!("MesenCE test rejected the mailbox ABI version"),
             Some(251) => bail!("MesenCE test rejected the mailbox block size"),
-            Some(252) => bail!("MesenCE test timed out after 600 emulated frames"),
+            Some(245) => bail!("MesenCE status screen is not the default"),
+            Some(246) => bail!("MesenCE status screen header validation failed"),
+            Some(247) => bail!("MesenCE application-status adapter validation failed"),
+            Some(248) => bail!("MesenCE software-clock restoration validation failed"),
+            Some(249) => {
+                bail!("MesenCE test timed out waiting for self-test command completion")
+            }
+            Some(252) => {
+                bail!("MesenCE test timed out waiting for mailbox initialization")
+            }
             Some(step @ 1..=249) => {
                 bail!("MesenCE PPP self-test failed at step 0x{step:02X}")
             }

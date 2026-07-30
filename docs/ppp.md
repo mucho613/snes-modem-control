@@ -258,7 +258,9 @@ stratum、poll、precision、reference IDをcopyせず読み取ります。NTP e
 `2208988800`を引いてUnix秒へ変換するため、最初の対象範囲は1970-01-01から
 2036年のNTP era切り替わり前までです。SFC側には絶対時刻を持つRTCがないため、最初の
 実装では四つのtimestampからclock offsetを推定せず、相関済みresponseのserver
-Transmit Timestampを取得時刻として採用します。
+Transmit Timestampを取得時刻として採用します。取得したUnix秒と二進小数上位16bitは
+プロトコル非依存のソフトウェア時計へ渡し、JST表示後はNTSC SFCの平均frame cadenceで
+進めます。
 
 状態機械への入力と出力は分離しています。
 
@@ -504,6 +506,6 @@ cargo run -p ndm24-tools -- ntp-request
 
 LCP、PAP、IPCP、IPv4、ICMP Echo、UDP、NTPはRust参照実装、65816常設
 セルフテスト、revision A実機とWSL2による実対向まで合格しました。IPCP `Opened`
-時のlocalは`10.24.0.2`、peerは`10.24.0.1`です。次は取得したUnix秒をSFC上で
-年月日時分秒へ変換し、ターミナルへ表示します。時刻表示まで合格した後、TCPとHTTPを
-独立したマイルストーンとして進めます。
+時のlocalは`10.24.0.2`、peerは`10.24.0.1`です。NTP時刻のJST変換、フレーム基準の
+進行、人間向けステータス画面も実装済みです。次はTCPとHTTPを独立したマイルストーン
+として進めます。画面側はアプリケーション・アダプターをビルド時に差し替えます。

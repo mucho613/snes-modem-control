@@ -381,6 +381,8 @@ pppDiagnosticStateEnd:
 .export pppUdpPacketOffset, pppUdpChecksumAccumulator
 .export pppUdpTransmitSourcePort, pppUdpTransmitDestinationPort
 .export pppNtpPacketOffset, pppNtpTestSavedFrameCounter
+.export pppNtpTestSavedClockValid, pppNtpTestSavedClockSeconds
+.export pppNtpTestSavedClockSubsecond
 pppLastEvent: .res $1
 pppLastInvalidReason: .res $1
 pppDecoderScratchByte: .res $1
@@ -422,6 +424,9 @@ pppUdpTransmitSourcePort: .res $2
 pppUdpTransmitDestinationPort: .res $2
 pppNtpPacketOffset: .res $2
 pppNtpTestSavedFrameCounter: .res $4
+pppNtpTestSavedClockValid: .res $1
+pppNtpTestSavedClockSeconds: .res $4
+pppNtpTestSavedClockSubsecond: .res $4
 pppLcpOptionSeen: .res $100
 pppLcpOptionDuplicate: .res $100
 pppIpcpOptionSeen: .res $100

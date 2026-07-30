@@ -8,6 +8,9 @@ local MAILBOX_SIZE = @MAILBOX_SIZE@
 local COMMAND_PPP_SELF_TEST = @COMMAND_PPP_SELF_TEST@
 local STATUS_PASSED = @STATUS_PASSED@
 local STATUS_FAILED = @STATUS_FAILED@
+local SCREEN_MODE = @SCREEN_MODE_OFFSET@
+local STATUS_TILE_BUFFER = @STATUS_TILE_BUFFER_OFFSET@
+local CLOCK_VALID = @CLOCK_VALID_OFFSET@
 
 local OFFSET_VERSION = 4
 local OFFSET_SIZE = 6
@@ -45,6 +48,19 @@ local function write32(offset, value)
     emu.write(MAILBOX + offset + 3, (value >> 24) & 0xff, memory_type)
 end
 
+local function read_wram8(offset)
+    return emu.read(offset, memory_type, false)
+end
+
+local function matches_text(offset, expected)
+    for index = 1, #expected do
+        if read_wram8(offset + index - 1) ~= string.byte(expected, index) then
+            return false
+        end
+    end
+    return true
+end
+
 local function magic_ready()
     return read8(0) == 0x4e
         and read8(1) == 0x44
@@ -69,7 +85,7 @@ local function poll()
                 read16(OFFSET_RESULT),
                 read32(OFFSET_PROCESSED_SEQUENCE)
             ),
-            252
+            command_sent and 249 or 252
         )
         return
     end
@@ -123,6 +139,27 @@ local function poll()
     local status = read8(OFFSET_STATUS)
     local result = read16(OFFSET_RESULT)
     if status == STATUS_PASSED then
+        if read_wram8(SCREEN_MODE) ~= 0 then
+            stop_failure("status screen is not the default", 245)
+            return
+        end
+        if not matches_text(STATUS_TILE_BUFFER, "modem-control-test") then
+            stop_failure("status header is missing", 246)
+            return
+        end
+        if not matches_text(STATUS_TILE_BUFFER + 10 * 32 + 7, "NTP") then
+            stop_failure("NTP application adapter is not visible", 247)
+            return
+        end
+        if read_wram8(CLOCK_VALID) ~= 0
+            or not matches_text(
+                STATUS_TILE_BUFFER + 12 * 32 + 7,
+                "---- -- -- --:--:-- JST"
+            )
+        then
+            stop_failure("software clock did not return to its pre-test state", 248)
+            return
+        end
         emu.displayMessage(
             "NDM24 test",
             string.format(
