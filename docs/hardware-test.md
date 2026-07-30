@@ -344,4 +344,17 @@ clear、Peer-IDとPasswordの分割登録、mailbox argumentsのzero化、登録
 切断時の一時資格情報消去、閉じた試験用fixtureへの復帰を実機65816上で検査
 します。実サービスの資格情報はこの試験では入力も送信もしていません。
 
+続いて同じROMをrevision A、DFM-56U、疑似PSTNのV.22bis 2400 bit/s回線で
+回帰試験しました。LCP、fixture PAP、IPCPはすべて`Opened`となり、local
+`10.24.0.2`、peer `10.24.0.1`、Primary DNS `1.1.1.1`を確認しました。
+FCS error、invalid、overflow、backpressureは0です。SFCからのlocal Closeに
+対して`pppd`は同じIdentifierのTerminate-Ackを返し、Connection terminated、
+Modem hangupまで到達しました。Closeと重なった定期LCP Echoの送信を1件
+意図的に破棄したため、`transmit_abort_count=1`、`echo_drop_count=1`です。
+切断後はLCP/IPCPが`Closed`、PAPが`Inactive`、local IPとPrimary/Secondary
+DNSがzero、PPP receiveが無効となりました。peer addressと`PEER_VALID`は
+zero peer要求へのNakに使う設定済みfixture値であり、交渉結果の持ち越しでは
+ありません。試験後にPPP serverを停止し、DFM-56UがCOM5へ戻ることも確認
+しました。
+
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。
