@@ -102,6 +102,8 @@ DFM-56UをWindowsのCOM5からWSL2の`/dev/ttyACM0`へUSBIPで切り替え、
 LCP試験に続き、PAP Authenticate-Request/Ack、IPCP `Opened`、SFC側local
 `10.24.0.2`、peer `10.24.0.1`、password非記録、切断後のLCP/IPCP
 `Closed`とPAP `Inactive`までをSFC診断ABIと`pppd`ログで照合済みです。
+対向からのLCP Terminate-Requestには同じIdentifierのTerminate-Ackを1回返し、
+Ack送信中に上位層のlower-downが共有送信器を中止しないことも確認します。
 試験中は従来の
 `connect-test --port COM5`と`binary-test --port COM5`を同時に実行しません。
 
@@ -120,6 +122,7 @@ LCP試験に続き、PAP Authenticate-Request/Ack、IPCP `Opened`、SFC側local
 | 30 分 soak | 合格 (2026-07-29) | 未実施 |
 | NMITIMEN gating回帰 | 合格 (2026-07-29) | 合格 (2026-07-29) |
 | PPP LCP実対向 | 合格 (2026-07-30) | 未実施 |
+| PPP LCP peer起点正常終了 | 合格 (2026-07-30) | 未実施 |
 | PPP PAP認証 | 合格 (2026-07-30) | 未実施 |
 | PPP IPCPセルフテスト | 合格 (2026-07-30) | 未実施 |
 | PPP IPCP実対向 | 合格 (2026-07-30) | 未実施 |
@@ -277,5 +280,18 @@ backpressure、abortはいずれも0です。明示resolver `1.1.1.1`を使う
 対向停止後はraw `NO CARRIER`を検出してLCP/IPCPが`Closed`、PAPが`Inactive`
 となり、Primary/Secondary DNSはともに`0.0.0.0`、flagsは次回要求用の
 `$2D`へ戻りました。`pending-rx`も空でした。
+
+同日、LCP peer起点正常終了対応のsmoke ROMをrevision AのFXPAK PROへ転送し、
+mailbox `ppp-self-test`（command 10、sequence 1）に合格しました。WSL2
+`pppd`とIPCP `Opened`まで再接続した後、serverを`Stop`すると、`pppd`は
+`TermReq id=0x2 "User request"`を送信し、SFCから`TermAck id=0x2`を受信して
+同じ秒に`Connection terminated`へ到達しました。
+
+切断後の診断ABI version 15、439byteでは
+`lcp_terminate_request_count=1`、`lcp_terminate_ack_count=1`でした。
+TX frame countは9から10、wire byte countは285から303へ進み、
+`transmit_abort_count=0`、FCS error、invalid、overflow、backpressureも0です。
+その後raw `NO CARRIER`を1回検出し、LCP/IPCPは`Closed`、PAPは`Inactive`、
+交渉済みlocal IPとPrimary/Secondary DNSはzeroへ戻りました。
 
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。

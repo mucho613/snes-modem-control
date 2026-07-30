@@ -153,7 +153,8 @@ peer profileの2つの`ms-dns`で固定します。
    Secondary DNS `1.0.0.1`が確定し、timerが停止する。
 9. DNS画面と`ppp-monitor`が同じ2アドレスを表示する。
 10. PAP payloadやpasswordが通常ログへ出ない。
-11. 切断後にSFC側LCPとIPCPが`Closed`、PAPが`Inactive`へ戻り、timerとpending送信を残さない。
+11. `Stop`時のpeer Terminate-Requestへ同じIdentifierのTerminate-Ackを返す。
+12. 切断後にSFC側LCPとIPCPが`Closed`、PAPが`Inactive`へ戻り、timerとpending送信を残さない。
 
 PPP受信は発信前に有効化します。`CONNECT`後に有効化すると、対向が先に送った
 LCP frameの途中からdecoderへ渡され、FCS errorやRX ring overflowを生じる
@@ -430,6 +431,24 @@ TX backpressure、TX abortは0です。既存の明示resolver経路を変えて
 `Stop`からraw `NO CARRIER`検出後はLCP/IPCP `Closed`、PAP `Inactive`となり、
 Primary/Secondary DNS addressはともにzeroへ戻りました。DNS request bitは
 次回接続用に復元され、前回のvalid bitは残りません。`pending-rx`も空でした。
+
+## 2026-07-30 revision A LCP正常終了結果
+
+peer起点のLCP終了対応後、同じrevision AとDFM-56Uを再接続し、PAP認証と
+RFC 1877を含むIPCP交渉が`Opened`へ到達してからserverを`Stop`しました。
+`pppd` journalでは終了要求と応答のIdentifierが一致しています。
+
+```text
+sent [LCP TermReq id=0x2 "User request"]
+rcvd [LCP TermAck id=0x2]
+Connection terminated.
+```
+
+SFC診断ABI version 15ではTerminate-Request受信数1、Terminate-Ack送信受理数1、
+TX frame数10、TX abort 0でした。FCS error、invalid、overflow、backpressureも
+0です。Terminate-Ack受理後はLCPを`Stopped`へ移し、続くraw `NO CARRIER`検出で
+LCP/IPCP `Closed`、PAP `Inactive`へ戻りました。local IP、Primary DNS、
+Secondary DNSもzeroへ初期化され、DFM-56UはWindowsのCOM5へ正常に返却されました。
 
 試験終了時は必ず停止します。
 
