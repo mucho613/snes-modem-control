@@ -12,6 +12,8 @@ pub const DEFAULT_MAX_TERMINATE: u8 = 2;
 pub const DEFAULT_MRU: u16 = 1_500;
 pub const DEFAULT_ACCM: u32 = u32::MAX;
 pub const PAP_PROTOCOL: u16 = 0xc023;
+pub const CHAP_PROTOCOL: u16 = 0xc223;
+pub const CHAP_MD5_ALGORITHM: u8 = 5;
 const MAGIC_RETRY_INCREMENT: u32 = 0x9e37_79b9;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,6 +30,7 @@ pub enum State {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuthenticationProtocol {
     Pap,
+    ChapMd5,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,11 +58,15 @@ impl Default for PeerConfiguration {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SfcPolicy {
     pub accept_pap: bool,
+    pub accept_chap_md5: bool,
 }
 
 impl Default for SfcPolicy {
     fn default() -> Self {
-        Self { accept_pap: true }
+        Self {
+            accept_pap: true,
+            accept_chap_md5: true,
+        }
     }
 }
 
@@ -838,10 +845,25 @@ fn evaluate_option(
             OptionDisposition::Nak(vec![2, 6, 0xff, 0xff, 0xff, 0xff])
         }
         Some(OptionType::AuthenticationProtocol)
+            if policy.accept_chap_md5
+                && option.data
+                    == [
+                        CHAP_PROTOCOL.to_be_bytes()[0],
+                        CHAP_PROTOCOL.to_be_bytes()[1],
+                        CHAP_MD5_ALGORITHM,
+                    ] =>
+        {
+            configuration.authentication = Some(AuthenticationProtocol::ChapMd5);
+            OptionDisposition::Ack
+        }
+        Some(OptionType::AuthenticationProtocol)
             if policy.accept_pap && option.data == PAP_PROTOCOL.to_be_bytes() =>
         {
             configuration.authentication = Some(AuthenticationProtocol::Pap);
             OptionDisposition::Ack
+        }
+        Some(OptionType::AuthenticationProtocol) if policy.accept_chap_md5 => {
+            OptionDisposition::Nak(vec![3, 5, 0xc2, 0x23, CHAP_MD5_ALGORITHM])
         }
         Some(OptionType::AuthenticationProtocol) if policy.accept_pap => {
             OptionDisposition::Nak(vec![3, 4, 0xc0, 0x23])
@@ -1119,7 +1141,7 @@ mod tests {
     }
 
     #[test]
-    fn policy_naks_chap_to_pap() {
+    fn policy_accepts_chap_md5() {
         let mut machine = machine(&[]);
         machine.open(0).unwrap();
         let transition = machine
@@ -1127,7 +1149,20 @@ mod tests {
             .unwrap();
         assert_eq!(
             packet(&transition.actions[0]),
-            &[3, 7, 0, 8, 3, 4, 0xc0, 0x23]
+            &[2, 7, 0, 9, 3, 5, 0xc2, 0x23, 5]
+        );
+    }
+
+    #[test]
+    fn policy_naks_unsupported_authentication_to_chap_md5() {
+        let mut machine = machine(&[]);
+        machine.open(0).unwrap();
+        let transition = machine
+            .receive(&[1, 7, 0, 8, 3, 4, 0xc2, 0x27], 1, SfcPolicy::default())
+            .unwrap();
+        assert_eq!(
+            packet(&transition.actions[0]),
+            &[3, 7, 0, 9, 3, 5, 0xc2, 0x23, 5]
         );
     }
 

@@ -7,6 +7,7 @@
 
 use std::mem;
 
+pub mod chap;
 pub mod dns;
 pub mod icmp;
 pub mod ipcp;

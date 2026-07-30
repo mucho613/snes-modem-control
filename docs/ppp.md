@@ -470,6 +470,21 @@ step `$6A`～`$6F`は、Authenticate-Request構築、共有encoderへの受理�
 不一致Identifierの無視と状態維持、正常Ack、timer停止、lower-downを閉じた
 fixtureで検査します。
 
+## CHAP-MD5参照実装
+
+`crates/ndm24-ppp/src/chap.rs`はRFC 1994のChallenge、Response、
+Success、Failure packetをLength境界内で解析し、Responseを追加allocation
+なしで構築します。CHAP-MD5のResponse Valueは
+`MD5(Identifier || Secret || Challenge Value)`で計算します。内蔵MD5は
+標準test vectorと、分割入力・padding境界を使って検査します。
+
+LCP参照状態機械はAuthentication-Protocol `$C223`、Algorithm 5を受理し、
+それ以外の認証方式にはCHAP-MD5をConfigure-Nakで提案します。PAPも閉じた
+fixtureとの互換性のため引き続き受理します。Nifty基準試験で観測した
+MRU 1524、ACCM 0、CHAP-MD5、PFC、ACFCのRequestでは、PFC/ACFCを先に
+Rejectし、圧縮optionが除かれた再RequestをCHAP-MD5としてAckする方針です。
+65816版CHAP状態機械とMD5は未実装です。
+
 ## 65816 IPCP client
 
 `src/ppp/ipcp.asm`はProtocol `$8021`のConfigure packetを解析し、RFC 1332の
