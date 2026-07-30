@@ -1,7 +1,5 @@
-//! RFC 1661 LCP establishment-state reference implementation.
-//!
-//! Link termination and maintenance packets are intentionally outside this
-//! first state-machine milestone.
+//! RFC 1661 LCP establishment and peer-initiated termination reference
+//! implementation.
 
 use super::{
     Code, ConfigurationOption, EncodeError, OptionParseError, OptionType, Packet, ParseError,
@@ -239,12 +237,38 @@ impl Machine {
             Some(Code::ConfigureAck) => self.receive_configure_ack(packet, now_ms),
             Some(Code::ConfigureNak) => self.receive_configure_nak(packet, now_ms),
             Some(Code::ConfigureReject) => self.receive_configure_reject(packet, now_ms),
+            Some(Code::TerminateRequest) => self.receive_terminate_request(packet),
+            Some(Code::TerminateAck) => Ok(Transition::default()),
             None => self.receive_unknown_code(input, packet),
             Some(code) => Ok(Transition {
                 actions: Vec::new(),
                 ignored: Some(IgnoreReason::UnsupportedCode(code as u8)),
             }),
         }
+    }
+
+    fn receive_terminate_request(
+        &mut self,
+        packet: Packet<'_>,
+    ) -> Result<Transition, MachineError> {
+        let was_open = self.state == State::Opened;
+        self.state = State::Stopped;
+        self.restart_deadline_ms = None;
+        self.restart_remaining = 0;
+        self.peer_configuration = None;
+
+        let mut actions = vec![Action::SendPacket(encode_packet(
+            Code::TerminateAck as u8,
+            packet.identifier,
+            &[],
+        )?)];
+        if was_open {
+            actions.push(Action::ThisLayerDown);
+        }
+        Ok(Transition {
+            actions,
+            ignored: None,
+        })
     }
 
     fn receive_configure_request(
@@ -915,5 +939,43 @@ mod tests {
         assert_eq!(transition.actions[0], Action::ThisLayerDown);
         assert_eq!(packet(&transition.actions[1]), &[1, 2, 0, 4]);
         assert_eq!(packet(&transition.actions[2]), &[2, 10, 0, 4]);
+    }
+
+    #[test]
+    fn peer_terminate_request_is_acknowledged_before_layer_down() {
+        let mut machine = machine(&[]);
+        machine.open(0).unwrap();
+        machine
+            .receive(&[1, 9, 0, 4], 1, SfcPolicy::default())
+            .unwrap();
+        machine
+            .receive(&[2, 1, 0, 4], 2, SfcPolicy::default())
+            .unwrap();
+        assert_eq!(machine.state(), State::Opened);
+
+        let transition = machine
+            .receive(
+                &[5, 0x42, 0, 16, b'U', b's', b'e', b'r', b' ', b'r', b'e', b'q', b'u', b'e',
+                    b's', b't'],
+                3,
+                SfcPolicy::default(),
+            )
+            .unwrap();
+
+        assert_eq!(machine.state(), State::Stopped);
+        assert_eq!(machine.restart_deadline_ms(), None);
+        assert_eq!(packet(&transition.actions[0]), &[6, 0x42, 0, 4]);
+        assert_eq!(transition.actions[1], Action::ThisLayerDown);
+    }
+
+    #[test]
+    fn terminate_ack_is_ignored_without_a_local_close() {
+        let mut machine = machine(&[]);
+        machine.open(0).unwrap();
+        let transition = machine
+            .receive(&[6, 0x31, 0, 4], 1, SfcPolicy::default())
+            .unwrap();
+        assert_eq!(machine.state(), State::RequestSent);
+        assert_eq!(transition, Transition::default());
     }
 }
