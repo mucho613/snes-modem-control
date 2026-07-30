@@ -294,4 +294,10 @@ TX frame countは9から10、wire byte countは285から303へ進み、
 その後raw `NO CARRIER`を1回検出し、LCP/IPCPは`Closed`、PAPは`Inactive`、
 交渉済みlocal IPとPrimary/Secondary DNSはzeroへ戻りました。
 
+同日、LCP Protocol-Reject対応のABI version 16 normal ROMをrevision Aの
+FXPAK PROへQUsb2Snes経由で転送し、起動確認後にmailbox `ppp-self-test`
+（command 10、sequence 1）が合格しました。常設fixtureは未知Protocol
+`$8057`に対するCode 8、Length 9の応答、Identifier、Rejected-Information、
+共有encoderのbackpressure中のframe保持、送信後の診断countを検査します。
+
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。

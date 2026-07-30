@@ -339,6 +339,10 @@ Max-Configureは初回送信を含む10回です。初回Requestの後に9回ま
 
 LCPが`Opened`の間、LCP `$C021`、PAP `$C023`、IPCP `$8021`、IPv4 `$0021`以外のProtocolは上位層へ渡さず、LCP Protocol-Rejectで応答します。共有encoderがbusyなら未知frameを保持し、Protocol-Rejectが受理された後だけ解放します。LCPが`Opened`でない間の未知Protocolは応答せず破棄します。常設セルフテストのstep `$65`には、未知Protocol `$8057`と3byteのInformationからCode 8、Length 9のProtocol-Rejectを構築し、backpressure中のframe保持、Identifier、複製byte列、診断countを検査するfixtureを含みます。
 
+2026-07-30にABI version 16のnormal ROMをrevision AのFXPAK PROへ転送し、
+QUsb2Snes mailboxの`ppp-self-test`（command 10、sequence 1）が合格しました。
+これにより、上記Protocol-Reject fixtureを実機65816上でも確認しています。
+
 Opened中にpeer Configure-Requestを受けた場合は応答packetと新しいlocal Configure-Requestの2packetが必要です。1frame分の応答を先にencoderへ渡し、`lcp_deferred_request` でlocal Requestを保持して直列化します。peer Terminate-Requestでは、Terminate-Ackが共有encoderへ受理されるまでLCPを`Opened`に保ち、受理後に`Stopped`へ遷移させます。これにより上位層のlower-downが先に共有encoderを中止してAckを失う競合を防ぎます。IPCPはlower-down時、送信中frameがLCP Terminate-Ackの場合に限ってこれを温存し、自身の送信中frameは従来どおり中止します。常設セルフテストのstep `$60`～`$65` は、初回Request、TX busy中のframe保持、Ack後の解放、Opened到達、Opened中の再交渉、peer起点の終了、所有権解除時のlower-downを模擬transcriptで検査します。
 
 2026-07-30のrevision A実対向では、`pppd`が送った`TermReq id=0x2`へSFCが
