@@ -91,7 +91,7 @@
   rep #$30
   .a16
   .i16
-  jsr statusInitialize
+  jsl statusInitialize
   sep #$10
   .i8
 
@@ -151,7 +151,7 @@
     jsr pppNtpPoll
     jsr pppDnsPoll
     jsr clockPoll
-    jsr statusPoll
+    jsl statusPoll
     jsr pppTransmitPoll
   .endif
   bra @mainLoop

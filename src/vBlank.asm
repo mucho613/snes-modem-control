@@ -45,8 +45,8 @@
   sep #$20
   .a8
   jsr terminalRenderVBlank
-  jsr statusRenderVBlank
-  jsr screenApplyVBlank
+  jsl statusRenderVBlank
+  jsl screenApplyVBlank
 
   lda #$01
   sta controllerPollTick

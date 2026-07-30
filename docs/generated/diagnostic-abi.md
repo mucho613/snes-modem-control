@@ -44,7 +44,7 @@ ABI version: `2`. Block size: `128` bytes.
 
 ## PPP Diagnostic ABI
 
-ABI version: `16`. Block size: `446` bytes.
+ABI version: `17`. Block size: `451` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|
@@ -234,7 +234,9 @@ ABI version: `16`. Block size: `446` bytes.
 | `0x1B3` | 4 | `u32` | `lcp_terminate_ack_count` | Terminate-Acks accepted by the shared PPP transmitter |
 | `0x1B7` | 4 | `u32` | `lcp_protocol_reject_count` | Protocol-Reject packets accepted by the shared PPP transmitter |
 | `0x1BB` | 2 | `u16` | `lcp_last_rejected_protocol` | Most recent unsupported PPP protocol rejected by LCP |
-| `0x1BD` | 1 | `u8` | `lcp_reject_identifier` | Identifier used by the most recent LCP Protocol-Reject |
+| `0x1BD` | 1 | `u8` | `lcp_reject_identifier` | Identifier used by the most recent LCP Code-Reject or Protocol-Reject |
+| `0x1BE` | 4 | `u32` | `lcp_code_reject_count` | Code-Reject packets accepted by the shared PPP transmitter |
+| `0x1C2` | 1 | `u8` | `lcp_last_rejected_code` | Most recent unknown LCP Code rejected by LCP |
 
 ## Mailbox ABI
 

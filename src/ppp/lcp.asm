@@ -15,6 +15,7 @@
 .import pppLcpTerminateRequestCount, pppLcpTerminateAckCount
 .import pppLcpProtocolRejectCount, pppLcpLastRejectedProtocol
 .import pppLcpRejectIdentifier
+.import pppLcpCodeRejectCount, pppLcpLastRejectedCode
 
 .export pppLcpInitialize, pppLcpParseFrame, pppLcpRunSelfTest
 
@@ -59,10 +60,13 @@
   stz pppLcpTerminateAckCount + 2
   stz pppLcpProtocolRejectCount
   stz pppLcpProtocolRejectCount + 2
+  stz pppLcpCodeRejectCount
+  stz pppLcpCodeRejectCount + 2
   stz pppLcpLastRejectedProtocol
   sep #$20
   .a8
   stz pppLcpRejectIdentifier
+  stz pppLcpLastRejectedCode
   plb
   rts
 .endproc

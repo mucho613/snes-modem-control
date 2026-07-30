@@ -338,6 +338,8 @@ pub struct PppDiagnosticSnapshot {
     pub lcp_protocol_reject_count: u32,
     pub lcp_last_rejected_protocol: u16,
     pub lcp_reject_identifier: u8,
+    pub lcp_code_reject_count: u32,
+    pub lcp_last_rejected_code: u8,
 }
 
 impl PppDiagnosticSnapshot {
@@ -553,11 +555,10 @@ impl PppDiagnosticSnapshot {
             lcp_terminate_request_count: read_u32(data, PPP_DIAG_LCP_TERMINATE_REQUEST_COUNT)?,
             lcp_terminate_ack_count: read_u32(data, PPP_DIAG_LCP_TERMINATE_ACK_COUNT)?,
             lcp_protocol_reject_count: read_u32(data, PPP_DIAG_LCP_PROTOCOL_REJECT_COUNT)?,
-            lcp_last_rejected_protocol: read_u16(
-                data,
-                PPP_DIAG_LCP_LAST_REJECTED_PROTOCOL,
-            )?,
+            lcp_last_rejected_protocol: read_u16(data, PPP_DIAG_LCP_LAST_REJECTED_PROTOCOL)?,
             lcp_reject_identifier: data[PPP_DIAG_LCP_REJECT_IDENTIFIER],
+            lcp_code_reject_count: read_u32(data, PPP_DIAG_LCP_CODE_REJECT_COUNT)?,
+            lcp_last_rejected_code: data[PPP_DIAG_LCP_LAST_REJECTED_CODE],
         })
     }
 }
@@ -981,6 +982,9 @@ mod tests {
         data[PPP_DIAG_LCP_LAST_REJECTED_PROTOCOL..PPP_DIAG_LCP_LAST_REJECTED_PROTOCOL + 2]
             .copy_from_slice(&0x8057_u16.to_le_bytes());
         data[PPP_DIAG_LCP_REJECT_IDENTIFIER] = 9;
+        data[PPP_DIAG_LCP_CODE_REJECT_COUNT..PPP_DIAG_LCP_CODE_REJECT_COUNT + 4]
+            .copy_from_slice(&5_u32.to_le_bytes());
+        data[PPP_DIAG_LCP_LAST_REJECTED_CODE] = 0x7f;
 
         let snapshot = PppDiagnosticSnapshot::decode(&data).unwrap();
         assert_eq!(snapshot.snapshot_sequence, 8);
@@ -1131,6 +1135,8 @@ mod tests {
         assert_eq!(snapshot.lcp_protocol_reject_count, 4);
         assert_eq!(snapshot.lcp_last_rejected_protocol, 0x8057);
         assert_eq!(snapshot.lcp_reject_identifier, 9);
+        assert_eq!(snapshot.lcp_code_reject_count, 5);
+        assert_eq!(snapshot.lcp_last_rejected_code, 0x7f);
     }
 
     #[test]

@@ -14,6 +14,7 @@
 .import pppLcpPollSavedModemState
 .import pppLcpProtocolRejectCount, pppLcpLastRejectedProtocol
 .import pppLcpRejectIdentifier
+.import pppLcpCodeRejectCount, pppLcpLastRejectedCode
 .import pppLcpInitialize, pppLcpOpen, pppLcpReceiveFrame
 .import pppLcpRejectProtocol
 .import pppLcpBuildPending, pppLcpPollTimeout, pppLcpLowerDown
@@ -122,6 +123,8 @@
   beq @responsePending
   cmp #PPP_LCP_ACTION_TERMINATE_ACK
   beq @responsePending
+  cmp #PPP_LCP_ACTION_CODE_REJECT
+  beq @responsePending
 
 @releaseThenTimer:
   .a8
@@ -190,6 +193,8 @@
   beq @terminateAckSent
   cmp #PPP_LCP_ACTION_PROTOCOL_REJECT
   beq @responseSent
+  cmp #PPP_LCP_ACTION_CODE_REJECT
+  beq @responseSent
   bne @serviceReady
 
 @terminateAckSent:
@@ -240,7 +245,7 @@
 ;
 ; Output:
 ;   Carry clear, A=$00: passed
-;   Carry set, A=$60-$65: failed step
+;   Carry set, A=$60-$66: failed step
 .proc pppLcpPollRunSelfTest
   .a8
   .i16
@@ -419,6 +424,95 @@
   sep #$20
   .a8
 
+  ; An unknown LCP Code is rejected with exactly the packet declared by its
+  ; Length field. PPP padding is excluded and a busy encoder retains the frame.
+  lda #$7f
+  sta pppFrameBuffer + 4
+  lda #$42
+  sta pppFrameBuffer + 5
+  stz pppFrameBuffer + 6
+  lda #$06
+  sta pppFrameBuffer + 7
+  lda #$aa
+  sta pppFrameBuffer + 8
+  lda #$bb
+  sta pppFrameBuffer + 9
+  lda #$cc
+  sta pppFrameBuffer + 10
+  rep #$20
+  .a16
+  lda #PPP_PROTOCOL_LCP
+  sta pppLastProtocol
+  lda #$000b
+  sta pppLastFrameLength
+  sep #$20
+  .a8
+  lda #$01
+  sta pppFrameReady
+  sta pppTransmitActive
+  rep #$20
+  .a16
+  jsr pppLcpPoll
+  sep #$20
+  .a8
+  lda pppFrameReady
+  pppLcpPollRequireNonzero @fail66
+  lda pppLcpPendingAction
+  cmp #PPP_LCP_ACTION_CODE_REJECT
+  pppLcpPollRequireEqual @fail66
+  jsr pppTransmitInitialize
+  rep #$20
+  .a16
+  jsr pppLcpPoll
+  sep #$20
+  .a8
+  lda pppFrameReady
+  ora pppLcpPendingAction
+  pppLcpPollRequireEqual @fail66
+  lda pppTransmitBuffer + 4
+  cmp #PPP_LCP_CODE_CODE_REJECT
+  pppLcpPollRequireEqual @fail66
+  lda pppTransmitBuffer + 5
+  cmp #$02
+  pppLcpPollRequireEqual @fail66
+  lda pppTransmitBuffer + 7
+  cmp #$0a
+  pppLcpPollRequireEqual @fail66
+  lda pppTransmitBuffer + 8
+  cmp #$7f
+  pppLcpPollRequireEqual @fail66
+  lda pppTransmitBuffer + 9
+  cmp #$42
+  pppLcpPollRequireEqual @fail66
+  lda pppTransmitBuffer + 10
+  pppLcpPollRequireEqual @fail66
+  lda pppTransmitBuffer + 11
+  cmp #$06
+  pppLcpPollRequireEqual @fail66
+  lda pppTransmitBuffer + 12
+  cmp #$aa
+  pppLcpPollRequireEqual @fail66
+  lda pppTransmitBuffer + 13
+  cmp #$bb
+  pppLcpPollRequireEqual @fail66
+  lda pppLcpLastRejectedCode
+  cmp #$7f
+  pppLcpPollRequireEqual @fail66
+  lda pppLcpRejectIdentifier
+  cmp #$02
+  pppLcpPollRequireEqual @fail66
+  rep #$20
+  .a16
+  lda pppLcpCodeRejectCount
+  cmp #$0001
+  beq :+
+  sep #$20
+  .a8
+  jmp @fail66
+:
+  sep #$20
+  .a8
+
   ; A peer request in Opened serializes its Ack before a fresh local request.
   jsr pppTransmitInitialize
   lda #PPP_LCP_CODE_CONFIGURE_REQUEST
@@ -524,6 +618,9 @@
   bra @fail
 @fail65:
   lda #$65
+  bra @fail
+@fail66:
+  lda #$66
 
 @fail:
   pha

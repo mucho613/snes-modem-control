@@ -6,13 +6,14 @@
 .import pppSnapshotBegin, pppSnapshotEnd
 .import pppLcpParseFrame, pppLcpInitialize
 .import pppLcpEvaluatePeerRequest, pppLcpBuildPeerResponse
-.import pppLcpState, pppLcpLastIdentifier, pppLcpLastError
+.import pppLcpState, pppLcpLastCode, pppLcpLastIdentifier, pppLcpLastError
 .import pppLcpRequestIdentifier, pppLcpRestartRemaining
 .import pppLcpPendingAction, pppLcpPacketLength
 .import pppLcpTimerActive, pppLcpDeferredRequest
 .import pppLcpTerminateRequestCount, pppLcpTerminateAckCount
 .import pppLcpProtocolRejectCount, pppLcpLastRejectedProtocol
 .import pppLcpRejectIdentifier, pppLcpPeerMru
+.import pppLcpCodeRejectCount, pppLcpLastRejectedCode
 .import pppLcpPacketEnd, pppLcpOutputCursor
 .import pppFrameBuffer, pppTransmitBuffer, pppTransmitActive
 .import pppTransmitBegin, pppTransmitInitialize
@@ -20,6 +21,7 @@
 .import pppLastProtocol, pppLastFrameLength
 
 .export pppLcpOpen, pppLcpReceiveFrame, pppLcpRejectProtocol
+.export pppLcpRejectCode
 .export pppLcpBuildPending
 .export pppLcpNegotiationRunSelfTest
 
@@ -101,7 +103,17 @@
   jmp @returnSuccess
 :
 
-  ; Maintenance and unknown Code processing remain outside this milestone.
+  ; Codes 7-11 are defined by RFC 1661 even when their maintenance behavior
+  ; is not implemented yet. Only genuinely unknown values receive Code-Reject.
+  cmp #PPP_LCP_CODE_CODE_REJECT
+  bcc @unknownCode
+  cmp #PPP_LCP_CODE_DISCARD_REQUEST + 1
+  bcs @unknownCode
+  jmp @returnSuccess
+
+@unknownCode:
+  .a8
+  jsr pppLcpRejectCode
   jmp @returnSuccess
 
 @terminateRequest:
@@ -325,6 +337,25 @@
   rts
 .endproc
 
+; Queue a Code-Reject for the retained, parsed LCP packet. The caller owns
+; pppFrameBuffer until pppLcpBuildPending enters the shared transmitter.
+.proc pppLcpRejectCode
+  .a8
+  .i16
+
+  phb
+  setDBR $7e
+  jsr pppSnapshotBegin
+  lda pppLcpLastCode
+  sta pppLcpLastRejectedCode
+  inc pppLcpRejectIdentifier
+  lda #PPP_LCP_ACTION_CODE_REJECT
+  sta pppLcpPendingAction
+  jsr pppSnapshotEnd
+  plb
+  rts
+.endproc
+
 ; Build the current pending LCP packet directly into the shared PPP transmit
 ; buffer and start its restartable RFC 1662 encoder.
 ;
@@ -369,6 +400,10 @@
   beq @buildTerminateAck
   cmp #PPP_LCP_ACTION_PROTOCOL_REJECT
   beq @buildProtocolReject
+  cmp #PPP_LCP_ACTION_CODE_REJECT
+  bne :+
+  jmp @buildCodeReject
+:
   jmp @busy
 
 @buildRequest:
@@ -499,6 +534,72 @@
   lda pppLcpOutputCursor
   clc
   adc #PPP_UNCOMPRESSED_HEADER_LENGTH
+  jmp @begin
+
+@buildCodeReject:
+  .a8
+  lda #PPP_LCP_CODE_CODE_REJECT
+  sta pppTransmitBuffer + 4
+  lda pppLcpRejectIdentifier
+  sta pppTransmitBuffer + 5
+
+  ; Copy the complete Length-delimited rejected LCP packet when possible.
+  ; The outer LCP packet is bounded by the peer MRU and the fixed transmit
+  ; Information area. Preserve at least the rejected four-byte LCP header.
+  rep #$20
+  .a16
+  lda pppLcpPacketLength
+  clc
+  adc #PPP_LCP_HEADER_LENGTH
+  cmp pppLcpPeerMru
+  bcc :+
+  beq :+
+  lda pppLcpPeerMru
+:
+  cmp #PPP_DEFAULT_MRU + 1
+  bcc :+
+  lda #PPP_DEFAULT_MRU
+:
+  cmp #(PPP_LCP_HEADER_LENGTH * 2)
+  bcs :+
+  lda #(PPP_LCP_HEADER_LENGTH * 2)
+:
+  sta pppLcpOutputCursor
+  xba
+  sep #$20
+  .a8
+  sta pppTransmitBuffer + 6
+  lda pppLcpOutputCursor
+  sta pppTransmitBuffer + 7
+
+  rep #$20
+  .a16
+  lda pppLcpOutputCursor
+  sec
+  sbc #PPP_LCP_HEADER_LENGTH
+  sta pppLcpPacketEnd
+  ldx #PPP_LCP_FRAME_OFFSET
+  ldy #PPP_UNCOMPRESSED_HEADER_LENGTH + PPP_LCP_HEADER_LENGTH
+@copyRejectedLcpPacket:
+  .a16
+  lda pppLcpPacketEnd
+  beq @codeRejectLength
+  sep #$20
+  .a8
+  lda pppFrameBuffer, x
+  sta pppTransmitBuffer, y
+  rep #$20
+  .a16
+  inx
+  iny
+  dec pppLcpPacketEnd
+  bra @copyRejectedLcpPacket
+
+@codeRejectLength:
+  .a16
+  lda pppLcpOutputCursor
+  clc
+  adc #PPP_UNCOMPRESSED_HEADER_LENGTH
 
 @begin:
   .a16
@@ -526,12 +627,24 @@
   bra @counterDone
 @maybeProtocolReject:
   cmp #PPP_LCP_ACTION_PROTOCOL_REJECT
-  bne @counterDone
+  bne @maybeCodeReject
   rep #$20
   .a16
   inc pppLcpProtocolRejectCount
   bne :+
   inc pppLcpProtocolRejectCount + 2
+:
+  sep #$20
+  .a8
+  bra @counterDone
+@maybeCodeReject:
+  cmp #PPP_LCP_ACTION_CODE_REJECT
+  bne @counterDone
+  rep #$20
+  .a16
+  inc pppLcpCodeRejectCount
+  bne :+
+  inc pppLcpCodeRejectCount + 2
 :
   sep #$20
   .a8

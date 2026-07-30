@@ -487,7 +487,7 @@ impl Machine {
             self.peer_configuration
                 .unwrap_or_default()
                 .transmit_mru
-                .max(4),
+                .max(8),
         );
         let rejected_length = (super::HEADER_LENGTH + packet.data.len()).min(input.len());
         let maximum_data = peer_mru.saturating_sub(super::HEADER_LENGTH);
@@ -1006,6 +1006,24 @@ mod tests {
         let transition = machine.reject_protocol(0x8057, &[1, 2]).unwrap();
         assert!(transition.actions.is_empty());
         assert_eq!(transition.ignored, Some(IgnoreReason::NotConfiguring));
+    }
+
+    #[test]
+    fn unknown_code_is_rejected_with_the_length_delimited_packet() {
+        let mut machine = machine(&[]);
+        machine.open(0).unwrap();
+
+        let transition = machine
+            .receive(
+                &[0x7f, 0x42, 0, 6, 0xaa, 0xbb, 0xcc],
+                1,
+                SfcPolicy::default(),
+            )
+            .unwrap();
+        assert_eq!(
+            packet(&transition.actions[0]),
+            &[7, 2, 0, 10, 0x7f, 0x42, 0, 6, 0xaa, 0xbb]
+        );
     }
 
     #[test]

@@ -6,6 +6,12 @@
 
 通常ROMとスモークテストROMはどちらも32文字幅ターミナルを表示します。通常ROMはNDM24を自動初期化せず、スモークテストROMはraw `R`、`AT`、受信echo、結果コードを起動後に表示します。
 
+ROM bank 0はSNES header・vector直前までPPPとドライバの実行コードに使い、
+人間向けステータス画面のコードは`BANK1_CODE`としてbank 1へ配置します。
+bankを跨ぐ4つの公開入口は`JSL`/`RTL`で呼び、画面モジュール内部のhelperは
+同じbank内の`JSR`/`RTS`を維持します。今後のプロトコル追加でbank 0のheader
+領域へコードが衝突しないための固定配置です。
+
 フォント確認ROMはNDM24を初期化せず、印字可能ASCIIと判別用文字列を表示します。font8x8の出所、変換、配色は [font.md](font.md)を参照してください。
 
 ```mermaid

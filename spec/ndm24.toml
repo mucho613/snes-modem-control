@@ -292,8 +292,8 @@ description = "Frame at which the current generic AT transaction started"
 
 [ppp_diagnostic]
 magic = [0x50, 0x50, 0x50, 0x31]
-version = 16
-size = 446
+version = 17
+size = 451
 
 [[ppp_diagnostic.fields]]
 name = "magic"
@@ -1602,7 +1602,21 @@ name = "lcp_reject_identifier"
 offset = 445
 size = 1
 type = "u8"
-description = "Identifier used by the most recent LCP Protocol-Reject"
+description = "Identifier used by the most recent LCP Code-Reject or Protocol-Reject"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_code_reject_count"
+offset = 446
+size = 4
+type = "u32"
+description = "Code-Reject packets accepted by the shared PPP transmitter"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_last_rejected_code"
+offset = 450
+size = 1
+type = "u8"
+description = "Most recent unknown LCP Code rejected by LCP"
 
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]

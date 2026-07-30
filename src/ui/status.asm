@@ -45,7 +45,7 @@ STATUS_VALUE_COLUMN = 7
 :
 .endmacro
 
-.code
+.segment "BANK1_CODE"
 
 .import frameCounter
 .import controller1Input, controller1InputPulse
@@ -126,7 +126,7 @@ STATUS_VALUE_COLUMN = 7
   pld
   plb
   pla
-  rts
+  rtl
 .endproc
 
 ; Clear and label a newly selected page. This happens in the main loop, never
@@ -515,7 +515,7 @@ STATUS_VALUE_COLUMN = 7
   plx
   plb
   pla
-  rts
+  rtl
 .endproc
 
 ; Copy one status row per VBlank. This bounded refresh makes protocol and
@@ -571,7 +571,7 @@ STATUS_VALUE_COLUMN = 7
   plb
   pla
   plp
-  rts
+  rtl
 .endproc
 
 ; Select the visible tilemap without disturbing either screen's state.
@@ -610,5 +610,5 @@ STATUS_VALUE_COLUMN = 7
   pld
   plb
   pla
-  rts
+  rtl
 .endproc
