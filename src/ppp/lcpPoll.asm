@@ -83,6 +83,8 @@
   beq @receiveLcp
   cmp #PPP_PROTOCOL_PAP
   beq @knownUpperProtocol
+  cmp #PPP_PROTOCOL_CHAP
+  beq @knownUpperProtocol
   cmp #PPP_PROTOCOL_IPCP
   beq @knownUpperProtocol
   cmp #PPP_PROTOCOL_IP

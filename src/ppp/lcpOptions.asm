@@ -77,7 +77,7 @@
   assert_m8_i16
   cpy pppLcpPacketEnd
   beq @selectPacketResponse
-  jsr pppLcpClassifyPeerOption
+  jsl pppLcpClassifyPeerOption
   pha
   cmp #PPP_LCP_OPTION_DISPOSITION_NAK
   bne @classified
@@ -166,14 +166,16 @@
 @commitLoop:
   assert_m8_i16
   cpy pppLcpPacketEnd
-  beq @commitDone
+  bne :+
+  jmp @commitDone
+:
   lda pppFrameBuffer, y
   cmp #PPP_LCP_OPTION_MRU
   beq @commitMru
   cmp #PPP_LCP_OPTION_ACCM
   beq @commitAccm
   cmp #PPP_LCP_OPTION_AUTHENTICATION
-  beq @commitPap
+  beq @commitAuthentication
   cmp #PPP_LCP_OPTION_MAGIC_NUMBER
   beq @commitMagic
   bra @commitAdvance
@@ -204,10 +206,19 @@
   sta pppLcpPeerFlags
   bra @commitAdvance
 
-@commitPap:
+@commitAuthentication:
   assert_m8_i16
+  lda pppFrameBuffer + 2, y
+  cmp #$c2
+  beq @commitChapMd5
   lda pppLcpPeerFlags
   ora #PPP_LCP_PEER_FLAG_PAP
+  sta pppLcpPeerFlags
+  bra @commitAdvance
+@commitChapMd5:
+  assert_m8_i16
+  lda pppLcpPeerFlags
+  ora #PPP_LCP_PEER_FLAG_CHAP_MD5
   sta pppLcpPeerFlags
   bra @commitAdvance
 
@@ -312,7 +323,30 @@
   cmp #$1234
   pppLcpBranchEqualOrJump @fail40_16
   m8
-  ; Invalid MRU and CHAP are Nak candidates in original option order.
+
+  ; CHAP-MD5 is accepted and published as the selected authentication mode.
+  lda #$09
+  jsr @preparePacket
+  lda #$45
+  sta pppFrameBuffer + 5
+  lda #PPP_LCP_OPTION_AUTHENTICATION
+  sta pppFrameBuffer + 8
+  lda #$05
+  sta pppFrameBuffer + 9
+  lda #$c2
+  sta pppFrameBuffer + 10
+  lda #$23
+  sta pppFrameBuffer + 11
+  lda #PPP_CHAP_ALGORITHM_MD5
+  sta pppFrameBuffer + 12
+  jsr pppLcpEvaluatePeerRequest
+  cmp #PPP_LCP_ACTION_CONFIGURE_ACK
+  pppLcpBranchEqualOrJump @fail40
+  lda pppLcpPeerFlags
+  cmp #PPP_LCP_PEER_FLAG_CHAP_MD5
+  pppLcpBranchEqualOrJump @fail40
+
+  ; Invalid MRU and unsupported CHAP algorithm are Nak candidates in order.
   lda #$0d
   jsr @preparePacket
   lda #$42
@@ -331,7 +365,7 @@
   sta pppFrameBuffer + 14
   lda #$23
   sta pppFrameBuffer + 15
-  lda #$05
+  lda #$80
   sta pppFrameBuffer + 16
   jsr pppLcpEvaluatePeerRequest
   cmp #PPP_LCP_ACTION_CONFIGURE_NAK
@@ -340,7 +374,7 @@
   m16
   jsr pppLcpBuildPeerResponse
   assert_m16_i16
-  cmp #$0010
+  cmp #$0011
   pppLcpBranchEqualOrJump @fail41_16
   m8
   lda pppTransmitBuffer + 4
@@ -350,7 +384,7 @@
   cmp #$42
   pppLcpBranchEqualOrJump @fail41
   lda pppTransmitBuffer + 7
-  cmp #$0c
+  cmp #$0d
   pppLcpBranchEqualOrJump @fail41
   lda pppTransmitBuffer + 8
   cmp #PPP_LCP_OPTION_MRU
@@ -365,13 +399,16 @@
   cmp #PPP_LCP_OPTION_AUTHENTICATION
   pppLcpBranchEqualOrJump @fail41
   lda pppTransmitBuffer + 14
-  cmp #$c0
+  cmp #$c2
   pppLcpBranchEqualOrJump @fail41
   lda pppTransmitBuffer + 15
   cmp #$23
   pppLcpBranchEqualOrJump @fail41
+  lda pppTransmitBuffer + 16
+  cmp #PPP_CHAP_ALGORITHM_MD5
+  pppLcpBranchEqualOrJump @fail41
 
-  ; Reject takes precedence over the CHAP Nak and includes only the exact
+  ; Reject takes precedence over the auth Nak and includes only the exact
   ; unsupported PFC and unknown options.
   lda #$0e
   jsr @preparePacket
@@ -385,7 +422,7 @@
   sta pppFrameBuffer + 10
   lda #$23
   sta pppFrameBuffer + 11
-  lda #$05
+  lda #$80
   sta pppFrameBuffer + 12
   lda #PPP_LCP_OPTION_PROTOCOL_FIELD_COMPRESSION
   sta pppFrameBuffer + 13
@@ -538,6 +575,8 @@
 
 ; Input Y=absolute option offset in pppFrameBuffer.
 ; Output A=PPP_LCP_OPTION_DISPOSITION_*. Preserves X and Y.
+.segment "BANK1_CODE"
+
 .proc pppLcpClassifyPeerOption
   .a8
   .i16
@@ -546,7 +585,9 @@
   lda pppFrameBuffer, y
   tax
   lda pppLcpOptionDuplicate, x
-  bne @reject
+  beq :+
+  jmp @reject
+:
 
   txa
   cmp #PPP_LCP_OPTION_MRU
@@ -579,6 +620,20 @@
 @authentication:
   assert_m8_i16
   lda pppFrameBuffer + 1, y
+  cmp #$05
+  bne @authenticationPap
+  lda pppFrameBuffer + 2, y
+  cmp #$c2
+  bne @nak
+  lda pppFrameBuffer + 3, y
+  cmp #$23
+  bne @nak
+  lda pppFrameBuffer + 4, y
+  cmp #PPP_CHAP_ALGORITHM_MD5
+  bne @nak
+  bra @ack
+@authenticationPap:
+  assert_m8_i16
   cmp #$04
   bne @nak
   lda pppFrameBuffer + 2, y
@@ -610,18 +665,20 @@
   assert_m8_i16
   plx
   lda #PPP_LCP_OPTION_DISPOSITION_ACK
-  rts
+  rtl
 @nak:
   assert_m8_i16
   plx
   lda #PPP_LCP_OPTION_DISPOSITION_NAK
-  rts
+  rtl
 @reject:
   assert_m8_i16
   plx
   lda #PPP_LCP_OPTION_DISPOSITION_REJECT
-  rts
+  rtl
 .endproc
+
+.code
 
 ; Build a selective Configure-Nak or Configure-Reject in pppTransmitBuffer.
 ; The option maps must still describe the retained peer request.
@@ -662,7 +719,7 @@
   jmp @finish
 :
   m8
-  jsr pppLcpClassifyPeerOption
+  jsl pppLcpClassifyPeerOption
   pha
   lda pppLcpPendingAction
   cmp #PPP_LCP_ACTION_CONFIGURE_REJECT
@@ -698,16 +755,18 @@
   ldx pppLcpOutputCursor
   lda #PPP_LCP_OPTION_AUTHENTICATION
   sta pppTransmitBuffer, x
-  lda #$04
+  lda #$05
   sta pppTransmitBuffer + 1, x
-  lda #$c0
+  lda #$c2
   sta pppTransmitBuffer + 2, x
   lda #$23
   sta pppTransmitBuffer + 3, x
+  lda #PPP_CHAP_ALGORITHM_MD5
+  sta pppTransmitBuffer + 4, x
   m16
   lda pppLcpOutputCursor
   clc
-  adc #$0004
+  adc #$0005
   sta pppLcpOutputCursor
   m8
   jmp @advanceInput
