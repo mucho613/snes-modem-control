@@ -317,7 +317,6 @@
   pppIpcpReturnError PPP_IPCP_ERROR_TRUNCATED_OPTION
 
 @dispatch:
-  assert_m16_i16
   m8
   lda pppIpcpState
   cmp #PPP_IPCP_STATE_CLOSED
@@ -940,7 +939,7 @@
 
 ; Build a selective peer Nak or Reject. Output A16=unescaped frame length.
 .proc pppIpcpBuildPeerResponse
-  .a8
+  .a16
   .i16
 
   phb
@@ -1201,7 +1200,7 @@
   bra @begin
 
 @selective:
-  m8
+  m16
   jsr pppIpcpBuildPeerResponse
 
 @begin:

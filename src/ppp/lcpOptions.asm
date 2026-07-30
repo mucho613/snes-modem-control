@@ -318,6 +318,7 @@
   cmp #PPP_LCP_ACTION_CONFIGURE_NAK
   pppLcpBranchEqualOrJump @fail41
   sta pppLcpPendingAction
+  m16
   jsr pppLcpBuildPeerResponse
   assert_m16_i16
   cmp #$0010
@@ -381,6 +382,7 @@
   cmp #PPP_LCP_ACTION_CONFIGURE_REJECT
   pppLcpBranchEqualOrJump @fail42
   sta pppLcpPendingAction
+  m16
   jsr pppLcpBuildPeerResponse
   assert_m16_i16
   cmp #$000d
@@ -436,6 +438,7 @@
   cmp #PPP_LCP_ACTION_CONFIGURE_REJECT
   pppLcpBranchEqualOrJump @fail43
   sta pppLcpPendingAction
+  m16
   jsr pppLcpBuildPeerResponse
   assert_m16_i16
   cmp #$0010
@@ -600,7 +603,7 @@
 ;
 ; Output A16=complete unescaped PPP frame length.
 .proc pppLcpBuildPeerResponse
-  .a8
+  .a16
   .i16
 
   phb
@@ -608,6 +611,7 @@
   phy
   setDBR $7e
 
+  m8
   lda pppLcpPendingAction
   cmp #PPP_LCP_ACTION_CONFIGURE_NAK
   beq @nakCode

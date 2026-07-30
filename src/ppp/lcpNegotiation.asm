@@ -439,6 +439,7 @@
 
 @buildSelectiveResponse:
   assert_m8_i16
+  m16
   jsr pppLcpBuildPeerResponse
   jmp @begin
 
