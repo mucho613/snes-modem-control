@@ -377,4 +377,9 @@ MD5(`abc`)の標準vectorと、閉じたChallenge/Response/Success transcriptを
 到達しました。Challenge、digest、MD5入力・中間状態のWRAM消去も同じ経路に
 組み込みました。この時点ではNDM24からNiftyへの実発信はまだ行っていません。
 
+同じ通常ROMをQUsb2Snes経由でFXPAK PROへ転送し、起動確認後にmailboxの
+`ppp-self-test`を実行しました。command 10、sequence 1は実機上でも合格し、
+MD5標準vectorと閉じたCHAP-MD5 transcriptを含む常設試験一式が65816実機で
+完了しました。この試験も電話回線への発信や実資格情報の入力を行っていません。
+
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。
