@@ -936,7 +936,10 @@ cleanup:
   sta frameCounter
   lda pppNtpTestSavedFrameCounter + 2
   sta frameCounter + 2
+  lda #$0000
+  m8
   lda pppNtpTestSavedClockValid
+  m16
   and #$00ff
   beq @restoreInvalidClock
 

@@ -109,6 +109,11 @@ struct Procedure {
     kind: ProcedureKind,
 }
 
+#[derive(Debug, Clone)]
+struct Allocation {
+    size: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Diagnostic {
     pub path: PathBuf,
@@ -189,6 +194,7 @@ pub fn lint_workspace(root: &Path, options: Options) -> Result<Vec<Diagnostic>> 
     let mut paths = Vec::new();
     collect_sources(&root.join("src"), &mut paths)?;
     paths.sort();
+    let allocations = collect_allocations(&paths)?;
 
     let mut diagnostics = BTreeSet::new();
     for profile in Profile::ALL {
@@ -204,9 +210,45 @@ pub fn lint_workspace(root: &Path, options: Options) -> Result<Vec<Diagnostic>> 
                 &mut diagnostics,
             ));
         }
-        analyze_procedures(profile, &procedures, &mut diagnostics);
+        analyze_procedures(profile, &procedures, &allocations, &mut diagnostics);
     }
     Ok(diagnostics.into_iter().collect())
+}
+
+fn collect_allocations(paths: &[PathBuf]) -> Result<BTreeMap<String, Allocation>> {
+    let mut allocations = BTreeMap::new();
+    for path in paths {
+        let source =
+            fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
+        collect_source_allocations(&source, &mut allocations);
+    }
+    Ok(allocations)
+}
+
+fn collect_source_allocations(source: &str, allocations: &mut BTreeMap<String, Allocation>) {
+    for line in source.lines() {
+        let code = strip_comment(line).trim();
+        let Some((name, declaration)) = code.split_once(':') else {
+            continue;
+        };
+        let name = name.trim();
+        if name.is_empty()
+            || !name
+                .chars()
+                .all(|character| character == '_' || character.is_ascii_alphanumeric())
+        {
+            continue;
+        }
+        let declaration = declaration.trim();
+        let Some(size) = declaration
+            .strip_prefix(".res ")
+            .and_then(|value| value.split_whitespace().next())
+            .and_then(parse_usize_literal)
+        else {
+            continue;
+        };
+        allocations.insert(name.to_owned(), Allocation { size });
+    }
 }
 
 fn collect_sources(directory: &Path, output: &mut Vec<PathBuf>) -> Result<()> {
@@ -461,6 +503,7 @@ fn active_lines(source: &str, profile: Profile) -> Vec<bool> {
 fn analyze_procedures(
     profile: Profile,
     procedures: &[Procedure],
+    allocations: &BTreeMap<String, Allocation>,
     diagnostics: &mut BTreeSet<Diagnostic>,
 ) {
     let abis: BTreeMap<_, _> = procedures
@@ -473,7 +516,15 @@ fn analyze_procedures(
                 let Some(abi) = procedure.abi else {
                     continue;
                 };
-                analyze_procedure(profile, procedure, Some(abi), abi, &abis, diagnostics);
+                analyze_procedure(
+                    profile,
+                    procedure,
+                    Some(abi),
+                    abi,
+                    &abis,
+                    allocations,
+                    diagnostics,
+                );
             }
             ProcedureKind::Interrupt => {
                 for a in [Width::Eight, Width::Sixteen] {
@@ -484,6 +535,7 @@ fn analyze_procedures(
                             None,
                             Abi { a, i },
                             &abis,
+                            allocations,
                             diagnostics,
                         );
                     }
@@ -499,6 +551,7 @@ fn analyze_procedure(
     return_abi: Option<Abi>,
     entry: Abi,
     abis: &BTreeMap<&str, Abi>,
+    allocations: &BTreeMap<String, Allocation>,
     diagnostics: &mut BTreeSet<Diagnostic>,
 ) {
     if procedure.statements.is_empty() {
@@ -518,7 +571,7 @@ fn analyze_procedure(
 
     while let Some((index, input)) = queue.pop_front() {
         let statement = &procedure.statements[index];
-        validate_statement_width(profile, statement, &input, abis, diagnostics);
+        validate_statement_width(profile, statement, &input, abis, allocations, diagnostics);
         if statement.mnemonic == "rti" {
             handle_interrupt_return(profile, procedure, statement, input, diagnostics);
             continue;
@@ -742,6 +795,7 @@ fn validate_statement_width(
     statement: &Statement,
     state: &RuntimeState,
     abis: &BTreeMap<&str, Abi>,
+    allocations: &BTreeMap<String, Allocation>,
     diagnostics: &mut BTreeSet<Diagnostic>,
 ) {
     if accumulator_immediate(&statement.mnemonic, &statement.operand) {
@@ -790,6 +844,79 @@ fn validate_statement_width(
             ));
         }
     }
+    validate_memory_access(profile, statement, state, allocations, diagnostics);
+}
+
+fn validate_memory_access(
+    profile: Profile,
+    statement: &Statement,
+    state: &RuntimeState,
+    allocations: &BTreeMap<String, Allocation>,
+    diagnostics: &mut BTreeSet<Diagnostic>,
+) {
+    let width = match statement.mnemonic.as_str() {
+        "adc" | "and" | "asl" | "bit" | "cmp" | "dec" | "eor" | "inc" | "lda" | "lsr" | "ora"
+        | "rol" | "ror" | "sbc" | "sta" | "stz" | "trb" | "tsb" => state.a.bits() as usize / 8,
+        "cpx" | "cpy" | "ldx" | "ldy" | "stx" | "sty" => state.i.bits() as usize / 8,
+        "inc32" => 4,
+        _ => return,
+    };
+    let Some((symbol, offset)) = allocation_operand(&statement.operand) else {
+        return;
+    };
+    let Some(allocation) = allocations.get(symbol) else {
+        return;
+    };
+    if offset.saturating_add(width) <= allocation.size {
+        return;
+    }
+    diagnostics.insert(Diagnostic::new(
+        &statement.location,
+        profile,
+        format!(
+            "{} {}-byte access at {}+{} exceeds its {}-byte allocation",
+            statement.mnemonic.to_ascii_uppercase(),
+            width,
+            symbol,
+            offset,
+            allocation.size
+        ),
+    ));
+}
+
+fn allocation_operand(operand: &str) -> Option<(&str, usize)> {
+    let operand = operand
+        .split_once(',')
+        .map_or(operand, |(base, _)| base)
+        .trim();
+    if operand.is_empty()
+        || operand.starts_with('#')
+        || operand.starts_with('(')
+        || operand.starts_with('[')
+    {
+        return None;
+    }
+    let operand = operand
+        .strip_prefix("f:")
+        .or_else(|| operand.strip_prefix("a:"))
+        .unwrap_or(operand)
+        .trim();
+    let (symbol, offset) = operand
+        .split_once('+')
+        .map_or((operand, 0), |(symbol, offset)| {
+            (
+                symbol.trim(),
+                parse_usize_literal(offset.trim()).unwrap_or(0),
+            )
+        });
+    if symbol.is_empty()
+        || !symbol
+            .chars()
+            .all(|character| character == '_' || character.is_ascii_alphanumeric())
+    {
+        return None;
+    }
+    Some((symbol, offset))
 }
 
 fn transfer(
@@ -1259,6 +1386,16 @@ fn parse_immediate(operand: &str) -> Option<u8> {
     }
 }
 
+fn parse_usize_literal(value: &str) -> Option<usize> {
+    if let Some(hex) = value.strip_prefix('$') {
+        usize::from_str_radix(hex, 16).ok()
+    } else if let Some(hex) = value.strip_prefix("0x") {
+        usize::from_str_radix(hex, 16).ok()
+    } else {
+        value.parse().ok()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1266,6 +1403,8 @@ mod tests {
     fn lint(source: &str) -> Vec<Diagnostic> {
         let path = Path::new("fixture.asm");
         let mut diagnostics = BTreeSet::new();
+        let mut allocations = BTreeMap::new();
+        collect_source_allocations(source, &mut allocations);
         let procedures = parse_procedures(
             path,
             source,
@@ -1275,7 +1414,7 @@ mod tests {
             },
             &mut diagnostics,
         );
-        analyze_procedures(Profile::Normal, &procedures, &mut diagnostics);
+        analyze_procedures(Profile::Normal, &procedures, &allocations, &mut diagnostics);
         diagnostics.into_iter().collect()
     }
 
@@ -1464,6 +1603,7 @@ mod tests {
 .endproc
 "#;
         let path = Path::new("fixture.asm");
+        let allocations = BTreeMap::new();
         let mut normal_diagnostics = BTreeSet::new();
         let normal = parse_procedures(
             path,
@@ -1474,7 +1614,12 @@ mod tests {
             },
             &mut normal_diagnostics,
         );
-        analyze_procedures(Profile::Normal, &normal, &mut normal_diagnostics);
+        analyze_procedures(
+            Profile::Normal,
+            &normal,
+            &allocations,
+            &mut normal_diagnostics,
+        );
         assert!(normal_diagnostics.is_empty());
 
         let mut smoke_diagnostics = BTreeSet::new();
@@ -1487,7 +1632,7 @@ mod tests {
             },
             &mut smoke_diagnostics,
         );
-        analyze_procedures(Profile::Smoke, &smoke, &mut smoke_diagnostics);
+        analyze_procedures(Profile::Smoke, &smoke, &allocations, &mut smoke_diagnostics);
         assert!(
             smoke_diagnostics
                 .iter()
@@ -1668,6 +1813,50 @@ mod tests {
   .i8
   enterNativeM8I16
   ldx #$1234
+.endproc
+"#,
+        );
+        assert!(messages.is_empty(), "{messages:?}");
+    }
+
+    #[test]
+    fn rejects_memory_access_wider_than_the_allocation() {
+        let messages = messages(
+            r#"
+byteValue: .res $1
+wordValue: .res $2
+.proc memory
+  .a16
+  .i16
+  lda byteValue
+  sta wordValue + 1
+  rts
+.endproc
+"#,
+        );
+        assert_eq!(
+            messages
+                .iter()
+                .filter(|message| message.contains("exceeds its"))
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn accepts_narrow_and_offset_accesses_within_an_allocation() {
+        let messages = messages(
+            r#"
+value: .res $4
+.proc memory
+  .a16
+  .i16
+  lda value
+  sta value + 2
+  m8
+  lda value + 3
+  m16
+  rts
 .endproc
 "#,
         );

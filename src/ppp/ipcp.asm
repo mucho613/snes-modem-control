@@ -946,6 +946,7 @@
   phx
   phy
   setDBR $7e
+  m8
   lda pppIpcpPendingAction
   cmp #PPP_IPCP_ACTION_CONFIGURE_NAK
   beq @nakCode

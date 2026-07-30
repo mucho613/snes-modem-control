@@ -515,7 +515,10 @@ STATUS_VALUE_COLUMN = 7
   setDP $2100
 
   m16
+  lda #$0000
+  m8
   lda statusRenderRow
+  m16
   and #$00ff
   asl
   asl

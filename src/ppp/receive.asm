@@ -73,6 +73,7 @@
   stz pppCarrierTailByteCount + 2
   stz pppCarrierTailByteCount + 3
   stz pppCarrierLineIndex
+  stz pppCarrierLineIndex + 1
   jsr pppDecoderReset
 
   plb

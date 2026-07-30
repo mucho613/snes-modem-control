@@ -514,7 +514,8 @@ pppLcpHasReject: .res $1
 pppLcpHasNak: .res $1
 pppLcpPollAction: .res $1
 pppLcpPollSavedModemState: .res $1
-pppCarrierLineIndex: .res $1
+; Compared and advanced through 16-bit Y in the connected-stream sentinel.
+pppCarrierLineIndex: .res $2
 pppCarrierScratchByte: .res $1
 pppCarrierTestSavedModemState: .res $1
 pppCarrierTestSavedSessionResult: .res $1
