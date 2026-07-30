@@ -129,7 +129,7 @@ LCP試験に続き、PAP Authenticate-Request/Ack、IPCP `Opened`、SFC側local
 | PPP NTP clientセルフテスト | 合格 (2026-07-30) | 未実施 |
 | PPP IPv4実対向 | 合格 (2026-07-30) | 未実施 |
 | PPP ICMP Echo実対向 | 合格 (2026-07-30) | 未実施 |
-| PPP NTP実対向 | 未実施 | 未実施 |
+| PPP NTP実対向 | 合格 (2026-07-30) | 未実施 |
 
 revision B の最新の疑似 PSTN connect 合格記録は test ID `unix-1785329111-revision-b` です。`AT&F`、`AT%B2400`、`ATS7=60`、`ATX3`、`ATDT0` のechoはすべて完全で、各transaction前後のRX discard counterは0のままでした。DFM-56U は `RING`、`CONNECT 115200` を返し、NDM24 は `CONNECT 2400` を受信して `CONNECTED` へ遷移しました。10秒保持中の未処理RXは0byteです。DFM-56UのDTRを下げた直後にはキャリア切断過渡の `07 99 62 A1 74 DD 6B EE 1E` が入り、続く `NO CARRIER` を受信して `READY` へ戻りました。最終snapshotはRX read/write indexがともに105、TX read/write indexがともに42で、error、timeout、RX/TX overflow、`poll_budget_yield`、discard、terminal droppedがすべて0です。transaction別trace、双方のAT transcript、切断前後のraw RX列は `build/hardware-tests/unix-1785329111-revision-b/connect-test.json` に保存されています。旧schemaのJSONでは `poll_budget_yield` と同じ値が `poll_limit` という名前で記録されています。
 
@@ -186,5 +186,17 @@ cookie不一致とKiss-o'-Deathの拒否、timeout、IPCP未接続時の拒否�
 検査しています。完了後はPPP診断ABI version 10、331byteのsnapshotをQUsb2Snes
 から安定読取し、NTP状態と要求・応答・破棄・timeout countが初期値へ復帰したことも
 確認しました。この試験は固定fixtureを使い、電話回線や対向Modemには接続しません。
+
+続いてrevision AとDFM-56Uを疑似PSTNのV.22bis 2400 bit/sで接続し、WSL2の
+`10.24.0.1:123`へNTP要求を2回送信しました。既存の`ntp.service`がVersion 4、
+Stratum 3で応答し、要求cookieのseconds `$4E444D24`とfraction 1、2がそれぞれ
+Originate Timestampへ完全一致しました。2回目に得たUnix秒`1785385397`は
+`2026-07-30 13:23:17 +09:00`です。SFC診断ではIPv4受信/受理/送信が2/2/2、
+UDP受信/送信が2/2、NTP要求/応答が2/2でした。PPP FCS error、invalid、overflow、
+IPv4 checksum error/drop、UDP checksum error/drop、NTP drop/timeoutはすべて0です。
+
+対向停止後はraw `NO CARRIER`を検出し、Modem `Ready`、LCP/IPCP `Closed`、
+PAP `Inactive`へ復帰しました。carrier loss countは1、同じRX burstのtailは12byte、
+RX ringは空で`pending-rx`も空配列でした。DFM-56UはWindowsのCOM5へ戻しています。
 
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。

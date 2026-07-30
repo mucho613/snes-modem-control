@@ -204,6 +204,11 @@ cargo run -p ndm24-tools -- ntp-request
 source/destinationを含むUDP checksum error 0、NTP drop/timeout 0、request/response
 countが各1増加し、表示Unix秒がWSLの現在時刻と回線遅延の範囲で一致することです。
 
+2026-07-30のrevision A実対向では、既存の`ntp.service`へ応答を委譲し、2回の
+要求がVersion 4、Stratum 3で成功しました。2回目のUnix秒は`1785385397`
+（`2026-07-30 13:23:17 +09:00`）で、IPv4、UDP、NTPの送受信countは各2、
+checksum error、drop、timeoutはすべて0でした。
+
 ## 2026-07-30 revision A 初回結果
 
 revision AのNDM24とDFM-56UをV.22bis 2400 bit/sで接続し、最初の実回線LCP

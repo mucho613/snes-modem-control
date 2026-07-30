@@ -4,7 +4,7 @@
 
 最初のPPPマイルストーンは、NDM24から受け取る任意位置で分割されたbyte列を、FCS検証済みのPPPフレームへ復元する層です。`crates/ndm24-ppp` を仕様の参照実装とし、同じ状態遷移と試験ベクトルを65816へ移植しています。
 
-現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP、PAP client、IPCP、IPv4 packet層、ICMP Echo responder、UDP datagram層、NTP clientまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ack、IPCP `Opened`まで確認し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。同日にIPv4とICMP EchoはMesenCE、FXPAK PRO実機、疑似PSTNのV.22bis 2400 bit/s回線上で送受信に合格しました。UDP datagram層とNTP clientはRust、MesenCE、FXPAK PRO実機の固定fixtureまで合格しており、実回線上のUDP/NTPとTCPは未検証です。
+現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP、PAP client、IPCP、IPv4 packet層、ICMP Echo responder、UDP datagram層、NTP clientまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ack、IPCP `Opened`まで確認し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。同日にIPv4、ICMP Echo、UDP/NTPはMesenCE、FXPAK PRO実機、疑似PSTNのV.22bis 2400 bit/s回線上で送受信に合格しました。NTPでは2回連続で相関済み応答からUnix秒を取得しています。TCPは未実装です。
 
 PPP接続は次の順序で進みます。
 
@@ -502,11 +502,8 @@ cargo run -p ndm24-tools -- ntp-request
 
 ## 次の実装
 
-LCP、PAP、IPCPはRust参照実装、65816常設セルフテスト、revision A実機と
-WSL2 `pppd`による実対向まで合格しました。IPv4 packet層とICMP Echo responderも
-Rustと65816へ実装し、固定fixtureと実回線の双方で合格しています。UDP datagram層
-とNTP clientもRustと65816へ実装し、固定fixtureで検証済みです。IPCP `Opened`
-時のlocalは`10.24.0.2`、peerは`10.24.0.1`です。次はWSL2の閉じたNTP応答器を
-使い、疑似PSTN上で最初のUDP datagram往復と時刻取得を確認します。実対向の合格後、
-取得したUnix秒を画面表示用日時へ変換します。TCPとHTTPはその後の独立した
-マイルストーンとします。
+LCP、PAP、IPCP、IPv4、ICMP Echo、UDP、NTPはRust参照実装、65816常設
+セルフテスト、revision A実機とWSL2による実対向まで合格しました。IPCP `Opened`
+時のlocalは`10.24.0.2`、peerは`10.24.0.1`です。次は取得したUnix秒をSFC上で
+年月日時分秒へ変換し、ターミナルへ表示します。時刻表示まで合格した後、TCPとHTTPを
+独立したマイルストーンとして進めます。
