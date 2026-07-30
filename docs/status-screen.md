@@ -62,3 +62,17 @@ TIME   2026-07-30 13:23:17 JST
 メインループは状態をWRAMの32×32文字バッファへ組み立てます。VBlankは1フレームに1行だけVRAMへ転送します。アプリケーション処理はPPUレジスタへ直接書かず、画面切替はVBlank内でBG1 tilemap baseとvertical scrollを選ぶだけです。
 
 表示・時計状態はlinker segment `DISPLAY_BSS`（`$7E3000`以降）へ置きます。NDM24のbank `$80` WRAM mirror制約を受けるドライバ状態と、固定`PPP_BSS`（`$7E2000`）から分離し、両領域の将来拡張を妨げません。
+
+## 実機確認
+
+2026-07-30にrevision AのNDM24、FXPAK PRO、QUsb2Snes、DFM-56U、
+疑似電話交換機を使用して確認しました。起動時はステータス画面、`R`で生ログ、
+`L`でステータスへ戻り、生ログには初期化時の`ATM0`と`OK`が欠落なく残って
+いました。
+
+疑似PSTN接続後はMODEM `CONNECTED`、LCP/PAP/IPCP `OPEN`、LOCAL
+`10.24.0.2`、PEER `10.24.0.1`へ更新されました。NTP Version 4、Stratum 3の
+応答後はSTATE `RECEIVED`、TIME `2026-07-30 14:29:27 JST`を表示し、別の
+キャプチャで秒が進むことを確認しました。対向停止後はMODEM `READY`、
+LCP/IPCP `CLOSED`、PAP `INACTIVE`へ戻り、最後に同期した時刻は失わず進み
+続けました。

@@ -10,6 +10,8 @@ import time
 
 NTP_PACKET_LENGTH = 48
 NTP_UNIX_EPOCH_OFFSET = 2_208_988_800
+NTP_DELEGATION_RETRY_LIMIT = 5
+NTP_DELEGATION_RETRY_DELAY_SECONDS = 1.0
 
 
 def ntp_timestamp(now: float) -> bytes:
@@ -65,6 +67,7 @@ def probe_existing_server(address: str, port: int) -> bool:
 
 
 def bind_when_available(address: str, port: int) -> socket.socket | None:
+    delegation_probe_failures = 0
     while True:
         server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
@@ -76,13 +79,26 @@ def bind_when_available(address: str, port: int) -> socket.socket | None:
                 logging.info("waiting for PPP address %s", address)
                 time.sleep(0.5)
                 continue
-            if error.errno == errno.EADDRINUSE and probe_existing_server(address, port):
-                logging.info(
-                    "compatible NTP daemon already owns %s:%d; delegating responses",
-                    address,
-                    port,
-                )
-                return None
+            if error.errno == errno.EADDRINUSE:
+                if probe_existing_server(address, port):
+                    logging.info(
+                        "compatible NTP daemon already owns %s:%d; delegating responses",
+                        address,
+                        port,
+                    )
+                    return None
+                delegation_probe_failures += 1
+                if delegation_probe_failures <= NTP_DELEGATION_RETRY_LIMIT:
+                    logging.info(
+                        "NTP port %s:%d is busy but the owner is not ready; "
+                        "retrying delegation probe (%d/%d)",
+                        address,
+                        port,
+                        delegation_probe_failures,
+                        NTP_DELEGATION_RETRY_LIMIT,
+                    )
+                    time.sleep(NTP_DELEGATION_RETRY_DELAY_SECONDS)
+                    continue
             raise
 
 

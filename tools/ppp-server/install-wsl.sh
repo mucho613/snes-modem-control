@@ -11,6 +11,7 @@ peer_file="${script_dir}/ndm24-lcp"
 chat_file="${script_dir}/ndm24-answer.chat"
 service_file="${script_dir}/ndm24-ppp-server.service"
 ntp_script="${script_dir}/ndm24-ntp-server.py"
+ntp_test_file="${script_dir}/test_ndm24_ntp_server.py"
 ntp_service_file="${script_dir}/ndm24-ntp-server.service"
 
 for command_name in pppd chat python3 systemctl; do
@@ -19,6 +20,8 @@ for command_name in pppd chat python3 systemctl; do
     exit 1
   fi
 done
+
+python3 "${ntp_test_file}"
 
 systemctl stop ndm24-ppp-server.service 2>/dev/null || true
 systemctl disable ndm24-ppp-server.service 2>/dev/null || true

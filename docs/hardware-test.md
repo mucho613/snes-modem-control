@@ -199,4 +199,16 @@ IPv4 checksum error/drop、UDP checksum error/drop、NTP drop/timeoutはすべ�
 PAP `Inactive`へ復帰しました。carrier loss countは1、同じRX burstのtailは12byte、
 RX ringは空で`pending-rx`も空配列でした。DFM-56UはWindowsのCOM5へ戻しています。
 
+同日のステータス画面追加後にもrevision Aで実対向試験を再実施しました。L/Rの
+画面切替、PPP確立状態と両IPアドレスの表示、NTP取得後のJST時刻表示とフレーム
+基準の秒更新、切断後のPPP状態復帰と時刻保持を実機映像で確認しています。NTPは
+2回ともVersion 4、Stratum 3で成功し、最後のUnix秒は`1785389435`でした。
+最終診断はIPv4受信/受理/送信が2/2/2、UDP受信/送信が2/2、NTP要求/応答が
+2/2で、PPP FCS error、invalid、overflow、IPv4/UDP checksum error、各層の
+drop、NTP timeoutはすべて0です。
+
+この試験ではIPCP成立直後、既存`ntp.service`がPPPアドレスへ応答可能になる前に
+内蔵NTP serviceの初回委譲probeが失敗する競合も観測しました。数秒後の再起動では
+正常に委譲できたため、内蔵応答器へ有限回の再試行を追加しています。
+
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。

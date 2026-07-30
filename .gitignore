@@ -2,3 +2,4 @@
 /.tools
 /target
 *.local.toml
+__pycache__/
