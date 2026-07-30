@@ -152,4 +152,10 @@ NMITIMEN gatingの初回候補実装に対するrevision A回帰試験は、疑�
 
 revision Bでも同じNMITIMEN gating最終実装を再試験しました。交換中に入った過渡データを除外するためROMを再起動して診断状態を初期化し、起動時probeとNMI有効状態からのクイック再初期化を取り直しています。最終状態は `READY`、累計受信18byte、送信8byte、`reinitialize=2`で、timeout、RX/TX overflow、`poll_budget_yield`、discard、terminal droppedはすべて0でした。続く疑似PSTN connectとbinary patternも上記の最新test IDで合格したため、revision BのNMITIMEN gating回帰を合格とします。
 
+2026-07-30にICMP Echo responder追加後のsmoke ROMをQUsb2SnesからFXPAK PROへ
+転送し、`ppp-self-test`（mailbox command 10、sequence 1）の合格を確認しました。
+step `$88`～`$8C`により、奇数長Echo checksum、Echo Reply生成、共有PPP送信器が
+busyな間のrequest保持と再試行、破損checksum拒否を実機65816上で検査しています。
+この試験は固定fixtureを使い、電話回線や対向Modemには接続しません。
+
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。

@@ -4,7 +4,7 @@
 
 最初のPPPマイルストーンは、NDM24から受け取る任意位置で分割されたbyte列を、FCS検証済みのPPPフレームへ復元する層です。`crates/ndm24-ppp` を仕様の参照実装とし、同じ状態遷移と試験ベクトルを65816へ移植しています。
 
-現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP、PAP client、IPCP、IPv4 packet層、ICMP Echo responderまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ack、IPCP `Opened`まで確認し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。同日にIPv4 parser、header checksum、local宛先選別、送信header生成をFXPAK PRO実機の常設セルフテストで確認しました。ICMP EchoはMesenCEの常設セルフテストまで確認済みで、実回線上のIPv4/ICMP送受信、UDP、TCP、NTPはまだ動作確認していません。
+現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP、PAP client、IPCP、IPv4 packet層、ICMP Echo responderまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ack、IPCP `Opened`まで確認し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。同日にIPv4 parser、header checksum、local宛先選別、送信header生成をFXPAK PRO実機の常設セルフテストで確認しました。ICMP EchoはMesenCEとFXPAK PRO実機の常設セルフテストまで確認済みで、実回線上のIPv4/ICMP送受信、UDP、TCP、NTPはまだ動作確認していません。
 
 PPP接続は次の順序で進みます。
 
@@ -418,8 +418,9 @@ version 8から取得できます。
 
 常設セルフテストのstep `$88`～`$8C`は、5byte payload `NDM24`を持つ既知checksum
 `$1654`のEcho Request、checksum `$1E54`のEcho Reply、送信busy時の保留と再試行、
-破損checksumの拒否を検査します。2026-07-30にMesenCE 2.2.1のheadless runnerで
-合格しました。NDM24とWSL2 `pppd`を通した実対向Echoは次の試験項目です。
+破損checksumの拒否を検査します。2026-07-30にMesenCE 2.2.1のheadless runnerと、
+QUsb2Snesでsmoke ROMを転送したFXPAK PRO実機のmailbox command 10で合格しました。
+NDM24とWSL2 `pppd`を通した実対向Echoは次の試験項目です。
 
 ## 次の実装
 
