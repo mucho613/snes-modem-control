@@ -469,19 +469,17 @@ fn analyze_procedure(
     }
     let labels = collect_labels(&procedure.statements);
     let anonymous = collect_anonymous_labels(&procedure.statements);
-    let mut states: Vec<Option<RuntimeState>> = vec![None; procedure.statements.len()];
-    states[0] = Some(RuntimeState {
+    let initial = RuntimeState {
         a: abi.a,
         i: abi.i,
         stack: Vec::new(),
         calls: Vec::new(),
-    });
-    let mut queue = VecDeque::from([0_usize]);
+    };
+    let mut states: Vec<Vec<RuntimeState>> = vec![Vec::new(); procedure.statements.len()];
+    states[0].push(initial.clone());
+    let mut queue = VecDeque::from([(0_usize, initial)]);
 
-    while let Some(index) = queue.pop_front() {
-        let Some(input) = states[index].clone() else {
-            continue;
-        };
+    while let Some((index, input)) = queue.pop_front() {
         let statement = &procedure.statements[index];
         validate_statement_width(profile, statement, &input, abis, diagnostics);
         if matches!(statement.mnemonic.as_str(), "rts" | "rtl") {
@@ -540,8 +538,8 @@ fn handle_return(
     abi: Abi,
     statement: &Statement,
     mut state: RuntimeState,
-    states: &mut [Option<RuntimeState>],
-    queue: &mut VecDeque<usize>,
+    states: &mut [Vec<RuntimeState>],
+    queue: &mut VecDeque<(usize, RuntimeState)>,
     diagnostics: &mut BTreeSet<Diagnostic>,
 ) {
     if let Some(frame) = state.calls.pop() {
@@ -595,21 +593,24 @@ fn merge_state(
     statements: &[Statement],
     successor: usize,
     incoming: RuntimeState,
-    states: &mut [Option<RuntimeState>],
-    queue: &mut VecDeque<usize>,
+    states: &mut [Vec<RuntimeState>],
+    queue: &mut VecDeque<(usize, RuntimeState)>,
     diagnostics: &mut BTreeSet<Diagnostic>,
 ) {
     if successor >= states.len() {
         return;
     }
-    match &states[successor] {
-        None => {
-            states[successor] = Some(incoming);
-            queue.push_back(successor);
-        }
-        Some(existing) if existing == &incoming => {}
-        Some(existing) => {
-            diagnostics.insert(Diagnostic::new(
+    if states[successor]
+        .iter()
+        .any(|existing| existing == &incoming)
+    {
+        return;
+    }
+    if let Some(existing) = states[successor]
+        .iter()
+        .find(|existing| existing.calls == incoming.calls)
+    {
+        diagnostics.insert(Diagnostic::new(
                 &statements[successor].location,
                 profile,
                 format!(
@@ -618,8 +619,10 @@ fn merge_state(
                     render_state(existing)
                 ),
             ));
-        }
+        return;
     }
+    states[successor].push(incoming.clone());
+    queue.push_back((successor, incoming));
 }
 
 fn validate_statement_width(
@@ -1352,6 +1355,26 @@ mod tests {
                 .iter()
                 .any(|message| message.contains("width assert expects A16/I16"))
         );
+    }
+
+    #[test]
+    fn keeps_local_subroutine_return_contexts_separate() {
+        let messages = messages(
+            r#"
+.proc repeated_local_call
+  .a8
+  .i16
+  jsr @helper
+  jsr @helper
+  rts
+
+@helper:
+  assert_m8_i16
+  rts
+.endproc
+"#,
+        );
+        assert!(messages.is_empty(), "{messages:?}");
     }
 
     #[test]
