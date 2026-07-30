@@ -252,4 +252,11 @@ drop、DNS timeoutはすべて0でした。対向のlegacy iptables counterは�
 57byte、戻り89byte、MASQUERADE 1 packetを記録しました。試験後にPPP serverを
 停止し、DFM-56UがWindowsのCOM5へ戻ったことも確認しています。
 
+同日、COMMON/NTP/DNS/ICMPの4ページ版ステータス画面を通常ROMとしてFXPAK PROへ
+転送し、起動確認とmailbox PPPセルフテスト（command 10、sequence 1）の合格を
+確認しました。OBS Virtual Cameraのcaptureではヘッダーを廃止したCOMMONページに
+MODEM/LCP/PAP/IPCP/LOCAL/PEERの6行が表示されました。公開診断ABIはversion 13、
+423byteで、最後に有効だった外向きICMP Echo Requestの専用snapshotを含みます。
+十字キーとL/Rボタンによる実機ページ巡回は未確認です。
+
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。

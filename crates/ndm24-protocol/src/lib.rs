@@ -322,6 +322,15 @@ pub struct PppDiagnosticSnapshot {
     pub dns_response_count: u32,
     pub dns_drop_count: u32,
     pub dns_timeout_count: u32,
+    pub icmp_inbound_state: u8,
+    pub icmp_inbound_last_error: u8,
+    pub icmp_inbound_flags: u8,
+    pub icmp_inbound_source: [u8; 4],
+    pub icmp_inbound_identifier: u16,
+    pub icmp_inbound_sequence: u16,
+    pub icmp_inbound_payload_length: u16,
+    pub icmp_inbound_reply_count: u32,
+    pub icmp_inbound_drop_count: u32,
 }
 
 impl PppDiagnosticSnapshot {
@@ -523,6 +532,15 @@ impl PppDiagnosticSnapshot {
             dns_response_count: read_u32(data, PPP_DIAG_DNS_RESPONSE_COUNT)?,
             dns_drop_count: read_u32(data, PPP_DIAG_DNS_DROP_COUNT)?,
             dns_timeout_count: read_u32(data, PPP_DIAG_DNS_TIMEOUT_COUNT)?,
+            icmp_inbound_state: data[PPP_DIAG_ICMP_INBOUND_STATE],
+            icmp_inbound_last_error: data[PPP_DIAG_ICMP_INBOUND_LAST_ERROR],
+            icmp_inbound_flags: data[PPP_DIAG_ICMP_INBOUND_FLAGS],
+            icmp_inbound_source: read_array(data, PPP_DIAG_ICMP_INBOUND_SOURCE)?,
+            icmp_inbound_identifier: read_u16(data, PPP_DIAG_ICMP_INBOUND_IDENTIFIER)?,
+            icmp_inbound_sequence: read_u16(data, PPP_DIAG_ICMP_INBOUND_SEQUENCE)?,
+            icmp_inbound_payload_length: read_u16(data, PPP_DIAG_ICMP_INBOUND_PAYLOAD_LENGTH)?,
+            icmp_inbound_reply_count: read_u32(data, PPP_DIAG_ICMP_INBOUND_REPLY_COUNT)?,
+            icmp_inbound_drop_count: read_u32(data, PPP_DIAG_ICMP_INBOUND_DROP_COUNT)?,
         })
     }
 }
@@ -918,6 +936,21 @@ mod tests {
             .copy_from_slice(&2_u32.to_le_bytes());
         data[PPP_DIAG_DNS_TIMEOUT_COUNT..PPP_DIAG_DNS_TIMEOUT_COUNT + 4]
             .copy_from_slice(&1_u32.to_le_bytes());
+        data[PPP_DIAG_ICMP_INBOUND_STATE] = 3;
+        data[PPP_DIAG_ICMP_INBOUND_LAST_ERROR] = 0;
+        data[PPP_DIAG_ICMP_INBOUND_FLAGS] = 1;
+        data[PPP_DIAG_ICMP_INBOUND_SOURCE..PPP_DIAG_ICMP_INBOUND_SOURCE + 4]
+            .copy_from_slice(&[10, 24, 0, 1]);
+        data[PPP_DIAG_ICMP_INBOUND_IDENTIFIER..PPP_DIAG_ICMP_INBOUND_IDENTIFIER + 2]
+            .copy_from_slice(&0x1234_u16.to_le_bytes());
+        data[PPP_DIAG_ICMP_INBOUND_SEQUENCE..PPP_DIAG_ICMP_INBOUND_SEQUENCE + 2]
+            .copy_from_slice(&7_u16.to_le_bytes());
+        data[PPP_DIAG_ICMP_INBOUND_PAYLOAD_LENGTH..PPP_DIAG_ICMP_INBOUND_PAYLOAD_LENGTH + 2]
+            .copy_from_slice(&56_u16.to_le_bytes());
+        data[PPP_DIAG_ICMP_INBOUND_REPLY_COUNT..PPP_DIAG_ICMP_INBOUND_REPLY_COUNT + 4]
+            .copy_from_slice(&8_u32.to_le_bytes());
+        data[PPP_DIAG_ICMP_INBOUND_DROP_COUNT..PPP_DIAG_ICMP_INBOUND_DROP_COUNT + 4]
+            .copy_from_slice(&1_u32.to_le_bytes());
 
         let snapshot = PppDiagnosticSnapshot::decode(&data).unwrap();
         assert_eq!(snapshot.snapshot_sequence, 8);
@@ -1052,6 +1085,15 @@ mod tests {
         assert_eq!(snapshot.dns_response_count, 4);
         assert_eq!(snapshot.dns_drop_count, 2);
         assert_eq!(snapshot.dns_timeout_count, 1);
+        assert_eq!(snapshot.icmp_inbound_state, 3);
+        assert_eq!(snapshot.icmp_inbound_last_error, 0);
+        assert_eq!(snapshot.icmp_inbound_flags, 1);
+        assert_eq!(snapshot.icmp_inbound_source, [10, 24, 0, 1]);
+        assert_eq!(snapshot.icmp_inbound_identifier, 0x1234);
+        assert_eq!(snapshot.icmp_inbound_sequence, 7);
+        assert_eq!(snapshot.icmp_inbound_payload_length, 56);
+        assert_eq!(snapshot.icmp_inbound_reply_count, 8);
+        assert_eq!(snapshot.icmp_inbound_drop_count, 1);
     }
 
     #[test]

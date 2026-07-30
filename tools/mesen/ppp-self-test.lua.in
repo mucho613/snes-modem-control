@@ -10,7 +10,11 @@ local STATUS_PASSED = @STATUS_PASSED@
 local STATUS_FAILED = @STATUS_FAILED@
 local SCREEN_MODE = @SCREEN_MODE_OFFSET@
 local STATUS_TILE_BUFFER = @STATUS_TILE_BUFFER_OFFSET@
+local STATUS_PAGE = @STATUS_PAGE_OFFSET@
+local STATUS_RENDERED_PAGE = @STATUS_RENDERED_PAGE_OFFSET@
 local CLOCK_VALID = @CLOCK_VALID_OFFSET@
+local NTP_LAST_ERROR = @NTP_LAST_ERROR_OFFSET@
+local NTP_REQUEST_COUNT = @NTP_REQUEST_COUNT_OFFSET@
 local FRAME_COUNTER = @FRAME_COUNTER_OFFSET@
 
 local OFFSET_VERSION = 4
@@ -30,6 +34,8 @@ local frame_probe_started = false
 local frame_probe_host_start = 0
 local frame_probe_sfc_start = 0
 local FRAME_PROBE_LENGTH = 120
+local dashboard_validation = 0
+local dashboard_validation_start = 0
 
 local function read8(offset)
     return emu.read(MAILBOX + offset, memory_type, false)
@@ -174,25 +180,91 @@ local function poll()
     local status = read8(OFFSET_STATUS)
     local result = read16(OFFSET_RESULT)
     if status == STATUS_PASSED then
-        if read_wram8(SCREEN_MODE) ~= 0 then
-            stop_failure("status screen is not the default", 245)
+        if dashboard_validation == 0 then
+            if read_wram8(SCREEN_MODE) ~= 0 then
+                stop_failure("status screen is not the default", 245)
+                return
+            end
+            if not matches_text(STATUS_TILE_BUFFER, "MODEM") then
+                stop_failure("common status page is missing", 246)
+                return
+            end
+            emu.write(STATUS_PAGE, 1, memory_type)
+            dashboard_validation = 1
+            dashboard_validation_start = frame_count
             return
-        end
-        if not matches_text(STATUS_TILE_BUFFER, "modem-control-test") then
-            stop_failure("status header is missing", 246)
+        elseif dashboard_validation == 1 then
+            if not matches_text(STATUS_TILE_BUFFER, "APP    NTP") then
+                if frame_count - dashboard_validation_start > 30 then
+                    if read_wram8(STATUS_PAGE) ~= 1 then
+                        stop_failure("NTP page selection did not persist", 241)
+                    elseif read_wram8(STATUS_RENDERED_PAGE) ~= 1 then
+                        stop_failure("NTP page selection was not rendered", 242)
+                    else
+                        stop_failure("NTP dashboard heading is missing", 243)
+                    end
+                end
+                return
+            end
+            if read_wram8(CLOCK_VALID) ~= 0
+                or not matches_text(
+                    STATUS_TILE_BUFFER + 3 * 32 + 7,
+                    "---- -- -- --:--:-- JST"
+                )
+            then
+                stop_failure("software clock did not return to its pre-test state", 248)
+                return
+            end
+            emu.write(NTP_LAST_ERROR, 0x0c, memory_type)
+            emu.write(NTP_REQUEST_COUNT, 0x39, memory_type)
+            emu.write(NTP_REQUEST_COUNT + 1, 0x30, memory_type)
+            dashboard_validation = 4
+            dashboard_validation_start = frame_count
             return
-        end
-        if not matches_text(STATUS_TILE_BUFFER + 10 * 32 + 7, "NTP") then
-            stop_failure("NTP application adapter is not visible", 247)
-            return
-        end
-        if read_wram8(CLOCK_VALID) ~= 0
-            or not matches_text(
-                STATUS_TILE_BUFFER + 12 * 32 + 7,
-                "---- -- -- --:--:-- JST"
+        elseif dashboard_validation == 4 then
+            if not matches_text(
+                STATUS_TILE_BUFFER + 4 * 32 + 7,
+                "TIMEOUT (0C)"
+            ) or not matches_text(
+                STATUS_TILE_BUFFER + 10 * 32 + 10,
+                "12345"
             )
-        then
-            stop_failure("software clock did not return to its pre-test state", 248)
+            then
+                if frame_count - dashboard_validation_start > 30 then
+                    stop_failure("NTP dashboard formatting did not update", 247)
+                end
+                return
+            end
+            emu.write(NTP_LAST_ERROR, 0, memory_type)
+            emu.write(NTP_REQUEST_COUNT, 0, memory_type)
+            emu.write(NTP_REQUEST_COUNT + 1, 0, memory_type)
+            emu.write(NTP_REQUEST_COUNT + 2, 0, memory_type)
+            emu.write(NTP_REQUEST_COUNT + 3, 0, memory_type)
+            emu.write(STATUS_PAGE, 2, memory_type)
+            dashboard_validation = 2
+            dashboard_validation_start = frame_count
+            return
+        elseif dashboard_validation == 2 then
+            if not matches_text(STATUS_TILE_BUFFER, "APP    DNS") then
+                if frame_count - dashboard_validation_start > 30 then
+                    if read_wram8(STATUS_PAGE) ~= 2 then
+                        stop_failure("DNS page selection did not persist", 241)
+                    elseif read_wram8(STATUS_RENDERED_PAGE) ~= 2 then
+                        stop_failure("DNS page selection was not rendered", 242)
+                    else
+                        stop_failure("DNS dashboard heading is missing", 243)
+                    end
+                end
+                return
+            end
+            emu.write(STATUS_PAGE, 3, memory_type)
+            dashboard_validation = 3
+            dashboard_validation_start = frame_count
+            return
+        elseif not matches_text(STATUS_TILE_BUFFER, "APP    ICMP") then
+            if frame_count - dashboard_validation_start > 30 then
+                stop_failure("ICMP dashboard did not render", 239)
+            end
             return
         end
         emu.displayMessage(

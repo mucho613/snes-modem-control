@@ -8,5 +8,5 @@
 .include "../modem/generated.inc"
 .include "../ppp/constants.inc"
 
-; Replace this include to select another application at build time.
-.include "ntp.inc"
+; Replace this include to select another dashboard at build time.
+.include "network.inc"

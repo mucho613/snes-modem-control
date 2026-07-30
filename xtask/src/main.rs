@@ -1111,12 +1111,24 @@ fn mesen_test(root: &Path, requested_mesen: Option<&Path>, timeout_seconds: u32)
     let screen_mode_offset = read_label_address(&labels, "screenMode")?
         .checked_sub(0x7e_0000)
         .context("screenMode is not in SNES WRAM bank 7E")?;
+    let status_page_offset = read_label_address(&labels, "statusPage")?
+        .checked_sub(0x7e_0000)
+        .context("statusPage is not in SNES WRAM bank 7E")?;
+    let status_rendered_page_offset = read_label_address(&labels, "statusRenderedPage")?
+        .checked_sub(0x7e_0000)
+        .context("statusRenderedPage is not in SNES WRAM bank 7E")?;
     let status_tile_buffer_offset = read_label_address(&labels, "statusTileBuffer")?
         .checked_sub(0x7e_0000)
         .context("statusTileBuffer is not in SNES WRAM bank 7E")?;
     let clock_valid_offset = read_label_address(&labels, "clockValid")?
         .checked_sub(0x7e_0000)
         .context("clockValid is not in SNES WRAM bank 7E")?;
+    let ntp_last_error_offset = read_label_address(&labels, "pppNtpLastError")?
+        .checked_sub(0x7e_0000)
+        .context("pppNtpLastError is not in SNES WRAM bank 7E")?;
+    let ntp_request_count_offset = read_label_address(&labels, "pppNtpRequestCount")?
+        .checked_sub(0x7e_0000)
+        .context("pppNtpRequestCount is not in SNES WRAM bank 7E")?;
     let frame_counter_offset = read_label_address(&labels, "frameCounter")?
         .checked_sub(0x7e_0000)
         .context("frameCounter is not in SNES WRAM bank 7E")?;
@@ -1153,8 +1165,24 @@ fn mesen_test(root: &Path, requested_mesen: Option<&Path>, timeout_seconds: u32)
             &format!("0x{status_tile_buffer_offset:05X}"),
         )
         .replace(
+            "@STATUS_PAGE_OFFSET@",
+            &format!("0x{status_page_offset:05X}"),
+        )
+        .replace(
+            "@STATUS_RENDERED_PAGE_OFFSET@",
+            &format!("0x{status_rendered_page_offset:05X}"),
+        )
+        .replace(
             "@CLOCK_VALID_OFFSET@",
             &format!("0x{clock_valid_offset:05X}"),
+        )
+        .replace(
+            "@NTP_LAST_ERROR_OFFSET@",
+            &format!("0x{ntp_last_error_offset:05X}"),
+        )
+        .replace(
+            "@NTP_REQUEST_COUNT_OFFSET@",
+            &format!("0x{ntp_request_count_offset:05X}"),
         )
         .replace(
             "@FRAME_COUNTER_OFFSET@",
@@ -1188,8 +1216,13 @@ fn mesen_test(root: &Path, requested_mesen: Option<&Path>, timeout_seconds: u32)
             Some(251) => bail!("MesenCE test rejected the mailbox block size"),
             Some(245) => bail!("MesenCE status screen is not the default"),
             Some(244) => bail!("MesenCE frame counter rate validation failed"),
-            Some(246) => bail!("MesenCE status screen header validation failed"),
-            Some(247) => bail!("MesenCE application-status adapter validation failed"),
+            Some(241) => bail!("MesenCE status-page selection did not persist"),
+            Some(242) => bail!("MesenCE status-page renderer did not observe the selection"),
+            Some(243) => bail!("MesenCE status-page adapter did not write its heading"),
+            Some(240) => bail!("MesenCE DNS dashboard did not render"),
+            Some(239) => bail!("MesenCE ICMP dashboard did not render"),
+            Some(246) => bail!("MesenCE common status page validation failed"),
+            Some(247) => bail!("MesenCE network dashboard validation failed"),
             Some(248) => bail!("MesenCE software-clock restoration validation failed"),
             Some(249) => {
                 bail!("MesenCE test timed out waiting for self-test command completion")

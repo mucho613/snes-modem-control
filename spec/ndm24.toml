@@ -292,8 +292,8 @@ description = "Frame at which the current generic AT transaction started"
 
 [ppp_diagnostic]
 magic = [0x50, 0x50, 0x50, 0x31]
-version = 12
-size = 402
+version = 13
+size = 423
 
 [[ppp_diagnostic.fields]]
 name = "magic"
@@ -1491,6 +1491,69 @@ offset = 398
 size = 4
 type = "u32"
 description = "DNS queries that expired without a valid response"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_inbound_state"
+offset = 402
+size = 1
+type = "u8"
+description = "State of the most recent inbound ICMP Echo Request"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_inbound_last_error"
+offset = 403
+size = 1
+type = "u8"
+description = "Most recent inbound Echo Request validation or reply error"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_inbound_flags"
+offset = 404
+size = 1
+type = "u8"
+description = "Inbound Echo Request snapshot-valid flag"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_inbound_source"
+offset = 405
+size = 4
+type = "ipv4"
+description = "Source address of the most recent valid inbound Echo Request"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_inbound_identifier"
+offset = 409
+size = 2
+type = "u16"
+description = "Identifier of the most recent valid inbound Echo Request"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_inbound_sequence"
+offset = 411
+size = 2
+type = "u16"
+description = "Sequence number of the most recent valid inbound Echo Request"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_inbound_payload_length"
+offset = 413
+size = 2
+type = "u16"
+description = "Payload length of the most recent valid inbound Echo Request"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_inbound_reply_count"
+offset = 415
+size = 4
+type = "u32"
+description = "Inbound Echo Replies accepted by the IPv4 transmitter"
+
+[[ppp_diagnostic.fields]]
+name = "icmp_inbound_drop_count"
+offset = 419
+size = 4
+type = "u32"
+description = "Inbound Echo Requests rejected by validation or reply handling"
 
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]

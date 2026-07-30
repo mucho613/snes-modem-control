@@ -167,22 +167,22 @@ terminalQueueScratchByte: .res $1
 terminalRenderScratchByte: .res $1
 .assert terminalDisplayBufferEnd - terminalDisplayBuffer = TERMINAL_QUEUE_STORAGE_SIZE, error, "terminal queue storage size"
 
-; Human-facing status screen. The screen owns only presentation state; the
-; selected application adapter publishes three fixed-width rows without
-; coupling the renderer to NTP, HTTP, or another protocol.
+; Human-facing status screen. The common renderer owns the connection page;
+; the selected application dashboard owns the remaining protocol pages.
 .segment "DISPLAY_BSS"
 
-.export screenMode
+.export screenMode, statusPage, statusRenderedPage
 .export statusTileBuffer, statusRenderRow, statusLastUpdateFrame
-.export statusApplicationName, statusApplicationState, statusApplicationValue
+.export statusFormatValue, statusFormatStarted
 screenMode: .res $1
+statusPage: .res $1
+statusRenderedPage: .res $1
 statusRenderRow: .res $1
 statusLastUpdateFrame: .res $2
 statusTileBuffer: .res TERMINAL_COLUMNS * TERMINAL_STATUS_ROWS
 statusTileBufferEnd:
-statusApplicationName: .res TERMINAL_COLUMNS - 7
-statusApplicationState: .res TERMINAL_COLUMNS - 7
-statusApplicationValue: .res TERMINAL_COLUMNS - 7
+statusFormatValue: .res $2
+statusFormatStarted: .res $1
 .assert statusTileBufferEnd - statusTileBuffer = TERMINAL_COLUMNS * TERMINAL_STATUS_ROWS, error, "status tile buffer size"
 
 ; Software wall clock. Unix seconds remain UTC; the decomposed calendar is

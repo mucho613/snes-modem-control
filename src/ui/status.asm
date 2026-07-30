@@ -6,11 +6,18 @@
 SCREEN_MODE_STATUS = $00
 SCREEN_MODE_RAW_LOG = $01
 
+STATUS_PAGE_COMMON = $00
+STATUS_PAGE_NTP = $01
+STATUS_PAGE_DNS = $02
+STATUS_PAGE_ICMP = $03
+STATUS_PAGE_COUNT = $04
+
 CONTROLLER_BUTTON_L = $20
 CONTROLLER_BUTTON_R = $10
+CONTROLLER_BUTTON_LEFT = $02
+CONTROLLER_BUTTON_RIGHT = $01
 
 STATUS_VALUE_COLUMN = 7
-STATUS_VALUE_WIDTH = TERMINAL_COLUMNS - STATUS_VALUE_COLUMN
 
 .assert TERMINAL_COLUMNS = 32, error, "status renderer requires 32 columns"
 .assert TERMINAL_STATUS_ROWS = 32, error, "status renderer requires 32 rows"
@@ -46,17 +53,15 @@ STATUS_VALUE_WIDTH = TERMINAL_COLUMNS - STATUS_VALUE_COLUMN
 .import pppLcpState, pppPapState, pppIpcpState
 .import pppIpcpFlags, pppIpcpLocalAddress, pppIpcpPeerAddress
 .import terminalVerticalScroll
-.import screenMode
+.import screenMode, statusPage, statusRenderedPage
 .import statusTileBuffer, statusRenderRow, statusLastUpdateFrame
-.import statusApplicationName, statusApplicationState, statusApplicationValue
 .import applicationStatusInitialize, applicationStatusPoll
 
 .export statusInitialize, statusPoll
 .export statusRenderVBlank, screenApplyVBlank
 
-; Initialize the generic status model and its fixed shell while the PPU is
-; forced blank. Application-specific rows are supplied by the selected
-; adapter through three fixed-width buffers.
+; Initialize the status model while the PPU is forced blank. The common UI
+; owns page zero; the build-time application adapter owns protocol pages.
 .proc statusInitialize
   .a16
   .i16
@@ -79,17 +84,10 @@ STATUS_VALUE_WIDTH = TERMINAL_COLUMNS - STATUS_VALUE_COLUMN
   cpx #(TERMINAL_COLUMNS * TERMINAL_STATUS_ROWS)
   bne @clearTileBuffer
 
-  ldx #$0000
-@clearApplicationBuffers:
-  sta statusApplicationName, x
-  sta statusApplicationState, x
-  sta statusApplicationValue, x
-  inx
-  cpx #STATUS_VALUE_WIDTH
-  bne @clearApplicationBuffers
-
-  stz statusRenderRow
+  stz statusPage
   lda #$ff
+  sta statusRenderedPage
+  stz statusRenderRow
   sta statusLastUpdateFrame
   sta statusLastUpdateFrame + 1
 
@@ -100,19 +98,6 @@ STATUS_VALUE_WIDTH = TERMINAL_COLUMNS - STATUS_VALUE_COLUMN
   .endif
   sta screenMode
 
-  statusWriteImmediate 0, 0, "modem-control-test"
-  statusWriteImmediate 1, 0, "--------------------------------"
-  statusWriteImmediate 3, 0, "MODEM  "
-  statusWriteImmediate 4, 0, "LCP    "
-  statusWriteImmediate 5, 0, "PAP    "
-  statusWriteImmediate 6, 0, "IPCP   "
-  statusWriteImmediate 7, 0, "LOCAL  "
-  statusWriteImmediate 8, 0, "PEER   "
-  statusWriteImmediate 10, 0, "APP    "
-  statusWriteImmediate 11, 0, "STATE  "
-  statusWriteImmediate 12, 0, "TIME   "
-
-  jsr applicationStatusInitialize
   jsr statusUpdateBuffer
 
   ; Populate the complete status tilemap immediately. Subsequent frames
@@ -143,15 +128,56 @@ STATUS_VALUE_WIDTH = TERMINAL_COLUMNS - STATUS_VALUE_COLUMN
   rts
 .endproc
 
-; Rebuild human-facing values. This routine and the application adapter run
-; only in the main loop; VBlank merely copies the resulting character rows.
+; Clear and label a newly selected page. This happens in the main loop, never
+; in VBlank, so page adapters remain independent from PPU timing.
+.proc statusPreparePage
+  .a8
+  .i16
+
+  ldx #$0000
+  lda #' '
+@clear:
+  sta statusTileBuffer, x
+  inx
+  cpx #(TERMINAL_COLUMNS * TERMINAL_STATUS_ROWS)
+  bne @clear
+
+  lda statusPage
+  sta statusRenderedPage
+  beq :+
+  jmp @application
+:
+
+  statusWriteImmediate 0, 0, "MODEM  "
+  statusWriteImmediate 1, 0, "LCP    "
+  statusWriteImmediate 2, 0, "PAP    "
+  statusWriteImmediate 3, 0, "IPCP   "
+  statusWriteImmediate 4, 0, "LOCAL  "
+  statusWriteImmediate 5, 0, "PEER   "
+  rts
+
+@application:
+  jsl applicationStatusInitialize
+  rts
+.endproc
+
+; Rebuild the selected human-facing page once per frame.
 .proc statusUpdateBuffer
   .a8
   .i16
 
-  jsr applicationStatusPoll
+  lda statusPage
+  cmp statusRenderedPage
+  beq :+
+  jsr statusPreparePage
+:
+  lda statusPage
+  beq @common
+  jsl applicationStatusPoll
+  rts
 
-  statusClearValue 3
+@common:
+  statusClearValue 0
   lda modemDriverState
   cmp #MODEM_STATE_RESETTING
   statusJumpIfEqual @modemResetting
@@ -169,38 +195,38 @@ STATUS_VALUE_WIDTH = TERMINAL_COLUMNS - STATUS_VALUE_COLUMN
   statusJumpIfEqual @modemDisconnecting
   cmp #MODEM_STATE_ERROR
   statusJumpIfEqual @modemError
-  statusWriteImmediate 3, STATUS_VALUE_COLUMN, "OFF"
+  statusWriteImmediate 0, STATUS_VALUE_COLUMN, "OFF"
   jmp @modemDone
 @modemResetting:
-  statusWriteImmediate 3, STATUS_VALUE_COLUMN, "RESETTING"
+  statusWriteImmediate 0, STATUS_VALUE_COLUMN, "RESETTING"
   jmp @modemDone
 @modemProbing:
-  statusWriteImmediate 3, STATUS_VALUE_COLUMN, "PROBING"
+  statusWriteImmediate 0, STATUS_VALUE_COLUMN, "PROBING"
   jmp @modemDone
 @modemReady:
-  statusWriteImmediate 3, STATUS_VALUE_COLUMN, "READY"
+  statusWriteImmediate 0, STATUS_VALUE_COLUMN, "READY"
   jmp @modemDone
 @modemAt:
-  statusWriteImmediate 3, STATUS_VALUE_COLUMN, "AT COMMAND"
+  statusWriteImmediate 0, STATUS_VALUE_COLUMN, "AT COMMAND"
   jmp @modemDone
 @modemDialing:
-  statusWriteImmediate 3, STATUS_VALUE_COLUMN, "DIALING"
+  statusWriteImmediate 0, STATUS_VALUE_COLUMN, "DIALING"
   jmp @modemDone
 @modemConnected:
-  statusWriteImmediate 3, STATUS_VALUE_COLUMN, "CONNECTED"
+  statusWriteImmediate 0, STATUS_VALUE_COLUMN, "CONNECTED"
   jmp @modemDone
 @modemDisconnecting:
-  statusWriteImmediate 3, STATUS_VALUE_COLUMN, "DISCONNECTING"
+  statusWriteImmediate 0, STATUS_VALUE_COLUMN, "DISCONNECTING"
   jmp @modemDone
 @modemError:
-  statusWriteImmediate 3, STATUS_VALUE_COLUMN, "ERROR"
+  statusWriteImmediate 0, STATUS_VALUE_COLUMN, "ERROR"
 @modemDone:
 
-  statusClearValue 4
+  statusClearValue 1
   lda pppLcpState
   jsr @writePppState
 
-  statusClearValue 5
+  statusClearValue 2
   lda pppPapState
   cmp #PPP_PAP_STATE_OPENED
   statusJumpIfEqual @papOpen
@@ -210,64 +236,48 @@ STATUS_VALUE_WIDTH = TERMINAL_COLUMNS - STATUS_VALUE_COLUMN
   statusJumpIfEqual @papNegotiating
   cmp #PPP_PAP_STATE_FAILED
   statusJumpIfEqual @papFailed
-  statusWriteImmediate 5, STATUS_VALUE_COLUMN, "INACTIVE"
+  statusWriteImmediate 2, STATUS_VALUE_COLUMN, "INACTIVE"
   jmp @papDone
 @papOpen:
-  statusWriteImmediate 5, STATUS_VALUE_COLUMN, "OPEN"
+  statusWriteImmediate 2, STATUS_VALUE_COLUMN, "OPEN"
   jmp @papDone
 @papNegotiating:
-  statusWriteImmediate 5, STATUS_VALUE_COLUMN, "NEGOTIATING"
+  statusWriteImmediate 2, STATUS_VALUE_COLUMN, "NEGOTIATING"
   jmp @papDone
 @papFailed:
-  statusWriteImmediate 5, STATUS_VALUE_COLUMN, "FAILED"
+  statusWriteImmediate 2, STATUS_VALUE_COLUMN, "FAILED"
 @papDone:
 
-  statusClearValue 6
+  statusClearValue 3
   lda pppIpcpState
   jsr @writePppState
 
-  statusClearValue 7
+  statusClearValue 4
   lda pppIpcpFlags
   and #PPP_IPCP_FLAG_LOCAL_VALID
   beq @localUnavailable
-  ldx #(7 * TERMINAL_COLUMNS) + STATUS_VALUE_COLUMN
+  ldx #(4 * TERMINAL_COLUMNS) + STATUS_VALUE_COLUMN
   ldy #.loword(pppIpcpLocalAddress)
   jsr @writeIpv4
   bra @localDone
 @localUnavailable:
-  statusWriteImmediate 7, STATUS_VALUE_COLUMN, "---.---.---.---"
+  statusWriteImmediate 4, STATUS_VALUE_COLUMN, "---.---.---.---"
 @localDone:
 
-  statusClearValue 8
+  statusClearValue 5
   lda pppIpcpFlags
   and #PPP_IPCP_FLAG_PEER_VALID
   beq @peerUnavailable
-  ldx #(8 * TERMINAL_COLUMNS) + STATUS_VALUE_COLUMN
+  ldx #(5 * TERMINAL_COLUMNS) + STATUS_VALUE_COLUMN
   ldy #.loword(pppIpcpPeerAddress)
   jsr @writeIpv4
   bra @peerDone
 @peerUnavailable:
-  statusWriteImmediate 8, STATUS_VALUE_COLUMN, "---.---.---.---"
+  statusWriteImmediate 5, STATUS_VALUE_COLUMN, "---.---.---.---"
 @peerDone:
-
-  statusClearValue 10
-  statusClearValue 11
-  statusClearValue 12
-  ldx #$0000
-@copyApplication:
-  lda statusApplicationName, x
-  sta statusTileBuffer + (10 * TERMINAL_COLUMNS) + STATUS_VALUE_COLUMN, x
-  lda statusApplicationState, x
-  sta statusTileBuffer + (11 * TERMINAL_COLUMNS) + STATUS_VALUE_COLUMN, x
-  lda statusApplicationValue, x
-  sta statusTileBuffer + (12 * TERMINAL_COLUMNS) + STATUS_VALUE_COLUMN, x
-  inx
-  cpx #STATUS_VALUE_WIDTH
-  bne @copyApplication
   rts
 
-; A contains an RFC 1661-style state, and the destination row has already
-; been selected by the caller's immediately preceding statusClearValue.
+; A contains an RFC 1661-style state. X points one byte past the cleared row.
 @writePppState:
   cmp #PPP_LCP_STATE_OPENED
   statusJumpIfEqual @pppOpen
@@ -279,38 +289,36 @@ STATUS_VALUE_WIDTH = TERMINAL_COLUMNS - STATUS_VALUE_COLUMN
   statusJumpIfEqual @pppNegotiating
   cmp #PPP_LCP_STATE_STOPPED
   statusJumpIfEqual @pppStopped
-  ; The caller is either the LCP row (4) or IPCP row (6). X still points one
-  ; byte past that row because statusClearValue leaves it at the row end.
-  cpx #(5 * TERMINAL_COLUMNS)
+  cpx #(2 * TERMINAL_COLUMNS)
   beq @pppClosedLcp
-  statusWriteImmediate 6, STATUS_VALUE_COLUMN, "CLOSED"
+  statusWriteImmediate 3, STATUS_VALUE_COLUMN, "CLOSED"
   rts
 @pppClosedLcp:
-  statusWriteImmediate 4, STATUS_VALUE_COLUMN, "CLOSED"
+  statusWriteImmediate 1, STATUS_VALUE_COLUMN, "CLOSED"
   rts
 @pppOpen:
-  cpx #(5 * TERMINAL_COLUMNS)
+  cpx #(2 * TERMINAL_COLUMNS)
   beq @pppOpenLcp
-  statusWriteImmediate 6, STATUS_VALUE_COLUMN, "OPEN"
+  statusWriteImmediate 3, STATUS_VALUE_COLUMN, "OPEN"
   rts
 @pppOpenLcp:
-  statusWriteImmediate 4, STATUS_VALUE_COLUMN, "OPEN"
+  statusWriteImmediate 1, STATUS_VALUE_COLUMN, "OPEN"
   rts
 @pppNegotiating:
-  cpx #(5 * TERMINAL_COLUMNS)
+  cpx #(2 * TERMINAL_COLUMNS)
   beq @pppNegotiatingLcp
-  statusWriteImmediate 6, STATUS_VALUE_COLUMN, "NEGOTIATING"
+  statusWriteImmediate 3, STATUS_VALUE_COLUMN, "NEGOTIATING"
   rts
 @pppNegotiatingLcp:
-  statusWriteImmediate 4, STATUS_VALUE_COLUMN, "NEGOTIATING"
+  statusWriteImmediate 1, STATUS_VALUE_COLUMN, "NEGOTIATING"
   rts
 @pppStopped:
-  cpx #(5 * TERMINAL_COLUMNS)
+  cpx #(2 * TERMINAL_COLUMNS)
   beq @pppStoppedLcp
-  statusWriteImmediate 6, STATUS_VALUE_COLUMN, "STOPPED"
+  statusWriteImmediate 3, STATUS_VALUE_COLUMN, "STOPPED"
   rts
 @pppStoppedLcp:
-  statusWriteImmediate 4, STATUS_VALUE_COLUMN, "STOPPED"
+  statusWriteImmediate 1, STATUS_VALUE_COLUMN, "STOPPED"
   rts
 
 ; Write the four network-order bytes at WRAM Y as unpadded decimal text.
@@ -401,7 +409,8 @@ STATUS_VALUE_WIDTH = TERMINAL_COLUMNS - STATUS_VALUE_COLUMN
   rts
 .endproc
 
-; Handle edge-triggered L/R selection and rebuild status data once per frame.
+; Status mode: D-pad changes pages and R opens raw log.
+; Raw-log mode: only L returns to the last selected status page.
 .proc statusPoll
   .a16
   .i16
@@ -414,18 +423,47 @@ STATUS_VALUE_WIDTH = TERMINAL_COLUMNS - STATUS_VALUE_COLUMN
 
   sep #$20
   .a8
+  lda screenMode
+  cmp #SCREEN_MODE_RAW_LOG
+  bne @statusInput
+
   lda controller1InputPulse
   and #CONTROLLER_BUTTON_L
-  beq :+
+  beq @update
   stz screenMode
-:
+  bra @update
+
+@statusInput:
   lda controller1InputPulse
   and #CONTROLLER_BUTTON_R
-  beq :+
+  beq @direction
   lda #SCREEN_MODE_RAW_LOG
   sta screenMode
-:
+  bra @update
 
+@direction:
+  lda controller1InputPulse + 1
+  and #CONTROLLER_BUTTON_LEFT
+  beq @right
+  lda statusPage
+  bne :+
+  lda #STATUS_PAGE_COUNT
+:
+  dec
+  sta statusPage
+  bra @update
+
+@right:
+  lda controller1InputPulse + 1
+  and #CONTROLLER_BUTTON_RIGHT
+  beq @update
+  inc statusPage
+  lda statusPage
+  cmp #STATUS_PAGE_COUNT
+  bcc @update
+  stz statusPage
+
+@update:
   rep #$20
   .a16
   lda frameCounter

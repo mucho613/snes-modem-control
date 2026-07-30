@@ -44,7 +44,7 @@ ABI version: `2`. Block size: `128` bytes.
 
 ## PPP Diagnostic ABI
 
-ABI version: `12`. Block size: `402` bytes.
+ABI version: `13`. Block size: `423` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|
@@ -219,6 +219,15 @@ ABI version: `12`. Block size: `402` bytes.
 | `0x186` | 4 | `u32` | `dns_response_count` | Correlated DNS responses containing a valid IN A record |
 | `0x18A` | 4 | `u32` | `dns_drop_count` | DNS requests or candidate responses rejected |
 | `0x18E` | 4 | `u32` | `dns_timeout_count` | DNS queries that expired without a valid response |
+| `0x192` | 1 | `u8` | `icmp_inbound_state` | State of the most recent inbound ICMP Echo Request |
+| `0x193` | 1 | `u8` | `icmp_inbound_last_error` | Most recent inbound Echo Request validation or reply error |
+| `0x194` | 1 | `u8` | `icmp_inbound_flags` | Inbound Echo Request snapshot-valid flag |
+| `0x195` | 4 | `ipv4` | `icmp_inbound_source` | Source address of the most recent valid inbound Echo Request |
+| `0x199` | 2 | `u16` | `icmp_inbound_identifier` | Identifier of the most recent valid inbound Echo Request |
+| `0x19B` | 2 | `u16` | `icmp_inbound_sequence` | Sequence number of the most recent valid inbound Echo Request |
+| `0x19D` | 2 | `u16` | `icmp_inbound_payload_length` | Payload length of the most recent valid inbound Echo Request |
+| `0x19F` | 4 | `u32` | `icmp_inbound_reply_count` | Inbound Echo Replies accepted by the IPv4 transmitter |
+| `0x1A3` | 4 | `u32` | `icmp_inbound_drop_count` | Inbound Echo Requests rejected by validation or reply handling |
 
 ## Mailbox ABI
 

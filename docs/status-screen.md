@@ -1,94 +1,126 @@
-# ステータス画面とアプリケーション・アダプター
+# ステータス画面とネットワーク・ダッシュボード
 
-## 画面の役割
+## 画面構成
 
-通常ROMは人間向けステータス画面を既定にします。`R`ボタンでNDM24通信の生ログ、`L`ボタンでステータスへ戻ります。生ログは非表示中も更新を続けます。
+通常ROMは人間向けの`COMMON`ページを既定にします。従来の
+`modem-control-test`ヘッダーと区切り線は廃止し、32×32文字を状態表示へ使います。
+
+- ステータス画面で十字キー左右: `COMMON`、`NTP`、`DNS`、`ICMP`を循環
+- `R`: NDM24通信の生ログへ移動
+- 生ログで`L`: 最後に選んでいたステータスページへ戻る
+- 生ログ表示中の十字キー: 無視
+
+通信開始を理由にページを自動変更しません。生ログは非表示中も更新を続けます。
+画面内に操作ガイドは表示しません。
+
+## COMMON
+
+通信基盤だけを表示し、アプリケーション固有情報は繰り返しません。
 
 ```text
-modem-control-test
---------------------------------
-
-MODEM  READY
+MODEM  CONNECTED
 LCP    OPEN
 PAP    OPEN
 IPCP   OPEN
 LOCAL  10.24.0.2
 PEER   10.24.0.1
-
-APP    NTP
-STATE  RECEIVED
-TIME   2026-07-30 13:23:17 JST
 ```
 
-上段のMODEMからPEERまでは通信基盤が所有します。下段のAPP、STATE、TIMEは選択中のアプリケーション・アダプターが所有します。表示器は通信プロトコル固有の状態を参照しません。
+## NTP
 
-## アプリケーション境界
+```text
+APP    NTP
 
-ビルド時の選択点は`src/application/status.asm`です。現在は`ntp.inc`をincludeします。将来HTTP等へ替える場合は別の`.inc`アダプターを追加し、このincludeだけを変更します。`.inc`にする理由は、ビルドが`src`以下の全`.asm`を自動収集する構成でも複数アダプターの同名exportを発生させないためです。
+STATE  RECEIVED
+TIME   2026-07-30 14:29:27 JST
+ERROR  NONE
 
-アダプターのABIは次の2エントリです。
+VERSION 4
+STRATUM 3
+REF ID GPS.
 
-- `applicationStatusInitialize`: 起動時に一度呼ばれる
-- `applicationStatusPoll`: メインループから1フレームにつき最大一度呼ばれる
+REQUESTS  2
+RESPONSES 2
+TIMEOUTS  0
+```
 
-どちらもA=8-bit、X/Y=16-bit、DBR=`$7E`で呼ばれます。出力先は25文字固定幅の次の3バッファです。
+`TIME`は最後の同期成功後もソフトウェア時計から進めます。後続要求が失敗しても
+既知の時刻は消しません。未同期時は`---- -- -- --:--:-- JST`です。
 
-- `statusApplicationName`
-- `statusApplicationState`
-- `statusApplicationValue`
+## DNS
 
-未使用部分は空白で埋め、NUL終端は使いません。アダプターはVRAM、画面選択、生ログ、MODEM/PPP行を操作しません。この契約により、NTPをHTTPへ替えても`src/ui/status.asm`、`src/terminal/print.asm`、L/R切替処理は共通のままです。
+STATE、HOST、RESOLVR、A、ANSWERS、TX ID、RTT、ERRORと要求・応答・破棄・
+timeout countを表示します。HOSTは表示領域25文字を超える場合、先頭24文字と
+末尾`>`へ短縮します。新しい要求を開始した時点で前回結果とRTTを消し、完了した
+結果は次の要求または再起動まで残します。
 
-## NTPアダプター
+## ICMP
 
-`src/application/ntp.inc`はNTP状態を次の表示へ写像します。
+1ページ内を`OUTBOUND`と`INBOUND`へ分けます。
 
-| NTP状態 | STATE |
-|---|---|
-| 未要求、要求中、応答待ち | `WAITING` |
-| 有効な相関済み応答を受信 | `RECEIVED` |
-| timeoutまたは検証失敗 | `ERROR` |
+`OUTBOUND`はSTATE、PEER、Identifier、Sequence、RTT、ERRORと要求・応答・破棄・
+timeout countを表示します。
 
-エラー後も最後に同期できた時計は失いません。時刻未取得中は`---- -- -- --:--:-- JST`を表示します。
+`INBOUND`はSTATE、SOURCE、Identifier、Sequence、payload byte数、受信要求・
+送信reply・破棄count、ERRORを表示します。SOURCE等は「最後に検証へ合格した
+Echo Request」の専用snapshotです。壊れたrequestはERRORとDROPSを更新しますが、
+このsnapshotを上書きしません。外向きEcho Replyや他プロトコルの受信でも
+上書きしません。
+
+## 状態とエラー表記
+
+NTP、DNS、外向きICMPの要求状態は共通して次の5語へ写像します。
+
+- `IDLE`
+- `QUEUED`
+- `WAITING`
+- `RECEIVED`
+- `FAILED`
+
+エラーなしは`NONE`です。既知のエラーは`TIMEOUT (0C)`のように短い記号名と
+16進codeを併記し、未知値は`UNKNOWN (XX)`とします。32bit counterが65535を
+超えた場合、画面では`>65535`と表示します。診断ABI内の値は32bitのままです。
+
+## 実装境界
+
+共通UIは`src/ui/status.asm`です。ページ選択、COMMON、生ログ切替、WRAM
+tile bufferからVRAMへの1行ずつの転送を所有します。
+
+ビルド時の選択点`src/application/status.asm`は現在
+`src/application/network.inc`をincludeします。ネットワーク・アダプターは
+NTP/DNS/ICMPページの静的labelと値の整形だけを所有し、PPU register、
+`screenMode`、生ログ、COMMONを操作しません。エントリは次の2つです。
+
+- `applicationStatusInitialize`: 選択ページが変わったときに静的labelを配置
+- `applicationStatusPoll`: 1フレームにつき最大1回、選択ページの値を更新
+
+アダプターはROMの`DATA`領域へ分離し、共通UIから`JSL`で呼びます。HTTP等へ
+置き換える場合はこのinclude先とアダプターだけを変更でき、共通UIと生ログを
+保てます。
+
+表示状態はlinker segment `DISPLAY_BSS`（`$7E3000`以降）に置きます。メイン
+ループは32×32文字bufferを組み立て、VBlankは1フレームに1行だけVRAMへ転送
+します。
 
 ## ソフトウェア時計
 
-時刻の正本は`src/clock/clock.asm`です。NTPは検証済みServer Transmit TimestampをUnix秒へ変換し、プロトコル非依存の`clockSetUnixTime`へ渡します。時計はUTCのUnix秒と32-bit二進小数を保持し、表示時だけ9時間加算してJST年月日時分秒へ分解します。
+時刻の正本は`src/clock/clock.asm`です。検証済みNTP Server Transmit Timestampを
+UTC Unix秒へ変換し、表示時だけ9時間加算してJSTへ分解します。同期後はNTSC
+SFCの公称約60.0988 Hzに基づくVBlank frame数で進めます。RTC、S-RTC、
+FXPAK PRO本体時計は使用しません。
 
-同期後はSFCのVBlankフレーム数で進めます。1フレームの加算値`$04427885`はNTSC SFCの公称master clockとnon-interlace frame長から得た平均約60.0988 Hzを基準にしています。これはRTCではないため、長時間の誤差、PAL、処理停止中の経過時間はNTP再同期で補正する前提です。S-RTCおよびFXPAK PRO本体時計は使用しません。
+## 自動検証
 
-時計のフレーム加算ループではXレジスタを残りフレーム数として使います。秒境界で
-呼ぶ表示整形処理もXを文字位置に使うため、処理のABIとしてXを保存・復元します。
-常設セルフテストは小数部`$80000000`から60フレーム進め、Unix秒がちょうど1増え、
-小数部が`$7F943F2C`になることをstep `$A1`で検査します。
+`cargo xtask mesen-test`はPPP常設セルフテストに加えて次を検査します。
 
-## 描画所有権
+- 起動時にCOMMONとMODEM行が選ばれる
+- NTP、DNS、ICMPの各ページへ切り替えると固有headingが生成される
+- NTP未同期表示がセルフテスト前の状態へ戻る
+- NTPの`TIMEOUT (0C)`と10進counter `12345`を正しく整形する
+- 120 emulator frameに対するSFC側`frameCounter`差が±1以内である
 
-メインループは状態をWRAMの32×32文字バッファへ組み立てます。VBlankは1フレームに1行だけVRAMへ転送します。アプリケーション処理はPPUレジスタへ直接書かず、画面切替はVBlank内でBG1 tilemap baseとvertical scrollを選ぶだけです。
-
-表示・時計状態はlinker segment `DISPLAY_BSS`（`$7E3000`以降）へ置きます。NDM24のbank `$80` WRAM mirror制約を受けるドライバ状態と、固定`PPP_BSS`（`$7E2000`）から分離し、両領域の将来拡張を妨げません。
-
-## 実機確認
-
-2026-07-30にrevision AのNDM24、FXPAK PRO、QUsb2Snes、DFM-56U、
-疑似電話交換機を使用して確認しました。起動時はステータス画面、`R`で生ログ、
-`L`でステータスへ戻り、生ログには初期化時の`ATM0`と`OK`が欠落なく残って
-いました。
-
-疑似PSTN接続後はMODEM `CONNECTED`、LCP/PAP/IPCP `OPEN`、LOCAL
-`10.24.0.2`、PEER `10.24.0.1`へ更新されました。NTP Version 4、Stratum 3の
-応答後はSTATE `RECEIVED`、TIME `2026-07-30 14:29:27 JST`を表示し、別の
-キャプチャで秒が進むことを確認しました。対向停止後はMODEM `READY`、
-LCP/IPCP `CLOSED`、PAP `INACTIVE`へ戻り、最後に同期した時刻は失わず進み
-続けました。
-
-初回実装では表示整形がフレーム加算ループのXを破壊し、秒境界ごとに余分な
-フレームを加算していました。実機では15.021秒の測定中に`frameCounter`が
-903（60.114Hz）増えた一方、内部時計は20.965秒進んでいました。X保存の修正後は
-15.021秒に対して内部時計15.025秒となり、画面キャプチャでも14秒間に表示が
-14秒進むことを確認しました。
-
-VBlank NMIでは`RDNMI`も読み、手動コントローラーI/Oのために`NMITIMEN`を
-一時的に無効化・再有効化した際、同じVBlankフラグからNMIが再発火しないように
-しています。MesenCEは120 emulator frameに対するSFC側`frameCounter`の差を
-±1以内として毎回検査します。
+2026-07-30の旧3行NTP画面はrevision A、FXPAK PRO、QUsb2Snes、DFM-56U、
+疑似電話交換機で確認済みです。同日の4ページ版はFXPAK PROへ転送して起動し、
+COMMONをOBS Virtual Cameraのcaptureで確認しました。実機mailboxのPPP常設
+セルフテストもsequence 1で合格しています。十字キーによる4ページ巡回と
+L/Rによる生ログ往復の実機目視確認は次の確認項目です。

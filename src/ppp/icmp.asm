@@ -17,6 +17,10 @@
 .import pppIcmpChecksum, pppIcmpReceiveCount, pppIcmpEchoRequestCount
 .import pppIcmpEchoReplyCount, pppIcmpChecksumErrorCount
 .import pppIcmpDropCount, pppIcmpTransmitCount
+.import pppIcmpInboundState, pppIcmpInboundLastError, pppIcmpInboundFlags
+.import pppIcmpInboundSource
+.import pppIcmpInboundIdentifier, pppIcmpInboundSequence, pppIcmpInboundPayloadLength
+.import pppIcmpInboundReplyCount, pppIcmpInboundDropCount
 .import pppIcmpPacketOffset, pppIcmpChecksumAccumulator
 .import pppIcmpRequestInitialize, pppIcmpRequestReceive
 
@@ -26,6 +30,16 @@
 .export pppIcmpRunSelfTest
 
 .macro pppIcmpReceiveError error
+  .local notInbound
+  lda pppIcmpLastType
+  cmp #PPP_ICMP_TYPE_ECHO_REQUEST
+  bne notInbound
+  lda #PPP_ICMP_INBOUND_STATE_FAILED
+  sta pppIcmpInboundState
+  lda #error
+  sta pppIcmpInboundLastError
+  pppIncrement32 pppIcmpInboundDropCount
+notInbound:
   lda #error
   sta pppIcmpLastError
   pppIncrement32 pppIcmpDropCount
@@ -47,6 +61,13 @@
   stz pppIcmpLastType
   stz pppIcmpLastCode
   stz pppIcmpFlags
+  stz pppIcmpInboundState
+  stz pppIcmpInboundLastError
+  stz pppIcmpInboundFlags
+  stz pppIcmpInboundSource + 0
+  stz pppIcmpInboundSource + 1
+  stz pppIcmpInboundSource + 2
+  stz pppIcmpInboundSource + 3
   rep #$20
   .a16
   stz pppIcmpIdentifier
@@ -65,6 +86,13 @@
   stz pppIcmpDropCount + 2
   stz pppIcmpTransmitCount
   stz pppIcmpTransmitCount + 2
+  stz pppIcmpInboundIdentifier
+  stz pppIcmpInboundSequence
+  stz pppIcmpInboundPayloadLength
+  stz pppIcmpInboundReplyCount
+  stz pppIcmpInboundReplyCount + 2
+  stz pppIcmpInboundDropCount
+  stz pppIcmpInboundDropCount + 2
   stz pppIcmpPacketOffset
   stz pppIcmpChecksumAccumulator
   sep #$20
@@ -179,6 +207,28 @@ valid:
 request:
   lda #(PPP_ICMP_FLAG_VALID | PPP_ICMP_FLAG_ECHO_REQUEST)
   sta pppIcmpFlags
+  lda #PPP_ICMP_INBOUND_STATE_RECEIVED
+  sta pppIcmpInboundState
+  stz pppIcmpInboundLastError
+  lda #PPP_ICMP_INBOUND_FLAG_VALID
+  sta pppIcmpInboundFlags
+  ldx #$0000
+copyInboundSource:
+  lda pppIpv4SourceAddress, x
+  sta pppIcmpInboundSource, x
+  inx
+  cpx #$0004
+  bne copyInboundSource
+  rep #$20
+  .a16
+  lda pppIcmpIdentifier
+  sta pppIcmpInboundIdentifier
+  lda pppIcmpSequence
+  sta pppIcmpInboundSequence
+  lda pppIcmpPayloadLength
+  sta pppIcmpInboundPayloadLength
+  sep #$20
+  .a8
   pppIncrement32 pppIcmpEchoRequestCount
   lda pppTransmitActive
   beq transmitReply
@@ -197,7 +247,11 @@ transmitReply:
   bcc receiveDone
   lda #PPP_ICMP_ERROR_TRANSMIT_FAILED
   sta pppIcmpLastError
+  sta pppIcmpInboundLastError
+  lda #PPP_ICMP_INBOUND_STATE_FAILED
+  sta pppIcmpInboundState
   pppIncrement32 pppIcmpDropCount
+  pppIncrement32 pppIcmpInboundDropCount
 receiveDone:
   jsr pppSnapshotEnd
   ply
@@ -279,7 +333,11 @@ retry:
   sta pppIcmpFlags
   lda #PPP_ICMP_ERROR_TRANSMIT_FAILED
   sta pppIcmpLastError
+  sta pppIcmpInboundLastError
+  lda #PPP_ICMP_INBOUND_STATE_FAILED
+  sta pppIcmpInboundState
   pppIncrement32 pppIcmpDropCount
+  pppIncrement32 pppIcmpInboundDropCount
 retryDone:
   jsr pppSnapshotEnd
 notPending:
@@ -307,7 +365,11 @@ notPending:
   sta pppIcmpFlags
   lda #PPP_ICMP_ERROR_PENDING_ABORTED
   sta pppIcmpLastError
+  sta pppIcmpInboundLastError
+  lda #PPP_ICMP_INBOUND_STATE_FAILED
+  sta pppIcmpInboundState
   pppIncrement32 pppIcmpDropCount
+  pppIncrement32 pppIcmpInboundDropCount
   jsr pppSnapshotEnd
 done:
   plb
@@ -364,6 +426,7 @@ copyDestination:
   sta pppIcmpFlags
   stz pppIcmpLastError
   pppIncrement32 pppIcmpTransmitCount
+  pppIncrement32 pppIcmpInboundReplyCount
   clc
   rts
 transmitFailed:
@@ -458,6 +521,15 @@ transmitFailed:
   lda pppIcmpFlags
   cmp #(PPP_ICMP_FLAG_VALID | PPP_ICMP_FLAG_ECHO_REQUEST)
   pppIcmpRequireEqual fail88
+  lda pppIcmpInboundState
+  cmp #PPP_ICMP_INBOUND_STATE_RECEIVED
+  pppIcmpRequireEqual fail88
+  lda pppIcmpInboundFlags
+  cmp #PPP_ICMP_INBOUND_FLAG_VALID
+  pppIcmpRequireEqual fail88
+  lda pppIcmpInboundSource + 3
+  cmp #$01
+  pppIcmpRequireEqual fail88
   rep #$20
   .a16
   lda pppIcmpIdentifier
@@ -474,6 +546,15 @@ transmitFailed:
   pppIcmpRequireEqual fail88_16
   lda pppIcmpEchoRequestCount
   cmp #$0001
+  pppIcmpRequireEqual fail88_16
+  lda pppIcmpInboundIdentifier
+  cmp #$1234
+  pppIcmpRequireEqual fail88_16
+  lda pppIcmpInboundSequence
+  cmp #$0001
+  pppIcmpRequireEqual fail88_16
+  lda pppIcmpInboundPayloadLength
+  cmp #$0005
   pppIcmpRequireEqual fail88_16
   sep #$20
   .a8
@@ -504,6 +585,9 @@ transmitFailed:
   cmp #$0001
   pppIcmpRequireEqual fail89_16
   lda pppIpv4TransmitCount
+  cmp #$0001
+  pppIcmpRequireEqual fail89_16
+  lda pppIcmpInboundReplyCount
   cmp #$0001
   pppIcmpRequireEqual fail89_16
   sep #$20
@@ -557,6 +641,12 @@ transmitFailed:
   lda pppIcmpLastError
   cmp #PPP_ICMP_ERROR_INVALID_CHECKSUM
   pppIcmpRequireEqual fail8c
+  lda pppIcmpInboundState
+  cmp #PPP_ICMP_INBOUND_STATE_FAILED
+  pppIcmpRequireEqual fail8c
+  lda pppIcmpInboundLastError
+  cmp #PPP_ICMP_ERROR_INVALID_CHECKSUM
+  pppIcmpRequireEqual fail8c
   rep #$20
   .a16
   lda pppIcmpChecksumErrorCount
@@ -564,6 +654,12 @@ transmitFailed:
   pppIcmpRequireEqual fail8c_16
   lda pppIcmpDropCount
   cmp #$0001
+  pppIcmpRequireEqual fail8c_16
+  lda pppIcmpInboundDropCount
+  cmp #$0001
+  pppIcmpRequireEqual fail8c_16
+  lda pppIcmpInboundIdentifier
+  cmp #$1234
   pppIcmpRequireEqual fail8c_16
   sep #$20
   .a8

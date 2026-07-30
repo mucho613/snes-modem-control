@@ -185,6 +185,8 @@ cargo run -p ndm24-tools -- ppp-monitor
 - NTPのstate、cookie、時刻、server属性、期限と各count
 - 外向きICMP Echoのstate、相関キー、宛先、RTT、期限と各count
 - DNSのstate、resolver、Transaction ID、RCODE、回答数、A address、RTTと各count
+- 外から受信した最後の有効なICMP Echo Requestのsource、Identifier、Sequence、
+  payload長、reply/drop countと最終error
 
 認証frameには利用者IDやpasswordが含まれ得るため、常設traceへpayload全体は保存しません。protocol、code、identifier、length、エラー理由までを診断対象とし、credential byte列は記録対象外とします。
 
@@ -429,7 +431,7 @@ checksum error、同一headerの送信生成、共有encoder受理を検査し�
 `$85`～`$87`はlocal宛先の受理、宛先不一致の破棄、IPCP phase gateを検査します。
 2026-07-30にFXPAK PRO実機で起動完了後3回連続合格し、当時のABI version 7の
 snapshot取得も確認しました。この試験は電話回線へ発信せず、固定fixtureだけを
-使います。ICMPとUDP診断はABI version 9で末尾へ追加され、現行version 12でも
+使います。ICMPとUDP診断はABI version 9で末尾へ追加され、現行version 13でも
 同じoffsetを維持しています。
 
 ## 65816 ICMP Echo
@@ -446,6 +448,13 @@ source addressへEcho Replyを返します。奇数byte長のpayloadでは末尾
 場合は保留を取り消してframeを解放するため、次の接続へpacketを持ち越しません。
 Type/Code/checksum、Identifier/Sequence、各種count、pending状態は公開診断ABI
 version 9から取得できます。
+
+公開診断ABI version 13、423byteでは、画面表示とhost側診断が同じ意味を持つよう、
+最後に検証へ合格した外向きEcho Requestとは独立の受信snapshotを末尾へ追加
+しました。source address、Identifier、Sequence Number、payload長は次の有効な
+Echo Requestまたは再起動まで保持します。壊れたrequestはこのsnapshotを維持した
+まま受信側state/error/drop countを更新し、IPv4送信器へ受理されたEcho Replyだけを
+受信側reply countへ加えます。
 
 常設セルフテストのstep `$88`～`$8C`は、5byte payload `NDM24`を持つ既知checksum
 `$1654`のEcho Request、checksum `$1E54`のEcho Reply、送信busy時の保留と再試行、

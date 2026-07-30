@@ -74,6 +74,10 @@
 .export pppDnsAnswerAddress, pppDnsDeadline, pppDnsSentFrame, pppDnsRttFrames
 .export pppDnsQueryCount, pppDnsResponseCount
 .export pppDnsDropCount, pppDnsTimeoutCount
+.export pppIcmpInboundState, pppIcmpInboundLastError, pppIcmpInboundFlags
+.export pppIcmpInboundSource
+.export pppIcmpInboundIdentifier, pppIcmpInboundSequence, pppIcmpInboundPayloadLength
+.export pppIcmpInboundReplyCount, pppIcmpInboundDropCount
 
 pppDiagnosticState:
 pppDiagnosticMagic: .res $4
@@ -247,6 +251,15 @@ pppDnsQueryCount: .res $4
 pppDnsResponseCount: .res $4
 pppDnsDropCount: .res $4
 pppDnsTimeoutCount: .res $4
+pppIcmpInboundState: .res $1
+pppIcmpInboundLastError: .res $1
+pppIcmpInboundFlags: .res $1
+pppIcmpInboundSource: .res $4
+pppIcmpInboundIdentifier: .res $2
+pppIcmpInboundSequence: .res $2
+pppIcmpInboundPayloadLength: .res $2
+pppIcmpInboundReplyCount: .res $4
+pppIcmpInboundDropCount: .res $4
 .res PPP_DIAGNOSTIC_SIZE - (* - pppDiagnosticState)
 pppDiagnosticStateEnd:
 
@@ -421,6 +434,15 @@ pppDiagnosticStateEnd:
 .assert pppDnsResponseCount - pppDiagnosticState = PPP_DIAG_DNS_RESPONSE_COUNT, error, "PPP DNS response count offset"
 .assert pppDnsDropCount - pppDiagnosticState = PPP_DIAG_DNS_DROP_COUNT, error, "PPP DNS drop count offset"
 .assert pppDnsTimeoutCount - pppDiagnosticState = PPP_DIAG_DNS_TIMEOUT_COUNT, error, "PPP DNS timeout count offset"
+.assert pppIcmpInboundState - pppDiagnosticState = PPP_DIAG_ICMP_INBOUND_STATE, error, "PPP inbound ICMP state offset"
+.assert pppIcmpInboundLastError - pppDiagnosticState = PPP_DIAG_ICMP_INBOUND_LAST_ERROR, error, "PPP inbound ICMP error offset"
+.assert pppIcmpInboundFlags - pppDiagnosticState = PPP_DIAG_ICMP_INBOUND_FLAGS, error, "PPP inbound ICMP flags offset"
+.assert pppIcmpInboundSource - pppDiagnosticState = PPP_DIAG_ICMP_INBOUND_SOURCE, error, "PPP inbound ICMP source offset"
+.assert pppIcmpInboundIdentifier - pppDiagnosticState = PPP_DIAG_ICMP_INBOUND_IDENTIFIER, error, "PPP inbound ICMP identifier offset"
+.assert pppIcmpInboundSequence - pppDiagnosticState = PPP_DIAG_ICMP_INBOUND_SEQUENCE, error, "PPP inbound ICMP sequence offset"
+.assert pppIcmpInboundPayloadLength - pppDiagnosticState = PPP_DIAG_ICMP_INBOUND_PAYLOAD_LENGTH, error, "PPP inbound ICMP payload offset"
+.assert pppIcmpInboundReplyCount - pppDiagnosticState = PPP_DIAG_ICMP_INBOUND_REPLY_COUNT, error, "PPP inbound ICMP reply count offset"
+.assert pppIcmpInboundDropCount - pppDiagnosticState = PPP_DIAG_ICMP_INBOUND_DROP_COUNT, error, "PPP inbound ICMP drop count offset"
 .assert pppDiagnosticStateEnd - pppDiagnosticState = PPP_DIAGNOSTIC_SIZE, error, "PPP diagnostic ABI size"
 
 ; Decoder and pump scratch fields are private and intentionally excluded from
