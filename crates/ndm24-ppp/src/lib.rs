@@ -7,6 +7,7 @@
 
 use std::mem;
 
+pub mod ipcp;
 pub mod lcp;
 pub mod pap;
 

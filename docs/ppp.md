@@ -4,7 +4,7 @@
 
 最初のPPPマイルストーンは、NDM24から受け取る任意位置で分割されたbyte列を、FCS検証済みのPPPフレームへ復元する層です。`crates/ndm24-ppp` を仕様の参照実装とし、同じ状態遷移と試験ベクトルを65816へ移植しています。
 
-現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP packet parser、Configure交渉、peer option方針、restart timer、main-loop pollまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向で双方のConfigure-Request/Ackと`Opened`到達まで確認しました。認証、IPCP、IPv4、UDP、TCP、NTPはまだSFC上で動作しません。
+現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP packet parser、Configure交渉、peer option方針、restart timer、main-loop pollとPAP clientまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ackまで確認しました。IPCPはRust参照実装まで完了し、65816への移植中です。IPv4、UDP、TCP、NTPはまだSFC上で動作しません。
 
 PPP接続は次の順序で進みます。
 
@@ -187,6 +187,32 @@ cargo run -p ndm24-tools -- ppp-monitor
 
 `crates/ndm24-ppp/src/pap/client.rs` は、認証される側としてのclient状態機械です。LCPでPAP要求を受理した場合だけAuthenticate-Requestを開始し、共有送信器がpacketを受理してからIdentifierとMax-Authenticate回数を消費してrestart timer待ちへ入ります。送信器のbackpressure中は同じpacketを再構築でき、回数を消費しません。timeout再送ではRFC 1334の指定どおりIdentifierを変更し、最新Identifierと完全に一致する正常なAck/Nakだけを状態遷移へ反映します。LCP lower-downでは進行中・成功・失敗のいずれもInactiveへ戻します。
 
+## Rust IPCP client
+
+`crates/ndm24-ppp/src/ipcp.rs` は [RFC 1332](https://www.rfc-editor.org/rfc/rfc1332.html)
+のIPCP packetとConfiguration Optionをcopyせず解析する参照codecです。
+Protocol `$8021`、Configure-Request/Ack/Nak/Reject、IP-Address optionを扱い、
+packet Lengthより後ろのpaddingを除外します。短いheader、不正なpacket Length、
+長さ2未満またはpacket境界を越えるoptionは個別のerrorにします。
+
+`crates/ndm24-ppp/src/ipcp/client.rs` はLCP/PAP完了後に動くConfigure交渉の
+参照状態機械です。SFCの最初のConfigure-RequestはIP-Address `0.0.0.0`を含み、
+対向のConfigure-Nakが非zeroのアドレスを提案した場合は、その値へ置き換えて
+新しいIdentifierで再要求します。WSL2 fixtureではlocal `10.24.0.2`、peer
+`10.24.0.1`が確定します。
+
+peer Configure-Requestについては、正しい長さの非zero IP-AddressをAckします。
+zeroアドレスにはfixtureのpeer address `10.24.0.1`をNak提案し、
+IP-Compression-Protocol、廃止されたIP-Addresses、未知option、重複optionは
+Rejectします。Configure-AckはIdentifierと送信option列の完全一致を要求します。
+restart intervalは3秒、Max-Configureは初回を含む10回で、lower-down時には
+交渉済みアドレス、timer、再送回数を初期値へ戻します。
+
+固定transcript試験は、`pppd`がSFCの`0.0.0.0`要求へ`10.24.0.2`をNak提案し、
+SFCが再要求した後に双方のConfigure-Ackが成立する経路を検査します。加えて、
+zero peer addressへのNak、圧縮・未知・重複optionのReject、不一致Ackの無視、
+同一Identifierでのtimeout再送と上限到達を検査します。
+
 状態機械への入力と出力は分離しています。
 
 - 入力: lower layerのopen/down、現在時刻、受信LCP packet
@@ -294,5 +320,6 @@ fixtureで検査します。
 オフラインで確定できるLCP処理と、実対向での`Opened`到達まで完了しました。
 raw `NO CARRIER`による自動lower-downも実対向で合格しました。PAP clientは
 Rust参照実装、65816常設セルフテスト、revision A実機とWSL2 `pppd`による
-Authenticate-Request/Ackまで合格しました。次はIPCP Configure交渉とIPv4
-address確定へ進みます。
+Authenticate-Request/Ackまで合格しました。IPCPのRust参照codecとclient状態機械
+まで完了しました。次は同じ固定transcriptを65816へ移植し、IPCP Configure交渉と
+IPv4 address確定を実機で確認します。
