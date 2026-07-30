@@ -337,4 +337,11 @@ Echo-Replyにも同じlocal Magicが入りました。LCP、PAP、IPCPはすべ�
 FCS error、invalid、overflow、backpressure、abortは0でした。停止後はpeer
 Terminate-Request/Ackが各1回、pending RXは空で、DFM-56UはCOM5へ戻りました。
 
+同日、PAP一時資格情報対応の診断ABI version 21、mailbox ABI version 9
+smoke ROMをFXPAK PROへQUsb2Snes経由で転送し、起動確認後にmailbox
+`ppp-self-test`（command 10、sequence 1）が合格しました。常設fixtureは
+clear、Peer-IDとPasswordの分割登録、mailbox argumentsのzero化、登録完了判定、
+切断時の一時資格情報消去、閉じた試験用fixtureへの復帰を実機65816上で検査
+します。実サービスの資格情報はこの試験では入力も送信もしていません。
+
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。
