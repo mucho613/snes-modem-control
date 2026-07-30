@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, ensure};
-use ndm24_protocol::{DiagnosticSnapshot, DriverState, MODEM_SESSION_RESULT_OK};
+use ndm24_protocol::{
+    DiagnosticSnapshot, DriverState, MODEM_MAILBOX_COMMAND_CLEAR_TRACE, MODEM_SESSION_RESULT_OK,
+};
 use serde::Serialize;
 
 use crate::connect_test::{normalize_hardware_revision, restore_peer};
@@ -167,6 +169,13 @@ async fn probe_ndm24_command(
     command: &str,
     report: &mut SpeedProbeReport,
 ) -> Result<()> {
+    qusb2snes::mailbox_command(
+        websocket,
+        labels,
+        MODEM_MAILBOX_COMMAND_CLEAR_TRACE,
+        Duration::from_secs(5),
+    )
+    .await?;
     let before = qusb2snes::read_snapshot(websocket, labels).await?;
     let record = identification_test::transact(websocket, labels, command, &before).await?;
     report.ndm24_commands.push(record);
