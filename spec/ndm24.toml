@@ -292,8 +292,8 @@ description = "Frame at which the current generic AT transaction started"
 
 [ppp_diagnostic]
 magic = [0x50, 0x50, 0x50, 0x31]
-version = 19
-size = 481
+version = 20
+size = 490
 
 [[ppp_diagnostic.fields]]
 name = "magic"
@@ -1680,6 +1680,27 @@ offset = 477
 size = 4
 type = "u32"
 description = "Locally initiated closures completed after Max-Terminate exhaustion"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_local_magic"
+offset = 481
+size = 4
+type = "u32"
+description = "Local Magic-Number currently proposed in Configure-Request"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_local_flags"
+offset = 485
+size = 1
+type = "u8"
+description = "Local Magic-Number request and acknowledgement flags"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_loopback_count"
+offset = 486
+size = 4
+type = "u32"
+description = "Peer Configure-Requests whose Magic-Number matched the local proposal"
 
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]

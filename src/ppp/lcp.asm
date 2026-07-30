@@ -21,6 +21,7 @@
 .import pppLcpAdministrativeOpen
 .import pppLcpLocalTerminateRequestCount, pppLcpLocalTerminateAckCount
 .import pppLcpLocalTerminateTimeoutCount
+.import pppLcpLocalMagic, pppLcpLocalFlags, pppLcpLoopbackCount
 
 .export pppLcpInitialize, pppLcpParseFrame, pppLcpRunSelfTest
 
@@ -80,6 +81,10 @@
   stz pppLcpLocalTerminateAckCount + 2
   stz pppLcpLocalTerminateTimeoutCount
   stz pppLcpLocalTerminateTimeoutCount + 2
+  stz pppLcpLocalMagic
+  stz pppLcpLocalMagic + 2
+  stz pppLcpLoopbackCount
+  stz pppLcpLoopbackCount + 2
   stz pppLcpLastEchoMagic
   stz pppLcpLastEchoMagic + 2
   stz pppLcpLastRejectedProtocol
@@ -87,6 +92,7 @@
   stz pppLcpRejectIdentifier
   stz pppLcpLastRejectedCode
   stz pppLcpLastEchoIdentifier
+  stz pppLcpLocalFlags
   plb
   rts
 .endproc

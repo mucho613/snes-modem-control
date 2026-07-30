@@ -11,6 +11,7 @@
 .import pppLcpRestartRemaining, pppLcpPendingAction
 .import pppLcpPeerFlags, pppLcpPeerMru, pppLcpPeerAccm
 .import pppLcpPeerMagic, pppLcpRestartDeadline, pppLcpTimerActive
+.import pppLcpLocalMagic, pppLcpLocalFlags
 .import pppLcpDeferredRequest
 .import pppLcpAdministrativeOpen
 .import pppLcpLocalTerminateTimeoutCount
@@ -225,6 +226,7 @@
   stz pppLcpTimerActive
   stz pppLcpDeferredRequest
   stz pppLcpPeerFlags
+  stz pppLcpLocalFlags
   m16
   lda #PPP_DEFAULT_MRU
   sta pppLcpPeerMru
@@ -233,6 +235,8 @@
   sta pppLcpPeerAccm + 2
   stz pppLcpPeerMagic
   stz pppLcpPeerMagic + 2
+  stz pppLcpLocalMagic
+  stz pppLcpLocalMagic + 2
   m8
   jsr pppSnapshotEnd
   plb
@@ -254,6 +258,7 @@
   stz pppLcpTimerActive
   stz pppLcpDeferredRequest
   stz pppLcpPeerFlags
+  stz pppLcpLocalFlags
   m16
   lda #PPP_DEFAULT_MRU
   sta pppLcpPeerMru
@@ -262,6 +267,8 @@
   sta pppLcpPeerAccm + 2
   stz pppLcpPeerMagic
   stz pppLcpPeerMagic + 2
+  stz pppLcpLocalMagic
+  stz pppLcpLocalMagic + 2
   m8
   jsr pppSnapshotEnd
   plb
@@ -285,6 +292,7 @@
   stz pppLcpTimerActive
   stz pppLcpDeferredRequest
   stz pppLcpPeerFlags
+  stz pppLcpLocalFlags
   m16
   lda #PPP_DEFAULT_MRU
   sta pppLcpPeerMru
@@ -293,6 +301,8 @@
   sta pppLcpPeerAccm + 2
   stz pppLcpPeerMagic
   stz pppLcpPeerMagic + 2
+  stz pppLcpLocalMagic
+  stz pppLcpLocalMagic + 2
   m8
   jsr pppSnapshotEnd
   plb

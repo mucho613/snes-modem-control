@@ -349,6 +349,9 @@ pub struct PppDiagnosticSnapshot {
     pub lcp_local_terminate_request_count: u32,
     pub lcp_local_terminate_ack_count: u32,
     pub lcp_local_terminate_timeout_count: u32,
+    pub lcp_local_magic: u32,
+    pub lcp_local_flags: u8,
+    pub lcp_loopback_count: u32,
 }
 
 impl PppDiagnosticSnapshot {
@@ -583,6 +586,9 @@ impl PppDiagnosticSnapshot {
                 data,
                 PPP_DIAG_LCP_LOCAL_TERMINATE_TIMEOUT_COUNT,
             )?,
+            lcp_local_magic: read_u32(data, PPP_DIAG_LCP_LOCAL_MAGIC)?,
+            lcp_local_flags: data[PPP_DIAG_LCP_LOCAL_FLAGS],
+            lcp_loopback_count: read_u32(data, PPP_DIAG_LCP_LOOPBACK_COUNT)?,
         })
     }
 }
@@ -1027,6 +1033,11 @@ mod tests {
         data[PPP_DIAG_LCP_LOCAL_TERMINATE_TIMEOUT_COUNT
             ..PPP_DIAG_LCP_LOCAL_TERMINATE_TIMEOUT_COUNT + 4]
             .copy_from_slice(&3_u32.to_le_bytes());
+        data[PPP_DIAG_LCP_LOCAL_MAGIC..PPP_DIAG_LCP_LOCAL_MAGIC + 4]
+            .copy_from_slice(&0x8765_4321_u32.to_le_bytes());
+        data[PPP_DIAG_LCP_LOCAL_FLAGS] = 3;
+        data[PPP_DIAG_LCP_LOOPBACK_COUNT..PPP_DIAG_LCP_LOOPBACK_COUNT + 4]
+            .copy_from_slice(&2_u32.to_le_bytes());
 
         let snapshot = PppDiagnosticSnapshot::decode(&data).unwrap();
         assert_eq!(snapshot.snapshot_sequence, 8);
@@ -1188,6 +1199,9 @@ mod tests {
         assert_eq!(snapshot.lcp_local_terminate_request_count, 2);
         assert_eq!(snapshot.lcp_local_terminate_ack_count, 1);
         assert_eq!(snapshot.lcp_local_terminate_timeout_count, 3);
+        assert_eq!(snapshot.lcp_local_magic, 0x8765_4321);
+        assert_eq!(snapshot.lcp_local_flags, 3);
+        assert_eq!(snapshot.lcp_loopback_count, 2);
     }
 
     #[test]

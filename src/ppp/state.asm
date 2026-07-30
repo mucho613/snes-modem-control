@@ -88,6 +88,7 @@
 .export pppLcpAdministrativeOpen
 .export pppLcpLocalTerminateRequestCount, pppLcpLocalTerminateAckCount
 .export pppLcpLocalTerminateTimeoutCount
+.export pppLcpLocalMagic, pppLcpLocalFlags, pppLcpLoopbackCount
 
 pppDiagnosticState:
 pppDiagnosticMagic: .res $4
@@ -288,6 +289,9 @@ pppLcpAdministrativeOpen: .res $1
 pppLcpLocalTerminateRequestCount: .res $4
 pppLcpLocalTerminateAckCount: .res $4
 pppLcpLocalTerminateTimeoutCount: .res $4
+pppLcpLocalMagic: .res $4
+pppLcpLocalFlags: .res $1
+pppLcpLoopbackCount: .res $4
 pppDiagnosticStateEnd:
 
 .assert pppDiagnosticMagic - pppDiagnosticState = PPP_DIAG_MAGIC, error, "PPP diagnostic magic offset"
@@ -488,6 +492,9 @@ pppDiagnosticStateEnd:
 .assert pppLcpLocalTerminateRequestCount - pppDiagnosticState = PPP_DIAG_LCP_LOCAL_TERMINATE_REQUEST_COUNT, error, "PPP LCP local terminate request count offset"
 .assert pppLcpLocalTerminateAckCount - pppDiagnosticState = PPP_DIAG_LCP_LOCAL_TERMINATE_ACK_COUNT, error, "PPP LCP local terminate ack count offset"
 .assert pppLcpLocalTerminateTimeoutCount - pppDiagnosticState = PPP_DIAG_LCP_LOCAL_TERMINATE_TIMEOUT_COUNT, error, "PPP LCP local terminate timeout count offset"
+.assert pppLcpLocalMagic - pppDiagnosticState = PPP_DIAG_LCP_LOCAL_MAGIC, error, "PPP LCP local magic offset"
+.assert pppLcpLocalFlags - pppDiagnosticState = PPP_DIAG_LCP_LOCAL_FLAGS, error, "PPP LCP local flags offset"
+.assert pppLcpLoopbackCount - pppDiagnosticState = PPP_DIAG_LCP_LOOPBACK_COUNT, error, "PPP LCP loopback count offset"
 .assert pppDiagnosticStateEnd - pppDiagnosticState = PPP_DIAGNOSTIC_SIZE, error, "PPP diagnostic ABI size"
 
 ; Decoder and pump scratch fields are private and intentionally excluded from

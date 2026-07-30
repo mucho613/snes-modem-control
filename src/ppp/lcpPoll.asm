@@ -18,10 +18,12 @@
 .import pppLcpCodeRejectCount, pppLcpLastRejectedCode
 .import pppLcpEchoRequestCount, pppLcpEchoReplyCount, pppLcpEchoDropCount
 .import pppLcpLastEchoIdentifier, pppLcpLastEchoMagic
+.import pppLcpLocalMagic
 .import pppLcpInitialize, pppLcpOpen, pppLcpClose, pppLcpReceiveFrame
 .import pppLcpRejectProtocol
 .import pppLcpBuildPending, pppLcpPollTimeout, pppLcpLowerDown
 .import pppLcpPeerTerminateComplete
+.import pppLcpWriteLocalAckTestPacket
 .import pppLastProtocol, pppLastFrameLength, pppFrameBuffer
 
 .export pppLcpPoll, pppLcpPollRunSelfTest
@@ -327,11 +329,13 @@
   cmp #$07
   pppLcpPollRequireEqual @fail62
 
-  ; Peer Ack of the local empty request completes Opened.
+  ; Peer Ack of the local Magic-Number request completes Opened.
   jsr pppTransmitInitialize
   lda #PPP_LCP_CODE_CONFIGURE_ACK
   ldx #$0000
-  jsr @writeEmptyPacket
+  jsl pppLcpWriteLocalAckTestPacket
+  lda #$01
+  sta pppFrameReady
   m16
   jsr pppLcpPoll
   m8
@@ -344,8 +348,8 @@
   pppLcpPollRequireEqual @fail63
 
   ; A valid Echo-Request remains owned under encoder backpressure, then
-  ; receives an Echo-Reply with the same Identifier and Data. Because the
-  ; local side did not negotiate Magic-Number, the transmitted value is zero.
+  ; receives an Echo-Reply with the same Identifier and Data plus our
+  ; acknowledged local Magic-Number.
   jsr @writeEchoPacket
   lda #$01
   sta pppTransmitActive
@@ -387,9 +391,16 @@
   cmp #$0b
   pppLcpPollRequireEqual @fail67
   lda pppTransmitBuffer + 8
-  ora pppTransmitBuffer + 9
-  ora pppTransmitBuffer + 10
-  ora pppTransmitBuffer + 11
+  cmp pppLcpLocalMagic + 3
+  pppLcpPollRequireEqual @fail67
+  lda pppTransmitBuffer + 9
+  cmp pppLcpLocalMagic + 2
+  pppLcpPollRequireEqual @fail67
+  lda pppTransmitBuffer + 10
+  cmp pppLcpLocalMagic + 1
+  pppLcpPollRequireEqual @fail67
+  lda pppTransmitBuffer + 11
+  cmp pppLcpLocalMagic + 0
   pppLcpPollRequireEqual @fail67
   lda pppTransmitBuffer + 12
   cmp #$61

@@ -44,7 +44,7 @@ ABI version: `2`. Block size: `128` bytes.
 
 ## PPP Diagnostic ABI
 
-ABI version: `19`. Block size: `481` bytes.
+ABI version: `20`. Block size: `490` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|
@@ -246,6 +246,9 @@ ABI version: `19`. Block size: `481` bytes.
 | `0x1D5` | 4 | `u32` | `lcp_local_terminate_request_count` | Locally initiated Terminate-Requests accepted by the shared PPP transmitter, including retries |
 | `0x1D9` | 4 | `u32` | `lcp_local_terminate_ack_count` | Matching Terminate-Acks received for locally initiated closure |
 | `0x1DD` | 4 | `u32` | `lcp_local_terminate_timeout_count` | Locally initiated closures completed after Max-Terminate exhaustion |
+| `0x1E1` | 4 | `u32` | `lcp_local_magic` | Local Magic-Number currently proposed in Configure-Request |
+| `0x1E5` | 1 | `u8` | `lcp_local_flags` | Local Magic-Number request and acknowledgement flags |
+| `0x1E6` | 4 | `u32` | `lcp_loopback_count` | Peer Configure-Requests whose Magic-Number matched the local proposal |
 
 ## Mailbox ABI
 

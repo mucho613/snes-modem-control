@@ -6,6 +6,7 @@
 .import pppSnapshotBegin, pppSnapshotEnd
 .import pppLcpParseFrame, pppLcpInitialize
 .import pppLcpEvaluatePeerRequest, pppLcpBuildPeerResponse
+.import pppLcpPeerMagicMatchesLocal
 .import pppLcpState, pppLcpLastCode, pppLcpLastIdentifier, pppLcpLastError
 .import pppLcpRequestIdentifier, pppLcpRestartRemaining
 .import pppLcpPendingAction, pppLcpPacketLength
@@ -16,18 +17,22 @@
 .import pppLcpProtocolRejectCount, pppLcpLastRejectedProtocol
 .import pppLcpRejectIdentifier, pppLcpPeerFlags, pppLcpPeerMru
 .import pppLcpPeerMagic
+.import pppLcpLocalMagic, pppLcpLocalFlags, pppLcpLoopbackCount
 .import pppLcpCodeRejectCount, pppLcpLastRejectedCode
 .import pppLcpEchoRequestCount, pppLcpEchoReplyCount, pppLcpEchoDropCount
 .import pppLcpLastEchoIdentifier, pppLcpLastEchoMagic
-.import pppLcpPacketEnd, pppLcpOutputCursor
+.import pppLcpPacketEnd, pppLcpOutputCursor, pppLcpOptionLength
+.import pppLcpHasNak
 .import pppFrameBuffer, pppTransmitBuffer, pppTransmitActive
 .import pppTransmitBegin, pppTransmitInitialize
 .import pppLcpArmRestartTimer, pppLcpLocalTerminateComplete
 .import pppLastProtocol, pppLastFrameLength
+.import frameCounter
 
 .export pppLcpOpen, pppLcpClose, pppLcpReceiveFrame, pppLcpRejectProtocol
 .export pppLcpRejectCode
-.export pppLcpBuildPending
+.export pppLcpBuildPending, pppLcpAdvanceLocalMagic
+.export pppLcpWriteLocalAckTestPacket
 .export pppLcpNegotiationRunSelfTest
 
 .macro pppLcpNegotiationRequireEqual failure
@@ -48,7 +53,7 @@
 :
 .endmacro
 
-; Start LCP establishment with the conservative empty local option list.
+; Start LCP establishment with a locally generated Magic-Number option.
 ; The pending request is built only after the shared PPP encoder is idle.
 .proc pppLcpOpen
   .a8
@@ -66,6 +71,20 @@
   beq @finish
   lda #PPP_LCP_STATE_REQUEST_SENT
   sta pppLcpState
+  m16
+  lda frameCounter
+  eor #$4d24
+  sta pppLcpLocalMagic
+  lda frameCounter + 2
+  eor #$4e44
+  sta pppLcpLocalMagic + 2
+  ora pppLcpLocalMagic
+  bne :+
+  inc pppLcpLocalMagic
+:
+  m8
+  lda #PPP_LCP_LOCAL_FLAG_MAGIC_REQUEST
+  sta pppLcpLocalFlags
   stz pppLcpRequestIdentifier
   lda #(PPP_LCP_DEFAULT_MAX_CONFIGURE - 1)
   sta pppLcpRestartRemaining
@@ -425,13 +444,64 @@
 :
   lda pppLcpLastIdentifier
   cmp pppLcpRequestIdentifier
-  bne @invalidResponse
+  beq :+
+  jmp @invalidResponse
+:
+  lda pppLcpLocalFlags
+  and #PPP_LCP_LOCAL_FLAG_MAGIC_REQUEST
+  beq @ackExpectEmpty
+  m16
+  lda pppLcpPacketLength
+  cmp #(PPP_LCP_HEADER_LENGTH + 6)
+  beq :+
+  jmp @invalidResponse16
+:
+  m8
+  lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 0
+  cmp #PPP_LCP_OPTION_MAGIC_NUMBER
+  beq :+
+  jmp @invalidResponse
+:
+  lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 1
+  cmp #$06
+  beq :+
+  jmp @invalidResponse
+:
+  lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 2
+  cmp pppLcpLocalMagic + 3
+  beq :+
+  jmp @invalidResponse
+:
+  lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 3
+  cmp pppLcpLocalMagic + 2
+  beq :+
+  jmp @invalidResponse
+:
+  lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 4
+  cmp pppLcpLocalMagic + 1
+  beq :+
+  jmp @invalidResponse
+:
+  lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 5
+  cmp pppLcpLocalMagic + 0
+  beq :+
+  jmp @invalidResponse
+:
+  lda pppLcpLocalFlags
+  ora #PPP_LCP_LOCAL_FLAG_MAGIC_ACKNOWLEDGED
+  sta pppLcpLocalFlags
+  bra @ackValidated
+
+@ackExpectEmpty:
+  assert_m8_i16
   m16
   lda pppLcpPacketLength
   cmp #PPP_LCP_HEADER_LENGTH
   bne @invalidResponse16
-
   m8
+@ackValidated:
+  assert_m8_i16
+
   lda pppLcpState
   cmp #PPP_LCP_STATE_REQUEST_SENT
   beq @ackReceived
@@ -476,12 +546,9 @@
   lda pppLcpLastIdentifier
   cmp pppLcpRequestIdentifier
   bne @invalidResponse
-  m16
-  lda pppLcpPacketLength
-  cmp #PPP_LCP_HEADER_LENGTH
-  bne @invalidResponse16
+  jsr @applyNegativeOptions
+  bcs @invalidResponse
 
-  m8
   lda pppLcpState
   cmp #PPP_LCP_STATE_ACK_SENT
   beq @negativeKeepsAckSent
@@ -531,6 +598,9 @@
 ; the current Identifier in the next milestone.
 @newRequest:
   assert_m8_i16
+  lda pppLcpLocalFlags
+  and #($ff ^ PPP_LCP_LOCAL_FLAG_MAGIC_ACKNOWLEDGED)
+  sta pppLcpLocalFlags
   inc pppLcpRequestIdentifier
   lda #(PPP_LCP_DEFAULT_MAX_CONFIGURE - 1)
   sta pppLcpRestartRemaining
@@ -539,6 +609,115 @@
   lda #PPP_LCP_ACTION_CONFIGURE_REQUEST
   sta pppLcpPendingAction
   rts
+
+; Apply Magic-Number Configure-Nak/Reject content to the local request.
+; Empty Nak remains accepted for compatibility with the earlier empty-option
+; implementation. Reject must contain only exact requested option bytes.
+@applyNegativeOptions:
+  assert_m8_i16
+  stz pppLcpHasNak
+  ldy #PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH
+@negativeOptionLoop:
+  assert_m8_i16
+  cpy pppLcpPacketEnd
+  bne :+
+  jmp @negativeOptionsDone
+:
+  lda pppFrameBuffer, y
+  cmp #PPP_LCP_OPTION_MAGIC_NUMBER
+  beq @negativeMagic
+  lda pppLcpLastCode
+  cmp #PPP_LCP_CODE_CONFIGURE_REJECT
+  bne :+
+  jmp @negativeInvalid
+:
+  bra @negativeAdvance
+
+@negativeMagic:
+  assert_m8_i16
+  lda pppLcpHasNak
+  beq :+
+  jmp @negativeInvalid
+:
+  inc pppLcpHasNak
+  lda pppLcpLocalFlags
+  and #PPP_LCP_LOCAL_FLAG_MAGIC_REQUEST
+  bne :+
+  jmp @negativeInvalid
+:
+  lda pppFrameBuffer + 1, y
+  cmp #$06
+  beq :+
+  jmp @negativeInvalid
+:
+  lda pppLcpLastCode
+  cmp #PPP_LCP_CODE_CONFIGURE_REJECT
+  bne @negativeMagicNak
+  jsl pppLcpPeerMagicMatchesLocal
+  beq :+
+  jmp @negativeInvalid
+:
+  lda pppLcpLocalFlags
+  and #($ff ^ (PPP_LCP_LOCAL_FLAG_MAGIC_REQUEST | PPP_LCP_LOCAL_FLAG_MAGIC_ACKNOWLEDGED))
+  sta pppLcpLocalFlags
+  m16
+  stz pppLcpLocalMagic
+  stz pppLcpLocalMagic + 2
+  m8
+  bra @negativeAdvance
+
+@negativeMagicNak:
+  assert_m8_i16
+  lda pppFrameBuffer + 2, y
+  ora pppFrameBuffer + 3, y
+  ora pppFrameBuffer + 4, y
+  ora pppFrameBuffer + 5, y
+  beq @negativeAdvanceMagic
+  jsl pppLcpPeerMagicMatchesLocal
+  beq @negativeAdvanceMagic
+  lda pppFrameBuffer + 5, y
+  sta pppLcpLocalMagic + 0
+  lda pppFrameBuffer + 4, y
+  sta pppLcpLocalMagic + 1
+  lda pppFrameBuffer + 3, y
+  sta pppLcpLocalMagic + 2
+  lda pppFrameBuffer + 2, y
+  sta pppLcpLocalMagic + 3
+  bra @negativeAdvance
+
+@negativeAdvanceMagic:
+  assert_m8_i16
+  jsl pppLcpAdvanceLocalMagic
+
+@negativeAdvance:
+  assert_m8_i16
+  lda pppFrameBuffer + 1, y
+  sta pppLcpOptionLength
+  stz pppLcpOptionLength + 1
+  m16
+  tya
+  clc
+  adc pppLcpOptionLength
+  tay
+  m8
+  jmp @negativeOptionLoop
+
+@negativeOptionsDone:
+  assert_m8_i16
+  lda pppLcpLastCode
+  cmp #PPP_LCP_CODE_CONFIGURE_NAK
+  beq @negativeValid
+  lda pppLcpHasNak
+  beq @negativeInvalid
+@negativeValid:
+  assert_m8_i16
+  clc
+  rts
+@negativeInvalid:
+  assert_m8_i16
+  sec
+  rts
+
 .endproc
 
 ; Queue a Protocol-Reject for the retained unknown PPP frame. The caller owns
@@ -694,10 +873,26 @@
   sta pppTransmitBuffer + PPP_LCP_FRAME_OFFSET + 3
   lda #PPP_LCP_CODE_ECHO_REPLY
   sta pppTransmitBuffer + PPP_LCP_FRAME_OFFSET
+  lda pppLcpLocalFlags
+  and #PPP_LCP_LOCAL_FLAG_MAGIC_ACKNOWLEDGED
+  beq @echoZeroMagic
+  lda pppLcpLocalMagic + 3
+  sta pppTransmitBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 0
+  lda pppLcpLocalMagic + 2
+  sta pppTransmitBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 1
+  lda pppLcpLocalMagic + 1
+  sta pppTransmitBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 2
+  lda pppLcpLocalMagic + 0
+  sta pppTransmitBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 3
+  bra @echoMagicDone
+@echoZeroMagic:
+  assert_m8_i16
   stz pppTransmitBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 0
   stz pppTransmitBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 1
   stz pppTransmitBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 2
   stz pppTransmitBuffer + PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH + 3
+@echoMagicDone:
+  assert_m8_i16
   m16
   lda pppLcpOutputCursor
   clc
@@ -710,6 +905,29 @@
   sta pppTransmitBuffer + 4
   lda pppLcpRequestIdentifier
   sta pppTransmitBuffer + 5
+  lda pppLcpLocalFlags
+  and #PPP_LCP_LOCAL_FLAG_MAGIC_REQUEST
+  beq @buildEmptyRequest
+  stz pppTransmitBuffer + 6
+  lda #(PPP_LCP_HEADER_LENGTH + 6)
+  sta pppTransmitBuffer + 7
+  lda #PPP_LCP_OPTION_MAGIC_NUMBER
+  sta pppTransmitBuffer + 8
+  lda #$06
+  sta pppTransmitBuffer + 9
+  lda pppLcpLocalMagic + 3
+  sta pppTransmitBuffer + 10
+  lda pppLcpLocalMagic + 2
+  sta pppTransmitBuffer + 11
+  lda pppLcpLocalMagic + 1
+  sta pppTransmitBuffer + 12
+  lda pppLcpLocalMagic + 0
+  sta pppTransmitBuffer + 13
+  m16
+  lda #(PPP_LCP_MINIMUM_FRAME_LENGTH + 6)
+  jmp @begin
+@buildEmptyRequest:
+  assert_m8_i16
   stz pppTransmitBuffer + 6
   lda #PPP_LCP_HEADER_LENGTH
   sta pppTransmitBuffer + 7
@@ -1019,7 +1237,12 @@
   jmp @fail31
 :
   lda pppTransmitBuffer + 7
-  cmp #PPP_LCP_HEADER_LENGTH
+  cmp #(PPP_LCP_HEADER_LENGTH + 6)
+  beq :+
+  jmp @fail31
+:
+  lda pppTransmitBuffer + 8
+  cmp #PPP_LCP_OPTION_MAGIC_NUMBER
   beq :+
   jmp @fail31
 :
@@ -1061,7 +1284,7 @@
   jsr pppTransmitInitialize
   lda #PPP_LCP_CODE_CONFIGURE_ACK
   ldx #$0000
-  jsr @writeEmptyPacket
+  jsl pppLcpWriteLocalAckTestPacket
   jsr pppLcpReceiveFrame
   bcc :+
   jmp @fail34
@@ -1083,7 +1306,7 @@
   jsr pppTransmitInitialize
   lda #PPP_LCP_CODE_CONFIGURE_ACK
   ldx #$0000
-  jsr @writeEmptyPacket
+  jsl pppLcpWriteLocalAckTestPacket
   jsr pppLcpReceiveFrame
   bcc :+
   jmp @fail35
@@ -1151,6 +1374,44 @@
   beq :+
   jmp @fail38
 :
+
+  ; A Nak that repeats our Magic is treated as a collision and advances the
+  ; proposal before allocating the next request.
+  m16
+  lda pppLcpLocalMagic
+  sta pppTransmitBuffer + 20
+  lda pppLcpLocalMagic + 2
+  sta pppTransmitBuffer + 22
+  m8
+  lda #PPP_LCP_CODE_CONFIGURE_NAK
+  ldx #$0001
+  jsl pppLcpWriteLocalAckTestPacket
+  jsr pppLcpReceiveFrame
+  bcc :+
+  jmp @fail3d
+:
+  lda pppLcpRequestIdentifier
+  cmp #$02
+  beq :+
+  jmp @fail3d
+:
+  m16
+  lda pppTransmitBuffer + 20
+  clc
+  adc #PPP_LCP_MAGIC_RETRY_INCREMENT_LOW
+  sta pppLcpOutputCursor
+  lda pppTransmitBuffer + 22
+  adc #PPP_LCP_MAGIC_RETRY_INCREMENT_HIGH
+  cmp pppLcpLocalMagic + 2
+  beq :+
+  jmp @fail3d16
+:
+  lda pppLcpOutputCursor
+  cmp pppLcpLocalMagic
+  beq :+
+  jmp @fail3d16
+:
+  m8
 
   ; A supported non-empty request is Acked without changing its option bytes.
   jsr pppLcpBuildPending
@@ -1316,6 +1577,12 @@
 @fail3c:
   lda #$3c
   bra @fail
+@fail3d16:
+  assert_m16_i16
+  m8
+@fail3d:
+  lda #$3d
+  bra @fail
 @fail3f:
   lda #$3f
 
@@ -1373,4 +1640,62 @@
   sta pppLastFrameLength
   m8
   rts
+.endproc
+
+.segment "BANK1_CODE"
+
+; Long-call leaf: select another nonzero local Magic after a Nak collision.
+.proc pppLcpAdvanceLocalMagic
+  .a8
+  .i16
+
+  m16
+  lda pppLcpLocalMagic
+  clc
+  adc #PPP_LCP_MAGIC_RETRY_INCREMENT_LOW
+  sta pppLcpLocalMagic
+  lda pppLcpLocalMagic + 2
+  adc #PPP_LCP_MAGIC_RETRY_INCREMENT_HIGH
+  sta pppLcpLocalMagic + 2
+  ora pppLcpLocalMagic
+  bne :+
+  lda #PPP_LCP_MAGIC_RETRY_INCREMENT_LOW
+  sta pppLcpLocalMagic
+  lda #PPP_LCP_MAGIC_RETRY_INCREMENT_HIGH
+  sta pppLcpLocalMagic + 2
+:
+  m8
+  rtl
+.endproc
+
+; Long-call self-test helper. Input A=Code, X low byte=Identifier.
+.proc pppLcpWriteLocalAckTestPacket
+  .a8
+  .i16
+
+  sta pppFrameBuffer + 4
+  txa
+  sta pppFrameBuffer + 5
+  stz pppFrameBuffer + 6
+  lda #(PPP_LCP_HEADER_LENGTH + 6)
+  sta pppFrameBuffer + 7
+  lda #PPP_LCP_OPTION_MAGIC_NUMBER
+  sta pppFrameBuffer + 8
+  lda #$06
+  sta pppFrameBuffer + 9
+  lda pppLcpLocalMagic + 3
+  sta pppFrameBuffer + 10
+  lda pppLcpLocalMagic + 2
+  sta pppFrameBuffer + 11
+  lda pppLcpLocalMagic + 1
+  sta pppFrameBuffer + 12
+  lda pppLcpLocalMagic + 0
+  sta pppFrameBuffer + 13
+  m16
+  lda #PPP_PROTOCOL_LCP
+  sta pppLastProtocol
+  lda #(PPP_LCP_MINIMUM_FRAME_LENGTH + 6)
+  sta pppLastFrameLength
+  m8
+  rtl
 .endproc

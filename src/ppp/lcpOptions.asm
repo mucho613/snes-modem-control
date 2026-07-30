@@ -10,10 +10,12 @@
 .import pppLcpOptionSeen, pppLcpOptionDuplicate
 .import pppLcpOptionOffset, pppLcpOptionLength, pppLcpOutputCursor
 .import pppLcpHasReject, pppLcpHasNak, pppLcpPeerMagic
+.import pppLcpLocalMagic, pppLcpLocalFlags, pppLcpLoopbackCount
 .import pppLcpInitialize, pppTransmitInitialize
 
 .export pppLcpEvaluatePeerRequest, pppLcpBuildPeerResponse
 .export pppLcpOptionsRunSelfTest
+.export pppLcpPeerMagicMatchesLocal
 
 .macro pppLcpBranchEqualOrJump failure
   beq :+
@@ -76,6 +78,23 @@
   cpy pppLcpPacketEnd
   beq @selectPacketResponse
   jsr pppLcpClassifyPeerOption
+  pha
+  cmp #PPP_LCP_OPTION_DISPOSITION_NAK
+  bne @classified
+  lda pppFrameBuffer, y
+  cmp #PPP_LCP_OPTION_MAGIC_NUMBER
+  bne @classified
+  jsl pppLcpPeerMagicMatchesLocal
+  bne @classified
+  m16
+  inc pppLcpLoopbackCount
+  bne :+
+  inc pppLcpLoopbackCount + 2
+:
+  m8
+@classified:
+  assert_m8_i16
+  pla
   cmp #PPP_LCP_OPTION_DISPOSITION_REJECT
   bne @checkNak
   lda #$01
@@ -579,7 +598,13 @@
   ora pppFrameBuffer + 3, y
   ora pppFrameBuffer + 4, y
   ora pppFrameBuffer + 5, y
-  beq @reject
+  beq @nak
+  lda pppLcpLocalFlags
+  and #PPP_LCP_LOCAL_FLAG_MAGIC_REQUEST
+  beq @ack
+  jsl pppLcpPeerMagicMatchesLocal
+  beq @nak
+  bra @ack
 
 @ack:
   assert_m8_i16
@@ -660,9 +685,15 @@
   assert_m8_i16
   lda pppFrameBuffer, y
   cmp #PPP_LCP_OPTION_MRU
-  beq @writeMruNak
+  bne :+
+  jmp @writeMruNak
+:
   cmp #PPP_LCP_OPTION_ACCM
-  beq @writeAccmNak
+  bne :+
+  jmp @writeAccmNak
+:
+  cmp #PPP_LCP_OPTION_MAGIC_NUMBER
+  beq @writeMagicNak
   ; Authentication is the only remaining Nak disposition.
   ldx pppLcpOutputCursor
   lda #PPP_LCP_OPTION_AUTHENTICATION
@@ -677,6 +708,45 @@
   lda pppLcpOutputCursor
   clc
   adc #$0004
+  sta pppLcpOutputCursor
+  m8
+  jmp @advanceInput
+
+@writeMagicNak:
+  assert_m8_i16
+  m16
+  lda pppLcpLocalMagic
+  clc
+  adc #PPP_LCP_MAGIC_RETRY_INCREMENT_LOW
+  sta pppLcpOptionOffset
+  lda pppLcpLocalMagic + 2
+  adc #PPP_LCP_MAGIC_RETRY_INCREMENT_HIGH
+  sta pppLcpOptionLength
+  ora pppLcpOptionOffset
+  bne :+
+  lda #PPP_LCP_MAGIC_RETRY_INCREMENT_LOW
+  sta pppLcpOptionOffset
+  lda #PPP_LCP_MAGIC_RETRY_INCREMENT_HIGH
+  sta pppLcpOptionLength
+:
+  ldx pppLcpOutputCursor
+  m8
+  lda #PPP_LCP_OPTION_MAGIC_NUMBER
+  sta pppTransmitBuffer, x
+  lda #$06
+  sta pppTransmitBuffer + 1, x
+  lda pppLcpOptionLength + 1
+  sta pppTransmitBuffer + 2, x
+  lda pppLcpOptionLength
+  sta pppTransmitBuffer + 3, x
+  lda pppLcpOptionOffset + 1
+  sta pppTransmitBuffer + 4, x
+  lda pppLcpOptionOffset
+  sta pppTransmitBuffer + 5, x
+  m16
+  lda pppLcpOutputCursor
+  clc
+  adc #$0006
   sta pppLcpOutputCursor
   m8
   bra @advanceInput
@@ -772,4 +842,26 @@
   plx
   plb
   rts
+.endproc
+
+.segment "BANK1_CODE"
+
+; Long-call leaf. Return Z set when peer Magic equals the local proposal.
+.proc pppLcpPeerMagicMatchesLocal
+  .a8
+  .i16
+
+  lda pppFrameBuffer + 2, y
+  cmp pppLcpLocalMagic + 3
+  bne :+
+  lda pppFrameBuffer + 3, y
+  cmp pppLcpLocalMagic + 2
+  bne :+
+  lda pppFrameBuffer + 4, y
+  cmp pppLcpLocalMagic + 1
+  bne :+
+  lda pppFrameBuffer + 5, y
+  cmp pppLcpLocalMagic + 0
+:
+  rtl
 .endproc
