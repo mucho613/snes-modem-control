@@ -382,4 +382,21 @@ MD5(`abc`)の標準vectorと、閉じたChallenge/Response/Success transcriptを
 MD5標準vectorと閉じたCHAP-MD5 transcriptを含む常設試験一式が65816実機で
 完了しました。この試験も電話回線への発信や実資格情報の入力を行っていません。
 
+続いてrevision A、DFM-56U、疑似PSTNのV.22bis 2400 bit/s回線で、実回線発信前の
+回帰試験を行いました。NDM24には`AT&F`、`ATM0`、`AT%B2400`、`ATS7=60`、
+`ATX3`、`ATDT0`を順に送り、DFM-56Uの応答後にLCP、fixture PAP、IPCPが
+すべて`Opened`となりました。SFC側local `10.24.0.2`、peer `10.24.0.1`、
+Primary DNS `1.1.1.1`、Secondary DNS `1.0.0.1`を確認し、LCP Echoは試験中の
+15件すべて応答しました。FCS error、invalid、RX overflow、backpressure、
+carrier lossは0です。さらにIPCPで得たPrimary DNSを使い、公開DNSへ
+`example.com`のA問い合わせを1回行いました。回答2件を66frameで受信し、
+IPv4/UDP checksum error、drop、DNS timeoutはいずれも0でした。
+
+SFC側からlocal Closeを行うと、再送を含むTerminate-Request 2件に対して
+matching Terminate-Ack 1件を受信し、timeout 0でLCP/IPCPが`Closed`となりました。
+Closeと定期LCP Echoが重なったため`transmit_abort_count=1`ですが、PPP終了処理
+そのものは正常です。試験後にPPP serverを停止し、DFM-56UがWindowsで
+`Status=OK`、`AttachedTo=COM5`へ戻ったことを確認しました。この試験では
+実サービスへの発信や実資格情報の入力を行っていません。
+
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。
