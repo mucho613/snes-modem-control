@@ -50,6 +50,11 @@
 .export pppIcmpChecksum, pppIcmpReceiveCount, pppIcmpEchoRequestCount
 .export pppIcmpEchoReplyCount, pppIcmpChecksumErrorCount
 .export pppIcmpDropCount, pppIcmpTransmitCount
+.export pppUdpLastError, pppUdpFlags
+.export pppUdpSourcePort, pppUdpDestinationPort
+.export pppUdpLength, pppUdpPayloadLength, pppUdpChecksum
+.export pppUdpReceiveCount, pppUdpChecksumErrorCount
+.export pppUdpDropCount, pppUdpTransmitCount
 
 pppDiagnosticState:
 pppDiagnosticMagic: .res $4
@@ -163,6 +168,17 @@ pppIcmpEchoReplyCount: .res $4
 pppIcmpChecksumErrorCount: .res $4
 pppIcmpDropCount: .res $4
 pppIcmpTransmitCount: .res $4
+pppUdpLastError: .res $1
+pppUdpFlags: .res $1
+pppUdpSourcePort: .res $2
+pppUdpDestinationPort: .res $2
+pppUdpLength: .res $2
+pppUdpPayloadLength: .res $2
+pppUdpChecksum: .res $2
+pppUdpReceiveCount: .res $4
+pppUdpChecksumErrorCount: .res $4
+pppUdpDropCount: .res $4
+pppUdpTransmitCount: .res $4
 .res PPP_DIAGNOSTIC_SIZE - (* - pppDiagnosticState)
 pppDiagnosticStateEnd:
 
@@ -277,6 +293,17 @@ pppDiagnosticStateEnd:
 .assert pppIcmpChecksumErrorCount - pppDiagnosticState = PPP_DIAG_ICMP_CHECKSUM_ERROR_COUNT, error, "PPP ICMP checksum error count offset"
 .assert pppIcmpDropCount - pppDiagnosticState = PPP_DIAG_ICMP_DROP_COUNT, error, "PPP ICMP drop count offset"
 .assert pppIcmpTransmitCount - pppDiagnosticState = PPP_DIAG_ICMP_TRANSMIT_COUNT, error, "PPP ICMP transmit count offset"
+.assert pppUdpLastError - pppDiagnosticState = PPP_DIAG_UDP_LAST_ERROR, error, "PPP UDP error offset"
+.assert pppUdpFlags - pppDiagnosticState = PPP_DIAG_UDP_FLAGS, error, "PPP UDP flags offset"
+.assert pppUdpSourcePort - pppDiagnosticState = PPP_DIAG_UDP_SOURCE_PORT, error, "PPP UDP source port offset"
+.assert pppUdpDestinationPort - pppDiagnosticState = PPP_DIAG_UDP_DESTINATION_PORT, error, "PPP UDP destination port offset"
+.assert pppUdpLength - pppDiagnosticState = PPP_DIAG_UDP_LENGTH, error, "PPP UDP length offset"
+.assert pppUdpPayloadLength - pppDiagnosticState = PPP_DIAG_UDP_PAYLOAD_LENGTH, error, "PPP UDP payload length offset"
+.assert pppUdpChecksum - pppDiagnosticState = PPP_DIAG_UDP_CHECKSUM, error, "PPP UDP checksum offset"
+.assert pppUdpReceiveCount - pppDiagnosticState = PPP_DIAG_UDP_RECEIVE_COUNT, error, "PPP UDP receive count offset"
+.assert pppUdpChecksumErrorCount - pppDiagnosticState = PPP_DIAG_UDP_CHECKSUM_ERROR_COUNT, error, "PPP UDP checksum error count offset"
+.assert pppUdpDropCount - pppDiagnosticState = PPP_DIAG_UDP_DROP_COUNT, error, "PPP UDP drop count offset"
+.assert pppUdpTransmitCount - pppDiagnosticState = PPP_DIAG_UDP_TRANSMIT_COUNT, error, "PPP UDP transmit count offset"
 .assert pppDiagnosticStateEnd - pppDiagnosticState = PPP_DIAGNOSTIC_SIZE, error, "PPP diagnostic ABI size"
 
 ; Decoder and pump scratch fields are private and intentionally excluded from
@@ -301,6 +328,8 @@ pppDiagnosticStateEnd:
 .export pppIpv4TransmitDestination, pppIpv4TransmitProtocol
 .export pppIpv4TransmitPayloadLength, pppIpv4PollSavedModemState
 .export pppIcmpPacketOffset, pppIcmpChecksumAccumulator
+.export pppUdpPacketOffset, pppUdpChecksumAccumulator
+.export pppUdpTransmitSourcePort, pppUdpTransmitDestinationPort
 pppLastEvent: .res $1
 pppLastInvalidReason: .res $1
 pppDecoderScratchByte: .res $1
@@ -336,6 +365,10 @@ pppIpv4TransmitPayloadLength: .res $2
 pppIpv4PollSavedModemState: .res $1
 pppIcmpPacketOffset: .res $2
 pppIcmpChecksumAccumulator: .res $2
+pppUdpPacketOffset: .res $2
+pppUdpChecksumAccumulator: .res $2
+pppUdpTransmitSourcePort: .res $2
+pppUdpTransmitDestinationPort: .res $2
 pppLcpOptionSeen: .res $100
 pppLcpOptionDuplicate: .res $100
 pppIpcpOptionSeen: .res $100

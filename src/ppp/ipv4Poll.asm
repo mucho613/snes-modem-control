@@ -20,6 +20,7 @@
 .import pppIpv4Initialize, pppIpv4ReceiveFrame
 .import pppIcmpFlags, pppIcmpInitialize, pppIcmpReceive
 .import pppIcmpRetryPending, pppIcmpCancelPending
+.import pppUdpInitialize, pppUdpReceive
 
 .export pppIpv4Poll, pppIpv4PollRunSelfTest
 
@@ -126,7 +127,13 @@ accepted:
   pppIncrement32 pppIpv4AcceptedCount
   lda pppIpv4Protocol
   cmp #PPP_IPV4_PROTOCOL_ICMP
+  beq receiveIcmp
+  cmp #PPP_IPV4_PROTOCOL_UDP
   bne policyDone
+  jsr pppUdpReceive
+  bra policyDone
+
+receiveIcmp:
   jsr pppIcmpReceive
   bcc policyDone
   jsr pppSnapshotEnd
@@ -195,6 +202,7 @@ done:
   jsr pppIpcpInitialize
   jsr pppIpv4Initialize
   jsr pppIcmpInitialize
+  jsr pppUdpInitialize
   lda #MODEM_STATE_CONNECTED
   sta modemDriverState
   lda #$01
@@ -355,6 +363,7 @@ done:
   jsr pppIpcpInitialize
   jsr pppIpv4Initialize
   jsr pppIcmpInitialize
+  jsr pppUdpInitialize
   rts
 .endproc
 

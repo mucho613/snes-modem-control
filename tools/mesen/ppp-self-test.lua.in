@@ -61,7 +61,16 @@ local function poll()
     frame_count = frame_count + 1
     if frame_count > FRAME_LIMIT then
         local phase = command_sent and "command completion" or "mailbox initialization"
-        stop_failure("timed out waiting for " .. phase, 252)
+        stop_failure(
+            string.format(
+                "timed out waiting for %s (status=$%02X result=$%04X processed=%u)",
+                phase,
+                read8(OFFSET_STATUS),
+                read16(OFFSET_RESULT),
+                read32(OFFSET_PROCESSED_SEQUENCE)
+            ),
+            252
+        )
         return
     end
 

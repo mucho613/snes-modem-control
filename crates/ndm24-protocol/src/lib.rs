@@ -262,6 +262,17 @@ pub struct PppDiagnosticSnapshot {
     pub icmp_checksum_error_count: u32,
     pub icmp_drop_count: u32,
     pub icmp_transmit_count: u32,
+    pub udp_last_error: u8,
+    pub udp_flags: u8,
+    pub udp_source_port: u16,
+    pub udp_destination_port: u16,
+    pub udp_length: u16,
+    pub udp_payload_length: u16,
+    pub udp_checksum: u16,
+    pub udp_receive_count: u32,
+    pub udp_checksum_error_count: u32,
+    pub udp_drop_count: u32,
+    pub udp_transmit_count: u32,
 }
 
 impl PppDiagnosticSnapshot {
@@ -403,6 +414,17 @@ impl PppDiagnosticSnapshot {
             icmp_checksum_error_count: read_u32(data, PPP_DIAG_ICMP_CHECKSUM_ERROR_COUNT)?,
             icmp_drop_count: read_u32(data, PPP_DIAG_ICMP_DROP_COUNT)?,
             icmp_transmit_count: read_u32(data, PPP_DIAG_ICMP_TRANSMIT_COUNT)?,
+            udp_last_error: data[PPP_DIAG_UDP_LAST_ERROR],
+            udp_flags: data[PPP_DIAG_UDP_FLAGS],
+            udp_source_port: read_u16(data, PPP_DIAG_UDP_SOURCE_PORT)?,
+            udp_destination_port: read_u16(data, PPP_DIAG_UDP_DESTINATION_PORT)?,
+            udp_length: read_u16(data, PPP_DIAG_UDP_LENGTH)?,
+            udp_payload_length: read_u16(data, PPP_DIAG_UDP_PAYLOAD_LENGTH)?,
+            udp_checksum: read_u16(data, PPP_DIAG_UDP_CHECKSUM)?,
+            udp_receive_count: read_u32(data, PPP_DIAG_UDP_RECEIVE_COUNT)?,
+            udp_checksum_error_count: read_u32(data, PPP_DIAG_UDP_CHECKSUM_ERROR_COUNT)?,
+            udp_drop_count: read_u32(data, PPP_DIAG_UDP_DROP_COUNT)?,
+            udp_transmit_count: read_u32(data, PPP_DIAG_UDP_TRANSMIT_COUNT)?,
         })
     }
 }
@@ -698,6 +720,25 @@ mod tests {
             .copy_from_slice(&2_u32.to_le_bytes());
         data[PPP_DIAG_ICMP_TRANSMIT_COUNT..PPP_DIAG_ICMP_TRANSMIT_COUNT + 4]
             .copy_from_slice(&7_u32.to_le_bytes());
+        data[PPP_DIAG_UDP_LAST_ERROR] = 4;
+        data[PPP_DIAG_UDP_FLAGS] = 3;
+        data[PPP_DIAG_UDP_SOURCE_PORT..PPP_DIAG_UDP_SOURCE_PORT + 2]
+            .copy_from_slice(&123_u16.to_le_bytes());
+        data[PPP_DIAG_UDP_DESTINATION_PORT..PPP_DIAG_UDP_DESTINATION_PORT + 2]
+            .copy_from_slice(&49_152_u16.to_le_bytes());
+        data[PPP_DIAG_UDP_LENGTH..PPP_DIAG_UDP_LENGTH + 2].copy_from_slice(&56_u16.to_le_bytes());
+        data[PPP_DIAG_UDP_PAYLOAD_LENGTH..PPP_DIAG_UDP_PAYLOAD_LENGTH + 2]
+            .copy_from_slice(&48_u16.to_le_bytes());
+        data[PPP_DIAG_UDP_CHECKSUM..PPP_DIAG_UDP_CHECKSUM + 2]
+            .copy_from_slice(&0xabcd_u16.to_le_bytes());
+        data[PPP_DIAG_UDP_RECEIVE_COUNT..PPP_DIAG_UDP_RECEIVE_COUNT + 4]
+            .copy_from_slice(&9_u32.to_le_bytes());
+        data[PPP_DIAG_UDP_CHECKSUM_ERROR_COUNT..PPP_DIAG_UDP_CHECKSUM_ERROR_COUNT + 4]
+            .copy_from_slice(&1_u32.to_le_bytes());
+        data[PPP_DIAG_UDP_DROP_COUNT..PPP_DIAG_UDP_DROP_COUNT + 4]
+            .copy_from_slice(&2_u32.to_le_bytes());
+        data[PPP_DIAG_UDP_TRANSMIT_COUNT..PPP_DIAG_UDP_TRANSMIT_COUNT + 4]
+            .copy_from_slice(&8_u32.to_le_bytes());
 
         let snapshot = PppDiagnosticSnapshot::decode(&data).unwrap();
         assert_eq!(snapshot.snapshot_sequence, 8);
@@ -772,6 +813,17 @@ mod tests {
         assert_eq!(snapshot.icmp_checksum_error_count, 1);
         assert_eq!(snapshot.icmp_drop_count, 2);
         assert_eq!(snapshot.icmp_transmit_count, 7);
+        assert_eq!(snapshot.udp_last_error, 4);
+        assert_eq!(snapshot.udp_flags, 3);
+        assert_eq!(snapshot.udp_source_port, 123);
+        assert_eq!(snapshot.udp_destination_port, 49_152);
+        assert_eq!(snapshot.udp_length, 56);
+        assert_eq!(snapshot.udp_payload_length, 48);
+        assert_eq!(snapshot.udp_checksum, 0xabcd);
+        assert_eq!(snapshot.udp_receive_count, 9);
+        assert_eq!(snapshot.udp_checksum_error_count, 1);
+        assert_eq!(snapshot.udp_drop_count, 2);
+        assert_eq!(snapshot.udp_transmit_count, 8);
     }
 
     #[test]

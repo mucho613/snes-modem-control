@@ -121,7 +121,8 @@ cargo xtask mesen-test --mesen C:\path\to\Mesen.exe
 labelから生成されます。成功時は終了コード0です。PPP fixtureが失敗した場合は
 失敗step番号を1～249の終了コードとして返し、`xtask`が16進のstep番号を表示します。
 ABI version不一致は250、block size不一致は251、600 emulated frames以内に
-初期化または完了しない場合は252です。MesenCE自身のwall-clock timeoutは既定
+初期化または完了しない場合は252です。timeout時のMesenCEメッセージにはmailboxの
+status、result、processed sequenceも表示します。MesenCE自身のwall-clock timeoutは既定
 30秒で、必要なら`--timeout-seconds`で変更できます。
 このコマンドは実機試験を置き換えず、65816のPPP/IPv4ロジックを高速に回帰確認する
 第一段階として使います。

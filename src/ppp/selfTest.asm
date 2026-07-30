@@ -25,6 +25,7 @@
 .import pppIpv4RunSelfTest
 .import pppIpv4PollRunSelfTest
 .import pppIcmpRunSelfTest
+.import pppUdpRunSelfTest
 .import pppCarrierLossRunSelfTest
 
 .export pppRunSelfTest
@@ -449,6 +450,10 @@
   jmp @fail
 :
   jsr pppIcmpRunSelfTest
+  bcc :+
+  jmp @fail
+:
+  jsr pppUdpRunSelfTest
   bcc :+
   jmp @fail
 :

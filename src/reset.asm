@@ -18,6 +18,7 @@
 .import pppIpcpInitialize, pppIpcpPoll
 .import pppIpv4Initialize, pppIpv4Poll
 .import pppIcmpInitialize
+.import pppUdpInitialize
 .import nmitimenShadow
 
 .include "./registers.inc"
@@ -77,6 +78,7 @@
   jsr pppIpcpInitialize
   jsr pppIpv4Initialize
   jsr pppIcmpInitialize
+  jsr pppUdpInitialize
   sep #$10
   .i8
 

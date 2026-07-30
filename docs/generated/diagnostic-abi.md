@@ -44,7 +44,7 @@ ABI version: `2`. Block size: `128` bytes.
 
 ## PPP Diagnostic ABI
 
-ABI version: `8`. Block size: `245` bytes.
+ABI version: `9`. Block size: `273` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|
@@ -159,6 +159,17 @@ ABI version: `8`. Block size: `245` bytes.
 | `0xE9` | 4 | `u32` | `icmp_checksum_error_count` | ICMP Echo messages rejected for an invalid checksum |
 | `0xED` | 4 | `u32` | `icmp_drop_count` | ICMP messages rejected by parser or transmit handling |
 | `0xF1` | 4 | `u32` | `icmp_transmit_count` | ICMP Echo Replies accepted by the IPv4 transmitter |
+| `0xF5` | 1 | `u8` | `udp_last_error` | Most recent UDP parser or transmit error |
+| `0xF6` | 1 | `u8` | `udp_flags` | UDP datagram-valid and checksum-present flags |
+| `0xF7` | 2 | `u16` | `udp_source_port` | Source port of the most recently parsed UDP datagram |
+| `0xF9` | 2 | `u16` | `udp_destination_port` | Destination port of the most recently parsed UDP datagram |
+| `0xFB` | 2 | `u16` | `udp_length` | Length field of the most recently parsed UDP datagram |
+| `0xFD` | 2 | `u16` | `udp_payload_length` | Payload length after the UDP header |
+| `0xFF` | 2 | `u16` | `udp_checksum` | Checksum of the most recently parsed UDP datagram |
+| `0x101` | 4 | `u32` | `udp_receive_count` | UDP datagrams presented to the parser |
+| `0x105` | 4 | `u32` | `udp_checksum_error_count` | UDP datagrams rejected for an invalid non-zero checksum |
+| `0x109` | 4 | `u32` | `udp_drop_count` | UDP datagrams rejected by parser or transmit handling |
+| `0x10D` | 4 | `u32` | `udp_transmit_count` | UDP datagrams accepted by the IPv4 transmitter |
 
 ## Mailbox ABI
 

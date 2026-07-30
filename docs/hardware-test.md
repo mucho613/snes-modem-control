@@ -125,6 +125,7 @@ LCP試験に続き、PAP Authenticate-Request/Ack、IPCP `Opened`、SFC側local
 | PPP IPCP実対向 | 合格 (2026-07-30) | 未実施 |
 | PPP IPv4セルフテスト | 合格 (2026-07-30) | 未実施 |
 | PPP ICMP Echoセルフテスト | 合格 (2026-07-30) | 未実施 |
+| PPP UDP datagramセルフテスト | 合格 (2026-07-30) | 未実施 |
 | PPP IPv4実対向 | 合格 (2026-07-30) | 未実施 |
 | PPP ICMP Echo実対向 | 合格 (2026-07-30) | 未実施 |
 
@@ -167,5 +168,13 @@ Echo Replyを受信してpacket loss 0%でした。最後のSFC診断はIPv4受�
 が8/8/8、ICMP Echo Request受信とICMP送信が8/8でした。PPP FCS error、
 invalid、overflow、IPv4 checksum error/drop、ICMP checksum error/dropは
 すべて0です。奇数長を含む可変payloadの実回線checksum処理も合格とします。
+
+同日、UDP datagram層追加後のsmoke ROMをrevision AのFXPAK PRO実機へ転送し、
+`ppp-self-test`（mailbox command 10、sequence 1）の合格を確認しました。step
+`$8D`～`$98`により、奇数長UDP checksum、IPv4で許可されるchecksum 0、破損
+checksumと不正Lengthの拒否、UDP/IPv4送信header生成を実機65816上で検査しています。
+完了後はPPP診断ABI version 9、273byteのsnapshotをQUsb2Snesから読み取り、
+UDP状態と各countが初期値へ戻ったことも確認しました。この試験は固定fixtureを
+使い、電話回線や対向Modemには接続しません。
 
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。
