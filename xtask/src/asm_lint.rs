@@ -61,6 +61,13 @@ struct RuntimeState {
     a: Width,
     i: Width,
     stack: Vec<StackItem>,
+    calls: Vec<CallFrame>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CallFrame {
+    return_index: usize,
+    stack: Vec<StackItem>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -467,6 +474,7 @@ fn analyze_procedure(
         a: abi.a,
         i: abi.i,
         stack: Vec::new(),
+        calls: Vec::new(),
     });
     let mut queue = VecDeque::from([0_usize]);
 
@@ -476,31 +484,140 @@ fn analyze_procedure(
         };
         let statement = &procedure.statements[index];
         validate_statement_width(profile, statement, &input, abis, diagnostics);
-        let Some(output) = transfer(profile, statement, input, diagnostics) else {
+        if matches!(statement.mnemonic.as_str(), "rts" | "rtl") {
+            handle_return(
+                profile,
+                procedure,
+                abi,
+                statement,
+                input,
+                &mut states,
+                &mut queue,
+                diagnostics,
+            );
+            continue;
+        }
+        let Some(mut output) = transfer(profile, statement, input, diagnostics) else {
             continue;
         };
+        if matches!(statement.mnemonic.as_str(), "jsr" | "jsl")
+            && let Some(target) = resolve_target(index, &statement.operand, &labels, &anonymous)
+        {
+            let return_index = index + 1;
+            output.calls.push(CallFrame {
+                return_index,
+                stack: output.stack.clone(),
+            });
+            merge_state(
+                profile,
+                &procedure.statements,
+                target,
+                output,
+                &mut states,
+                &mut queue,
+                diagnostics,
+            );
+            continue;
+        }
         for successor in successors(index, &procedure.statements, &labels, &anonymous) {
-            if successor >= states.len() {
-                continue;
-            }
-            match &states[successor] {
-                None => {
-                    states[successor] = Some(output.clone());
-                    queue.push_back(successor);
-                }
-                Some(existing) if existing == &output => {}
-                Some(existing) => {
-                    diagnostics.insert(Diagnostic::new(
-                        &procedure.statements[successor].location,
-                        profile,
-                        format!(
-                            "control-flow merge has incompatible width/stack states: incoming {} versus existing {}",
-                            render_state(&output),
-                            render_state(existing)
-                        ),
-                    ));
-                }
-            }
+            merge_state(
+                profile,
+                &procedure.statements,
+                successor,
+                output.clone(),
+                &mut states,
+                &mut queue,
+                diagnostics,
+            );
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn handle_return(
+    profile: Profile,
+    procedure: &Procedure,
+    abi: Abi,
+    statement: &Statement,
+    mut state: RuntimeState,
+    states: &mut [Option<RuntimeState>],
+    queue: &mut VecDeque<usize>,
+    diagnostics: &mut BTreeSet<Diagnostic>,
+) {
+    if let Some(frame) = state.calls.pop() {
+        if state.stack != frame.stack {
+            diagnostics.insert(Diagnostic::new(
+                &statement.location,
+                profile,
+                format!(
+                    "local return has unbalanced stack: expected {:?} but found {:?}",
+                    frame.stack, state.stack
+                ),
+            ));
+            return;
+        }
+        merge_state(
+            profile,
+            &procedure.statements,
+            frame.return_index,
+            state,
+            states,
+            queue,
+            diagnostics,
+        );
+        return;
+    }
+
+    if !state.stack.is_empty() {
+        diagnostics.insert(Diagnostic::new(
+            &statement.location,
+            profile,
+            format!("return leaves stack items behind: {:?}", state.stack),
+        ));
+    }
+    if state.a != abi.a || state.i != abi.i {
+        diagnostics.insert(Diagnostic::new(
+            &statement.location,
+            profile,
+            format!(
+                "return ABI requires A{}/I{} but control flow has A{}/I{}",
+                abi.a.bits(),
+                abi.i.bits(),
+                state.a.bits(),
+                state.i.bits()
+            ),
+        ));
+    }
+}
+
+fn merge_state(
+    profile: Profile,
+    statements: &[Statement],
+    successor: usize,
+    incoming: RuntimeState,
+    states: &mut [Option<RuntimeState>],
+    queue: &mut VecDeque<usize>,
+    diagnostics: &mut BTreeSet<Diagnostic>,
+) {
+    if successor >= states.len() {
+        return;
+    }
+    match &states[successor] {
+        None => {
+            states[successor] = Some(incoming);
+            queue.push_back(successor);
+        }
+        Some(existing) if existing == &incoming => {}
+        Some(existing) => {
+            diagnostics.insert(Diagnostic::new(
+                &statements[successor].location,
+                profile,
+                format!(
+                    "control-flow merge has incompatible width/stack states: incoming {} versus existing {}",
+                    render_state(&incoming),
+                    render_state(existing)
+                ),
+            ));
         }
     }
 }
@@ -722,16 +839,6 @@ fn transfer(
             },
             diagnostics,
         ),
-        "rts" | "rtl" => {
-            if !state.stack.is_empty() {
-                diagnostics.insert(Diagnostic::new(
-                    &statement.location,
-                    profile,
-                    format!("return leaves stack items behind: {:?}", state.stack),
-                ));
-            }
-            return None;
-        }
         "rti" | "stp" => return None,
         _ => {}
     }
@@ -1221,6 +1328,48 @@ mod tests {
             messages
                 .iter()
                 .any(|message| message.contains("width assert expects A16/I16"))
+        );
+    }
+
+    #[test]
+    fn follows_local_subroutine_calls_into_width_asserts() {
+        let messages = messages(
+            r#"
+.proc local_call
+  .a8
+  .i16
+  jsr @helper
+  rts
+
+@helper:
+  assert_m16_i16
+  rts
+.endproc
+"#,
+        );
+        assert!(
+            messages
+                .iter()
+                .any(|message| message.contains("width assert expects A16/I16"))
+        );
+    }
+
+    #[test]
+    fn rejects_return_width_that_differs_from_entry_abi() {
+        let messages = messages(
+            r#"
+.proc changed_return
+  .a8
+  .i16
+  m16
+  rts
+.endproc
+"#,
+        );
+        assert!(
+            messages
+                .iter()
+                .any(|message| message.contains("return ABI requires A8/I16"))
         );
     }
 }
