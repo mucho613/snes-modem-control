@@ -185,6 +185,10 @@ LCP以降の試験では、DFM-56UをUSBIPでUbuntu 22.04へattachし、WSL2上�
 `pppd`を対向serverとして使います。導入、回線を使わないAT probe、待受開始、
 状態確認、ログ取得、停止はPowerShellから統合して操作できます。
 
+`Start`はSFCの`10.24.0.2`だけを対象とするIPv4 forwardingとNATも適用し、
+`Stop`で規則と一時状態を撤去します。`Status`の`sharing=active`で適用状態を
+確認できます。外部からSFCへの新規接続を許可するport forwardingは行いません。
+
 ```powershell
 .\tools\ppp-server\ndm24-ppp-server.ps1 Install
 .\tools\ppp-server\ndm24-ppp-server.ps1 Probe

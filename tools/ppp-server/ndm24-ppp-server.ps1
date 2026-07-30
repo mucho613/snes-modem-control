@@ -108,6 +108,12 @@ function Show-ServiceStatus {
     if ($LASTEXITCODE -notin @(0, 3, 4)) {
         throw "systemctl status failed with exit code $LASTEXITCODE"
     }
+
+    & wsl.exe -d $Distribution -u root --exec `
+        /usr/local/lib/ndm24/ndm24-internet-sharing.sh status
+    if ($LASTEXITCODE -notin @(0, 127)) {
+        throw "internet-sharing status failed with exit code $LASTEXITCODE"
+    }
 }
 
 switch ($Action) {

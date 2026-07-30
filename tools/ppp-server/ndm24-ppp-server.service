@@ -4,7 +4,9 @@ Documentation=file:///etc/ppp/peers/ndm24-lcp
 
 [Service]
 Type=simple
+ExecStartPre=/usr/local/lib/ndm24/ndm24-internet-sharing.sh start
 ExecStart=/usr/sbin/pppd call ndm24-lcp
+ExecStopPost=/usr/local/lib/ndm24/ndm24-internet-sharing.sh stop
 Restart=no
 TimeoutStopSec=10
 StandardOutput=journal

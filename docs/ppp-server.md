@@ -12,8 +12,9 @@
 flowchart LR
     S["SFC + NDM24"] <-->|"V.22bis 2400 bit/s"| X["疑似電話交換機"]
     X <-->|"V.22bis 2400 bit/s"| D["DFM-56U"]
-    D <-->|"USB CDC ACM"| W["Ubuntu 22.04 / WSL2<br/>pppd + NTP"]
+    D <-->|"USB CDC ACM"| W["Ubuntu 22.04 / WSL2<br/>pppd + NTP + NAT"]
     P["Windows PowerShell"] -->|"usbipd / systemctl"| W
+    W -->|"outbound IPv4"| I["Internet"]
 ```
 
 疑似電話交換機は閉じた試験環境だけに接続し、公衆電話網へ接続しません。
@@ -51,6 +52,7 @@ usbipd-winを修復または更新します。
 - `tools/ppp-server/ndm24-ppp-server.service`: 手動起動するsystemd service
 - `tools/ppp-server/ndm24-ntp-server.py`: 閉じた試験網専用の最小NTPv4応答器
 - `tools/ppp-server/ndm24-ntp-server.service`: PPP addressを待つNTP service
+- `tools/ppp-server/ndm24-internet-sharing.sh`: 外向き転送とNATの適用・撤去
 - `tools/ppp-server/install-wsl.sh`: WSL側へのroot所有ファイルの導入
 - `tools/ppp-server/ndm24-probe.chat`: 読み取り専用AT probeと応答検査
 - `tools/ppp-server/probe-modem.sh`: 回線を使わないAT probe
@@ -165,6 +167,40 @@ PPP受信開始、`ATDT0`、`CONNECT`待機を順に実行します。SFC側time
 途中で失敗した場合はPPP受信を停止して終了します。切断時は`Stop`で対向を
 停止し、PPP受信層がpeerのTerminate-Requestとraw `NO CARRIER`を処理した後、
 診断と`pending-rx`を確認します。
+
+## インターネットへの外向き転送
+
+`ndm24-ppp-server.service`の開始時に
+`ndm24-internet-sharing.sh start`を実行し、終了時は`stop`を必ず実行します。
+対象はSFCの`10.24.0.2`、PPP interface `ppp0`、WSLのIPv4既定経路interface
+だけです。開始時に次の3規則を追加します。
+
+- `10.24.0.2`から`ppp0`を経て外へ出る新規・確立済み通信を転送する
+- 外側から`ppp0`へ戻る確立済み・関連通信だけを転送する
+- `10.24.0.2`の送信元アドレスを外向きinterfaceでMASQUERADEする
+
+外部からSFCへ新規接続するDNATやport forwardingは追加しません。規則には
+`ndm24-internet-sharing`というcommentを付け、他用途のfirewall規則を変更せず
+完全一致する規則だけを撤去します。`net.ipv4.ip_forward`は開始前の値を
+`/run/ndm24-internet-sharing`へ保存し、停止時に復元します。二重に開始しても
+規則は3本から増えません。
+
+このPCのカスタムWSLカーネルはlegacy iptablesのconntrack/NATを組み込み済み
+ですが、既定のiptables-nftに必要な`NFT_COMPAT`を持ちません。そのため専用
+スクリプトだけが`iptables-legacy`を明示して使い、システム全体の
+`update-alternatives`は変更しません。`Install`はconntrack、MASQUERADE、
+IPv4既定経路を非変更の`check`で先に検査します。
+
+状態だけを確認する場合は次を使います。
+
+```powershell
+.\tools\ppp-server\ndm24-ppp-server.ps1 Status
+```
+
+PPPサービスの待受中は`sharing=active`、`Stop`後は`sharing=inactive`になります。
+NAT規則の単体適用、重複開始、完全撤去に加え、一時的な仮想`ppp0`上の
+`10.24.0.2`から`1.1.1.1`へのICMP Echo往復もWSL上で確認済みです。SFC実機から
+公開IPv4 hostへの往復は、外向きICMP Echo Request機能を追加した後に検証します。
 
 SFCの診断は別のPowerShellで取得します。
 
