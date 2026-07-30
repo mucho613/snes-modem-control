@@ -593,7 +593,7 @@ fn merge_state(
     profile: Profile,
     statements: &[Statement],
     successor: usize,
-    incoming: RuntimeState,
+    mut incoming: RuntimeState,
     states: &mut [Vec<RuntimeState>],
     queue: &mut VecDeque<(usize, RuntimeState)>,
     diagnostics: &mut BTreeSet<Diagnostic>,
@@ -601,6 +601,12 @@ fn merge_state(
     if successor >= states.len() {
         return;
     }
+    let normalizer = statements[successor..]
+        .iter()
+        .find(|statement| !is_label(&statement.text))
+        .map(|statement| statement.mnemonic.as_str())
+        .unwrap_or(&statements[successor].mnemonic);
+    normalize_at_entry(normalizer, &mut incoming);
     if states[successor]
         .iter()
         .any(|existing| existing == &incoming)
@@ -624,6 +630,24 @@ fn merge_state(
     }
     states[successor].push(incoming.clone());
     queue.push_back((successor, incoming));
+}
+
+fn normalize_at_entry(mnemonic: &str, state: &mut RuntimeState) {
+    match mnemonic {
+        "m8" => state.a = Width::Eight,
+        "m16" | "pppipv4entera16" | "pppudpentera16" => state.a = Width::Sixteen,
+        "i8" => state.i = Width::Eight,
+        "i16" => state.i = Width::Sixteen,
+        "mi8" => {
+            state.a = Width::Eight;
+            state.i = Width::Eight;
+        }
+        "mi16" => {
+            state.a = Width::Sixteen;
+            state.i = Width::Sixteen;
+        }
+        _ => {}
+    }
 }
 
 fn validate_statement_width(
@@ -1406,6 +1430,27 @@ mod tests {
 @ok:
   assert_m16_i16
   m8
+  rts
+.endproc
+"#,
+        );
+        assert!(messages.is_empty(), "{messages:?}");
+    }
+
+    #[test]
+    fn width_macro_normalizes_incompatible_incoming_paths() {
+        let messages = messages(
+            r#"
+.proc normalized_merge
+  .a8
+  .i16
+  beq @wide
+  bra @merge
+@wide:
+  m16
+@merge:
+  m8
+  lda #$12
   rts
 .endproc
 "#,
