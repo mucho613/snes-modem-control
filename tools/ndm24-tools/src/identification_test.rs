@@ -53,9 +53,9 @@ struct IdentificationFailureCapture {
 }
 
 #[derive(Debug, Serialize)]
-struct IdentificationRecord {
+pub(crate) struct IdentificationRecord {
     command: String,
-    result: u16,
+    pub(crate) result: u16,
     result_name: String,
     raw_response: Vec<u8>,
     lines: Vec<String>,
@@ -148,7 +148,7 @@ pub async fn run(
     Ok(report_path)
 }
 
-async fn transact(
+pub(crate) async fn transact(
     websocket: &str,
     labels: &Path,
     command: &str,
@@ -194,7 +194,7 @@ async fn transact(
         "{command} discarded received bytes"
     );
     ensure!(
-        snapshot.trace_overwritten == 0,
+        snapshot.trace_overwritten == before.trace_overwritten,
         "{command} response exceeded trace capacity"
     );
 

@@ -47,6 +47,11 @@ cargo run -p ndm24-tools -- identify --revision B
 
 `ATI`、`ATI0`～`ATI9`とV.250の `AT+GMI`、`AT+GMM`、`AT+GMR`、`AT+GSN`、`AT+GCAP` を照会します。いずれも読み取り専用で、設定変更や発信は行いません。未対応コマンドの `ERROR` もrevision固有の結果として保存します。各応答はtraceのRX accepted eventからraw byte列を復元し、終端検出後100ms以内に後着したbyteもRX ringから取得して統合します。ATI2のchecksum結果 `OK` のように終端結果と同じ情報行が先行する場合は、最後の行だけを終端として除外します。応答終端が得られずタイムアウトした場合も、それ以前の全結果と失敗コマンドの前後snapshot、受信・送信byte数差分、利用可能なtraceを保存して照会を終了します。行単位の情報とsnapshotは `build/hardware-tests/<test-id>/at-identification.json` へ記録します。
 
+回線速度の能力probeと最大速度認定の方針は
+[NDM24 回線速度探索](ndm24-speed.md)に分離しています。`speed-probe`は発信せず、
+2400～14400 bit/sの速度コマンド対応をrevisionごとに記録し、終了時に必ず
+2400 bit/s設定へ復帰します。
+
 合格条件:
 
 - 対応コマンドは `OK` または `ERROR` などの終端結果まで完了する。無応答のコマンドはタイムアウトとして明示され、後続コマンドを実行しない。

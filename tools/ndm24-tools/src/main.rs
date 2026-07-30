@@ -7,6 +7,7 @@ mod nifty_dial;
 mod peer;
 mod ppp_dial;
 mod qusb2snes;
+mod speed_probe;
 mod trace;
 
 use std::net::Ipv4Addr;
@@ -41,6 +42,19 @@ enum Command {
         #[arg(long, default_value = "ws://localhost:23074")]
         websocket: String,
         #[arg(long, default_value = "build/smoke/modem-control.lbl")]
+        labels: PathBuf,
+        #[arg(long, default_value = "build/hardware-tests")]
+        output: PathBuf,
+    },
+    /// Probe NDM24 and peer speed commands without dialing.
+    SpeedProbe {
+        #[arg(long)]
+        revision: String,
+        #[arg(long, default_value = "COM5")]
+        port: String,
+        #[arg(long, default_value = "ws://localhost:23074")]
+        websocket: String,
+        #[arg(long, default_value = "build/normal/modem-control.lbl")]
         labels: PathBuf,
         #[arg(long, default_value = "build/hardware-tests")]
         output: PathBuf,
@@ -311,6 +325,17 @@ async fn main() -> Result<()> {
         } => {
             let report = identification_test::run(&websocket, &labels, &revision, &output).await?;
             println!("AT identification report saved at {}", report.display());
+            Ok(())
+        }
+        Command::SpeedProbe {
+            revision,
+            port,
+            websocket,
+            labels,
+            output,
+        } => {
+            let report = speed_probe::run(&websocket, &labels, &port, &revision, &output).await?;
+            println!("speed capability report saved at {}", report.display());
             Ok(())
         }
         Command::BinaryTest {

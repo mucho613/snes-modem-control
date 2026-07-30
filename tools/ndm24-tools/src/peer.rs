@@ -1,7 +1,15 @@
 use std::io::{Read, Write};
 use std::time::{Duration, Instant};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, bail, ensure};
+use serde::Serialize;
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PeerResponse {
+    pub command: String,
+    pub lines: Vec<String>,
+    pub result: String,
+}
 
 pub struct PeerModem {
     port: Box<dyn serialport::SerialPort>,
@@ -23,13 +31,29 @@ impl PeerModem {
     }
 
     pub fn command(&mut self, command: &str, timeout: Duration) -> Result<()> {
+        let response = self.query(command, timeout)?;
+        ensure!(
+            response.result == "OK",
+            "{command} returned {}",
+            response.result
+        );
+        Ok(())
+    }
+
+    pub fn query(&mut self, command: &str, timeout: Duration) -> Result<PeerResponse> {
         self.transcript.push(format!("TX {command}"));
         self.port.write_all(command.as_bytes())?;
         self.port.write_all(b"\r")?;
-        wait_for_line_recorded(&mut *self.port, timeout, &mut self.transcript, |line| {
-            line == "OK"
+        let lines = wait_for_result_recorded(&mut *self.port, timeout, &mut self.transcript)?;
+        let result = lines
+            .last()
+            .cloned()
+            .context("peer modem response did not contain a terminal result")?;
+        Ok(PeerResponse {
+            command: command.to_owned(),
+            lines,
+            result,
         })
-        .map(|_| ())
     }
 
     pub fn wait_for_connect(&mut self, timeout: Duration) -> Result<String> {
@@ -106,6 +130,39 @@ impl PeerModem {
     pub fn transcript(&self) -> &[String] {
         &self.transcript
     }
+}
+
+fn wait_for_result_recorded(
+    port: &mut dyn serialport::SerialPort,
+    timeout: Duration,
+    transcript: &mut Vec<String>,
+) -> Result<Vec<String>> {
+    let deadline = Instant::now() + timeout;
+    let mut current = Vec::new();
+    let mut lines = Vec::new();
+    let mut byte = [0u8; 1];
+    while Instant::now() < deadline {
+        match port.read(&mut byte) {
+            Ok(1) if byte[0] == b'\r' || byte[0] == b'\n' => {
+                if current.is_empty() {
+                    continue;
+                }
+                let text = String::from_utf8_lossy(&current).trim().to_owned();
+                current.clear();
+                transcript.push(format!("RX {text}"));
+                let terminal = text == "OK" || text == "ERROR";
+                lines.push(text);
+                if terminal {
+                    return Ok(lines);
+                }
+            }
+            Ok(1) => current.push(byte[0]),
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::TimedOut => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+    bail!("timed out waiting for modem result code")
 }
 
 pub fn run(port_name: &str, baud: u32, command_timeout: Duration) -> Result<()> {
