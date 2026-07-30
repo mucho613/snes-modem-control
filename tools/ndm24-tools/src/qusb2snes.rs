@@ -318,6 +318,93 @@ pub async fn measure_frame_rate(
     })
 }
 
+pub async fn ppp_close(
+    websocket: &str,
+    label_path: &Path,
+    timeout: Duration,
+) -> Result<PppDiagnosticSnapshot> {
+    const LCP_STATE_CLOSED: u8 = 0;
+
+    let labels = read_labels(label_path)?;
+    let state = labels
+        .get("pppDiagnosticState")
+        .copied()
+        .context("label file does not contain pppDiagnosticState")?;
+    let offset = wram_to_usb2snes(state)?;
+
+    mailbox_command_with_arguments(
+        websocket,
+        label_path,
+        ndm24_protocol::MODEM_MAILBOX_COMMAND_PPP_CLOSE,
+        &[],
+        timeout,
+    )
+    .await?;
+
+    let mut client = Client::connect(websocket).await?;
+    eprintln!("attached to {}", client.device);
+    let started = Instant::now();
+    loop {
+        let snapshot = read_stable_ppp_snapshot(&mut client, offset).await?;
+        if snapshot.lcp_state == LCP_STATE_CLOSED && !snapshot.lcp_administrative_open {
+            return Ok(snapshot);
+        }
+        ensure!(
+            started.elapsed() < timeout,
+            "timed out waiting for local LCP closure: state={}, administrative_open={}, requests={}, matching_acks={}, timeouts={}",
+            snapshot.lcp_state,
+            snapshot.lcp_administrative_open,
+            snapshot.lcp_local_terminate_request_count,
+            snapshot.lcp_local_terminate_ack_count,
+            snapshot.lcp_local_terminate_timeout_count
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+
+pub async fn ppp_open(
+    websocket: &str,
+    label_path: &Path,
+    timeout: Duration,
+) -> Result<PppDiagnosticSnapshot> {
+    const LCP_STATE_OPENED: u8 = 9;
+
+    let labels = read_labels(label_path)?;
+    let state = labels
+        .get("pppDiagnosticState")
+        .copied()
+        .context("label file does not contain pppDiagnosticState")?;
+    let offset = wram_to_usb2snes(state)?;
+
+    mailbox_command_with_arguments(
+        websocket,
+        label_path,
+        ndm24_protocol::MODEM_MAILBOX_COMMAND_PPP_OPEN,
+        &[],
+        timeout,
+    )
+    .await?;
+
+    let mut client = Client::connect(websocket).await?;
+    eprintln!("attached to {}", client.device);
+    let started = Instant::now();
+    loop {
+        let snapshot = read_stable_ppp_snapshot(&mut client, offset).await?;
+        if snapshot.lcp_state == LCP_STATE_OPENED && snapshot.lcp_administrative_open {
+            return Ok(snapshot);
+        }
+        ensure!(
+            started.elapsed() < timeout,
+            "timed out waiting for LCP Opened: state={}, administrative_open={}, request_identifier={}, restart_remaining={}",
+            snapshot.lcp_state,
+            snapshot.lcp_administrative_open,
+            snapshot.lcp_request_identifier,
+            snapshot.lcp_restart_remaining
+        );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+
 pub async fn ntp_request(
     websocket: &str,
     label_path: &Path,

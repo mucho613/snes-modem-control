@@ -333,6 +333,18 @@ parserの最終Code、Identifier、Length、error、呼出回数は現在のPPP�
 
 Max-Configureは初回送信を含む10回です。初回Requestの後に9回まで再送し、次の期限で `Stopped` へ遷移します。Max-Terminateは初回送信を含む2回で、再送後の次の期限ではAckがなくても`Closed`へ進みます。`Ack-Received` でConfigure期限に達した場合は `Request-Sent` に戻ります。双方のAckが成立して `Opened` へ入った場合、local終了が完了した場合、またはcarrier喪失を表すlower-downではtimerを停止します。終了完了とlower-downはpeer MRU、ACCM、PAP、Magic-Numberも既定値へ戻し、次の接続へ交渉結果を持ち越しません。常設timer自己試験のstep `$56`は同一IdentifierのTerminate再送と回数超過を検査します。
 
+mailbox ABI version 8のcommand 16/17は、PCからlocal `Close`/`Open` eventを
+発生させます。CLIの`ppp-close`はcommand 16を発行した後、診断blockの
+`Closed`とadministrative-open解除を待ちます。`ppp-open`はcommand 17の後に
+`Opened`まで待ちます。`ppp-close`はLCPの論理終了だけを要求し、NDM24へ
+hang-up用AT commandを直接送らないため、Terminate交換と物理carrier喪失を
+別々に観測できます。
+
+```powershell
+cargo run -p ndm24-tools -- ppp-close
+cargo run -p ndm24-tools -- ppp-open
+```
+
 16bit counterの比較は期限までの差が半周未満であることを利用した減算で行うため、`$FFFF` から `$0000` をまたぐ場合も同じです。常設セルフテストのstep `$50`～`$55` は、共有encoder受理時のtimer開始、wrap-around直前、期限ちょうど、同一Identifier再送、回数超過、`Ack-Received` fallback、lower-downによる初期化を実時間待ちなしで検査します。
 
 ## 65816 LCP main-loop接続

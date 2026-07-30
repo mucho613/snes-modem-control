@@ -17,6 +17,7 @@
 .import modemClearTrace, modemFreezeTrace, modemResumeTrace
 .import pppRunSelfTest
 .import pppReceiveStart, pppReceiveStop
+.import pppLcpOpen, pppLcpClose
 .import pppNtpRequest
 .import pppIcmpRequestDestination, pppIcmpRequestBegin
 .import pppDnsResolver, pppDnsQueryName, pppDnsQueryNameLength
@@ -116,9 +117,13 @@
 
   lda modemMailboxCommand
   cmp #MODEM_MAILBOX_COMMAND_INITIALIZE
-  beq @initialize
+  bne :+
+  jmp @initialize
+:
   cmp #MODEM_MAILBOX_COMMAND_QUICK_TEST
-  beq @quickTest
+  bne :+
+  jmp @quickTest
+:
   cmp #MODEM_MAILBOX_COMMAND_CLEAR_TRACE
   bne :+
   jmp @clearTrace
@@ -132,9 +137,13 @@
   jmp @resumeTrace
 :
   cmp #MODEM_MAILBOX_COMMAND_AT_TRANSACTION
-  beq @atTransaction
+  bne :+
+  jmp @atTransaction
+:
   cmp #MODEM_MAILBOX_COMMAND_BINARY_TRANSMIT
-  beq @binaryTransmit
+  bne :+
+  jmp @binaryTransmit
+:
   cmp #MODEM_MAILBOX_COMMAND_BINARY_RECEIVE
   bne :+
   jmp @binaryReceive
@@ -166,6 +175,14 @@
   cmp #MODEM_MAILBOX_COMMAND_DNS_QUERY
   bne :+
   jmp @dnsQuery
+:
+  cmp #MODEM_MAILBOX_COMMAND_PPP_CLOSE
+  bne :+
+  jmp @pppClose
+:
+  cmp #MODEM_MAILBOX_COMMAND_PPP_OPEN
+  bne :+
+  jmp @pppOpen
 :
   lda #MODEM_MAILBOX_STATUS_FAILED
   sta modemMailboxStatus
@@ -307,6 +324,22 @@
 
 @pppReceiveStop:
   jsr pppReceiveStop
+  lda #MODEM_MAILBOX_STATUS_PASSED
+  sta modemMailboxStatus
+  jmp @commitCommand
+
+@pppClose:
+  i16
+  jsr pppLcpClose
+  i8
+  lda #MODEM_MAILBOX_STATUS_PASSED
+  sta modemMailboxStatus
+  jmp @commitCommand
+
+@pppOpen:
+  i16
+  jsr pppLcpOpen
+  i8
   lda #MODEM_MAILBOX_STATUS_PASSED
   sta modemMailboxStatus
   jmp @commitCommand

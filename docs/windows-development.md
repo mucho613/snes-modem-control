@@ -104,6 +104,12 @@ cargo run -p ndm24-tools -- at ATM0
 cargo run -p ndm24-tools -- mailbox ppp-receive-start
 cargo run -p ndm24-tools -- ppp-dial
 
+# LCPをローカルから終了し、Terminate-AckまたはMax-Terminate完了まで待つ
+cargo run -p ndm24-tools -- ppp-close
+
+# carrierが残っている場合にLCP交渉を明示的に再開し、Openedまで待つ
+cargo run -p ndm24-tools -- ppp-open
+
 # 次のtransactionへ持ち越される未処理RX byteをJSON配列で確認
 cargo run -p ndm24-tools -- pending-rx
 

@@ -1683,7 +1683,7 @@ description = "Locally initiated closures completed after Max-Terminate exhausti
 
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]
-version = 7
+version = 8
 size = 96
 argument_size = 32
 
@@ -1816,6 +1816,8 @@ ppp_receive_stop = 12
 ntp_request = 13
 icmp_echo_request = 14
 dns_query = 15
+ppp_close = 16
+ppp_open = 17
 
 [mailbox_status]
 idle = 0

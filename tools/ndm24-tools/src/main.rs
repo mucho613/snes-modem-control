@@ -17,6 +17,7 @@ use ndm24_protocol::{
     MODEM_MAILBOX_COMMAND_AT_TRANSACTION, MODEM_MAILBOX_COMMAND_CLEAR_TRACE,
     MODEM_MAILBOX_COMMAND_FREEZE_TRACE, MODEM_MAILBOX_COMMAND_ICMP_ECHO_REQUEST,
     MODEM_MAILBOX_COMMAND_INITIALIZE, MODEM_MAILBOX_COMMAND_NTP_REQUEST,
+    MODEM_MAILBOX_COMMAND_PPP_CLOSE, MODEM_MAILBOX_COMMAND_PPP_OPEN,
     MODEM_MAILBOX_COMMAND_PPP_RECEIVE_START, MODEM_MAILBOX_COMMAND_PPP_RECEIVE_STOP,
     MODEM_MAILBOX_COMMAND_PPP_SELF_TEST, MODEM_MAILBOX_COMMAND_QUICK_TEST,
     MODEM_MAILBOX_COMMAND_RESUME_TRACE, MODEM_SESSION_RESULT_CONNECT,
@@ -90,6 +91,22 @@ enum Command {
         setup_timeout_seconds: u64,
         #[arg(long, default_value_t = 75)]
         dial_timeout_seconds: u64,
+    },
+    PppClose {
+        #[arg(long, default_value = "ws://localhost:23074")]
+        websocket: String,
+        #[arg(long, default_value = "build/smoke/modem-control.lbl")]
+        labels: PathBuf,
+        #[arg(long, default_value_t = 10)]
+        timeout_seconds: u64,
+    },
+    PppOpen {
+        #[arg(long, default_value = "ws://localhost:23074")]
+        websocket: String,
+        #[arg(long, default_value = "build/smoke/modem-control.lbl")]
+        labels: PathBuf,
+        #[arg(long, default_value_t = 30)]
+        timeout_seconds: u64,
     },
     Monitor {
         #[arg(long, default_value = "ws://localhost:23074")]
@@ -246,6 +263,8 @@ enum MailboxCommand {
     PppSelfTest,
     PppReceiveStart,
     PppReceiveStop,
+    PppClose,
+    PppOpen,
     NtpRequest,
     IcmpEchoRequest,
 }
@@ -261,6 +280,8 @@ impl MailboxCommand {
             Self::PppSelfTest => MODEM_MAILBOX_COMMAND_PPP_SELF_TEST,
             Self::PppReceiveStart => MODEM_MAILBOX_COMMAND_PPP_RECEIVE_START,
             Self::PppReceiveStop => MODEM_MAILBOX_COMMAND_PPP_RECEIVE_STOP,
+            Self::PppClose => MODEM_MAILBOX_COMMAND_PPP_CLOSE,
+            Self::PppOpen => MODEM_MAILBOX_COMMAND_PPP_OPEN,
             Self::NtpRequest => MODEM_MAILBOX_COMMAND_NTP_REQUEST,
             Self::IcmpEchoRequest => MODEM_MAILBOX_COMMAND_ICMP_ECHO_REQUEST,
         }
@@ -350,6 +371,35 @@ async fn main() -> Result<()> {
                 Duration::from_secs(dial_timeout_seconds),
             )
             .await
+        }
+        Command::PppClose {
+            websocket,
+            labels,
+            timeout_seconds,
+        } => {
+            let snapshot =
+                qusb2snes::ppp_close(&websocket, &labels, Duration::from_secs(timeout_seconds))
+                    .await?;
+            println!("{}", serde_json::to_string(&snapshot)?);
+            println!(
+                "LCP closed: local_term_requests={}, matching_acks={}, timeouts={}",
+                snapshot.lcp_local_terminate_request_count,
+                snapshot.lcp_local_terminate_ack_count,
+                snapshot.lcp_local_terminate_timeout_count
+            );
+            Ok(())
+        }
+        Command::PppOpen {
+            websocket,
+            labels,
+            timeout_seconds,
+        } => {
+            let snapshot =
+                qusb2snes::ppp_open(&websocket, &labels, Duration::from_secs(timeout_seconds))
+                    .await?;
+            println!("{}", serde_json::to_string(&snapshot)?);
+            println!("LCP opened");
+            Ok(())
         }
         Command::Monitor {
             websocket,
@@ -511,5 +561,42 @@ async fn main() -> Result<()> {
             websocket,
             remote_path,
         } => qusb2snes::upload_and_boot(&websocket, &rom, &remote_path).await,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn local_lcp_mailbox_commands_use_distinct_generated_values() {
+        assert_eq!(
+            MailboxCommand::PppClose.value(),
+            MODEM_MAILBOX_COMMAND_PPP_CLOSE
+        );
+        assert_eq!(
+            MailboxCommand::PppOpen.value(),
+            MODEM_MAILBOX_COMMAND_PPP_OPEN
+        );
+        assert_ne!(
+            MODEM_MAILBOX_COMMAND_PPP_CLOSE,
+            MODEM_MAILBOX_COMMAND_PPP_OPEN
+        );
+    }
+
+    #[test]
+    fn parses_local_lcp_control_commands() {
+        assert!(matches!(
+            Cli::try_parse_from(["ndm24-tools", "ppp-close"])
+                .unwrap()
+                .command,
+            Command::PppClose { .. }
+        ));
+        assert!(matches!(
+            Cli::try_parse_from(["ndm24-tools", "ppp-open"])
+                .unwrap()
+                .command,
+            Command::PppOpen { .. }
+        ));
     }
 }
