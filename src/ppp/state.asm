@@ -79,6 +79,7 @@
 .export pppIcmpInboundIdentifier, pppIcmpInboundSequence, pppIcmpInboundPayloadLength
 .export pppIcmpInboundReplyCount, pppIcmpInboundDropCount
 .export pppIpcpPrimaryDnsAddress, pppIpcpSecondaryDnsAddress
+.export pppLcpTerminateRequestCount, pppLcpTerminateAckCount
 
 pppDiagnosticState:
 pppDiagnosticMagic: .res $4
@@ -263,6 +264,8 @@ pppIcmpInboundReplyCount: .res $4
 pppIcmpInboundDropCount: .res $4
 pppIpcpPrimaryDnsAddress: .res $4
 pppIpcpSecondaryDnsAddress: .res $4
+pppLcpTerminateRequestCount: .res $4
+pppLcpTerminateAckCount: .res $4
 pppDiagnosticStateEnd:
 
 .assert pppDiagnosticMagic - pppDiagnosticState = PPP_DIAG_MAGIC, error, "PPP diagnostic magic offset"
@@ -447,6 +450,8 @@ pppDiagnosticStateEnd:
 .assert pppIcmpInboundDropCount - pppDiagnosticState = PPP_DIAG_ICMP_INBOUND_DROP_COUNT, error, "PPP inbound ICMP drop count offset"
 .assert pppIpcpPrimaryDnsAddress - pppDiagnosticState = PPP_DIAG_IPCP_PRIMARY_DNS_ADDRESS, error, "PPP IPCP primary DNS offset"
 .assert pppIpcpSecondaryDnsAddress - pppDiagnosticState = PPP_DIAG_IPCP_SECONDARY_DNS_ADDRESS, error, "PPP IPCP secondary DNS offset"
+.assert pppLcpTerminateRequestCount - pppDiagnosticState = PPP_DIAG_LCP_TERMINATE_REQUEST_COUNT, error, "PPP LCP terminate request count offset"
+.assert pppLcpTerminateAckCount - pppDiagnosticState = PPP_DIAG_LCP_TERMINATE_ACK_COUNT, error, "PPP LCP terminate ack count offset"
 .assert pppDiagnosticStateEnd - pppDiagnosticState = PPP_DIAGNOSTIC_SIZE, error, "PPP diagnostic ABI size"
 
 ; Decoder and pump scratch fields are private and intentionally excluded from

@@ -14,6 +14,7 @@
 .import pppLcpPollSavedModemState
 .import pppLcpInitialize, pppLcpOpen, pppLcpReceiveFrame
 .import pppLcpBuildPending, pppLcpPollTimeout, pppLcpLowerDown
+.import pppLcpPeerTerminateComplete
 .import pppLastProtocol, pppLastFrameLength, pppFrameBuffer
 
 .export pppLcpPoll, pppLcpPollRunSelfTest
@@ -89,6 +90,8 @@
   beq @responsePending
   cmp #PPP_LCP_ACTION_CONFIGURE_REJECT
   beq @responsePending
+  cmp #PPP_LCP_ACTION_TERMINATE_ACK
+  beq @responsePending
 
 @releaseThenTimer:
   .a8
@@ -152,7 +155,19 @@
   cmp #PPP_LCP_ACTION_CONFIGURE_NAK
   beq @responseSent
   cmp #PPP_LCP_ACTION_CONFIGURE_REJECT
+  beq @responseSent
+  cmp #PPP_LCP_ACTION_TERMINATE_ACK
+  beq @terminateAckSent
   bne @serviceReady
+
+@terminateAckSent:
+  .a8
+  lda pppFrameReady
+  beq :+
+  jsr pppReleaseFrame
+:
+  jsr pppLcpPeerTerminateComplete
+  bra @serviceReady
 
 @responseSent:
   .a8
@@ -318,6 +333,33 @@
   pppLcpPollRequireEqual @fail64
   lda pppLcpPendingAction
   pppLcpPollRequireEqual @fail64
+
+  ; A peer Terminate-Request is acknowledged before LCP enters Stopped.
+  jsr pppTransmitInitialize
+  lda #PPP_LCP_STATE_OPENED
+  sta pppLcpState
+  lda #PPP_LCP_CODE_TERMINATE_REQUEST
+  ldx #$0042
+  jsr @writeEmptyPacket
+  rep #$20
+  .a16
+  jsr pppLcpPoll
+  sep #$20
+  .a8
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_STOPPED
+  pppLcpPollRequireEqual @fail65
+  lda pppTransmitBuffer + 4
+  cmp #PPP_LCP_CODE_TERMINATE_ACK
+  pppLcpPollRequireEqual @fail65
+  lda pppTransmitBuffer + 5
+  cmp #$42
+  pppLcpPollRequireEqual @fail65
+  lda pppFrameReady
+  ora pppLcpPendingAction
+  pppLcpPollRequireEqual @fail65
+  lda pppTransmitActive
+  pppLcpPollRequireNonzero @fail65
 
   ; Disabling ownership releases any retained frame, cancels TX, and lowers LCP.
   lda #$01

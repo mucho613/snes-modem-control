@@ -14,6 +14,7 @@
 .import pppLcpDeferredRequest
 
 .export pppLcpArmRestartTimer, pppLcpPollTimeout, pppLcpLowerDown
+.export pppLcpPeerTerminateComplete
 .export pppLcpTimerRunSelfTest
 
 .macro pppLcpTimerRequireEqual failure
@@ -183,6 +184,39 @@
   setDBR $7e
   jsr pppSnapshotBegin
   lda #PPP_LCP_STATE_CLOSED
+  sta pppLcpState
+  stz pppLcpRestartRemaining
+  stz pppLcpPendingAction
+  stz pppLcpTimerActive
+  stz pppLcpDeferredRequest
+  stz pppLcpPeerFlags
+  rep #$20
+  .a16
+  lda #PPP_DEFAULT_MRU
+  sta pppLcpPeerMru
+  lda #$ffff
+  sta pppLcpPeerAccm
+  sta pppLcpPeerAccm + 2
+  stz pppLcpPeerMagic
+  stz pppLcpPeerMagic + 2
+  sep #$20
+  .a8
+  jsr pppSnapshotEnd
+  plb
+  rts
+.endproc
+
+; Complete a peer-initiated graceful close after Terminate-Ack has been
+; accepted by the asynchronous transmitter. Stopped prevents the still-live
+; carrier from immediately reopening LCP while NO CARRIER is pending.
+.proc pppLcpPeerTerminateComplete
+  .a8
+  .i16
+
+  phb
+  setDBR $7e
+  jsr pppSnapshotBegin
+  lda #PPP_LCP_STATE_STOPPED
   sta pppLcpState
   stz pppLcpRestartRemaining
   stz pppLcpPendingAction

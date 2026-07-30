@@ -146,7 +146,7 @@ Address 1 + Control 1 + Protocol 2 + Information 1500 + FCS 2
 
 ## 常設PPP診断
 
-`pppDiagnosticState` はmagic `PPP1`、ABI version 12、402byteの公開診断blockです。レイアウトの正本は `spec/ndm24.toml` で、AssemblyとRustのoffset定数および[生成済みABI表](generated/diagnostic-abi.md)を同時に生成します。
+`pppDiagnosticState` はmagic `PPP1`、ABI version 15、439byteの公開診断blockです。レイアウトの正本は `spec/ndm24.toml` で、AssemblyとRustのoffset定数および[生成済みABI表](generated/diagnostic-abi.md)を同時に生成します。
 
 PC側では次のコマンドでJSON Linesとして読み取れます。
 
@@ -172,6 +172,7 @@ cargo run -p ndm24-tools -- ppp-monitor
 - LCP state、最後のCode・Identifier・error、local Request Identifier
 - restart残数、timer有効状態と期限、pending/deferred送信
 - 受理したpeer MRU、ACCM、Magic-Number、option flags
+- peer Terminate-Request受信数とTerminate-Ack送信受理数
 - PAP state、Code、Identifier、Length、error、failure、restart状態
 - PAP packet送受信回数
 - IPCP state、Code、Identifier、Length、error、pending/deferred送信
@@ -206,7 +207,7 @@ cargo run -p ndm24-tools -- ppp-monitor
 
 ## Rust LCP Configure状態機械
 
-`crates/ndm24-ppp/src/lcp/negotiation.rs` は [RFC 1661 section 4](https://www.rfc-editor.org/rfc/rfc1661.html) のestablishment部分を参照実装します。今回の対象は `Request-Sent`、`Ack-Received`、`Ack-Sent`、`Opened` と、Configure用restart timerです。Link terminationとEchoはまだ含みません。
+`crates/ndm24-ppp/src/lcp/negotiation.rs` は [RFC 1661 section 4](https://www.rfc-editor.org/rfc/rfc1661.html) のestablishment部分を参照実装します。`Request-Sent`、`Ack-Received`、`Ack-Sent`、`Opened` とConfigure用restart timerに加え、peer起点のTerminate-Requestを同じIdentifierの空Terminate-Ackで応答し、`Opened`から`Stopped`へ移る終了経路を扱います。local起点の終了とEchoはまだ含みません。
 
 `crates/ndm24-ppp/src/pap.rs` は [RFC 1334 section 2](https://www.rfc-editor.org/rfc/rfc1334.html) のPAP packetをallocation-freeで解析・生成する参照実装です。Authenticate-RequestのPeer-IDとPassword、およびAuthenticate-Ack/NakのMessageについて、各1 octetの長さとPAP packet全体の16 bit Lengthを別々に検証します。宣言Lengthより後のpaddingは無視しますが、宣言Length内で各可変長fieldより後に余分なdataがあればmalformedとして扱います。PAPの認証情報は平文なので、通常の診断やログへpacket dataを出しません。
 
@@ -307,7 +308,7 @@ Configure-Rejectが必要なoptionとConfigure-Nak候補が同じRequestに含�
 
 ## 65816 LCP packet parser
 
-`src/ppp/lcp.asm` の `pppLcpParseFrame` は、FCS検証後に所有権が固定された `pppFrameBuffer` を直接読みます。非圧縮のAddress・Control・Protocolを確認した後、LCPのCode、Identifier、network byte orderのLengthを抽出します。LengthがPPP Informationより短い場合のpaddingは無視し、Configure-Request/Ack/Nak/Rejectでは各optionのLengthもpacket境界内で検証します。
+`src/ppp/lcp.asm` の `pppLcpParseFrame` は、FCS検証後に所有権が固定された `pppFrameBuffer` を直接読みます。非圧縮のAddress・Control・Protocolを確認した後、LCPのCode、Identifier、network byte orderのLengthを抽出します。LengthがPPP Informationより短い場合のpaddingは無視し、Configure-Request/Ack/Nak/Rejectでは各optionのLengthもpacket境界内で検証します。Terminate-Request/Ackは同じ共通header検査を通り、終了応答では受信Dataを反映せずLength 4の空packetを生成します。
 
 parserの最終Code、Identifier、Length、error、呼出回数は現在のPPP診断ABIへ公開します。診断blockを拡張しても、frame bufferや低レベルNDM24転送用WRAMの配置は変わりません。`ppp-self-test` の失敗step `$20`～`$27` はLCP parser fixtureを表します。
 
@@ -315,11 +316,11 @@ parserの最終Code、Identifier、Length、error、呼出回数は現在のPPP�
 
 `src/ppp/lcpNegotiation.asm` は、Rust参照実装から `Request-Sent`、`Ack-Received`、`Ack-Sent`、`Opened` の基本遷移を移植しています。local Configure-Requestは既定MRU 1500と既定ACCM `$FFFFFFFF` を維持する空optionです。Identifierは有効なNak/Rejectまたは重複Ack後の新しいRequestで更新し、Identifierやoption列が一致しない応答は状態を変えません。
 
-交渉コアは共有送信encoderを直接上書きせず、`pppLcpPendingAction` にConfigure-Request/Ack/Nak/Rejectを保持します。`pppLcpBuildPending` はencoderがidleのときだけ `pppTransmitBuffer` を構築します。Ackは受信packetのIdentifierとoption列をLength境界までそのまま複製し、Nakは置換が必要なoptionだけを元の順序で返し、Rejectは対象optionのbyte列だけを変更せず返します。
+交渉コアは共有送信encoderを直接上書きせず、`pppLcpPendingAction` にConfigure-Request/Ack/Nak/RejectまたはTerminate-Ackを保持します。`pppLcpBuildPending` はencoderがidleのときだけ `pppTransmitBuffer` を構築します。Configure-Ackは受信packetのIdentifierとoption列をLength境界までそのまま複製し、Nakは置換が必要なoptionだけを元の順序で返し、Rejectは対象optionのbyte列だけを変更せず返します。Terminate-Ackは受信Terminate-RequestのIdentifierを引き継ぐ空packetです。
 
 `src/ppp/lcpOptions.asm` はMRU、ACCM、PAP、Magic-Numberを選別して受理します。CHAPなどPAP以外の認証方式はPAPへNakし、PFC、ACFC、Quality-Protocol、未知option、重複した全optionはRejectします。同じRequestにReject対象とNak対象があればRejectを優先します。
 
-常設セルフテストのstep `$30`～`$3A` は、Ack到着順が逆の2経路、Opened到達、不正Identifier、Nak後のIdentifier更新、共有encoderへのRequest/Ack構築を固定transcriptで検査します。step `$40`～`$43` は、全対応optionの受理と値の公開、MRU・CHAPのNak置換、RejectのNakに対する優先、重複optionを両方Rejectするbyte列を検査します。
+常設セルフテストのstep `$30`～`$3B` は、Ack到着順が逆の2経路、Opened到達、不正Identifier、Nak後のIdentifier更新、共有encoderへのRequest/Ack構築、peer Terminate-Requestに対する空Terminate-Ackを固定transcriptで検査します。step `$40`～`$43` は、全対応optionの受理と値の公開、MRU・CHAPのNak置換、RejectのNakに対する優先、重複optionを両方Rejectするbyte列を検査します。
 
 ## 65816 LCP restart timer
 
@@ -333,9 +334,9 @@ Max-Configureは初回送信を含む10回です。初回Requestの後に9回ま
 
 `src/ppp/lcpPoll.asm` は `pppReceivePoll` の後、`pppTransmitPoll` の前に毎main-loop呼び出されます。PPP受信所有権が有効でNDM24が `CONNECTED` のときだけ、ClosedからLCPを開始します。未接続時や所有権無効時はLCPをlower-downし、保持frameと送信中frameを破棄するため、AT sessionやraw binary試験へ状態を持ち越しません。
 
-完成したLCP frameにAck/Nak/Rejectが必要な場合、その応答が共有encoderへ受理されるまで `pppFrameReady` を保持します。encoderがbusyでも受信bufferを上書きせず、受理後にだけ `pppReleaseFrame` します。受信AckやNak後の新しいlocal Requestは受信frameのbyte列に依存しないため、frameを解放してからpending送信として待機できます。
+完成したLCP frameにAck/Nak/RejectまたはTerminate-Ackが必要な場合、その応答が共有encoderへ受理されるまで `pppFrameReady` を保持します。encoderがbusyでも受信bufferを上書きせず、受理後にだけ `pppReleaseFrame` します。受信AckやNak後の新しいlocal Requestは受信frameのbyte列に依存しないため、frameを解放してからpending送信として待機できます。
 
-Opened中にpeer Configure-Requestを受けた場合は応答packetと新しいlocal Configure-Requestの2packetが必要です。1frame分の応答を先にencoderへ渡し、`lcp_deferred_request` でlocal Requestを保持して直列化します。常設セルフテストのstep `$60`～`$65` は、初回Request、TX busy中のframe保持、Ack後の解放、Opened到達、Opened中の再交渉、所有権解除時のlower-downを模擬transcriptで検査します。
+Opened中にpeer Configure-Requestを受けた場合は応答packetと新しいlocal Configure-Requestの2packetが必要です。1frame分の応答を先にencoderへ渡し、`lcp_deferred_request` でlocal Requestを保持して直列化します。peer Terminate-Requestでは、Terminate-Ackが共有encoderへ受理されるまでLCPを`Opened`に保ち、受理後に`Stopped`へ遷移させます。これにより上位層のlower-downが先に共有encoderを中止してAckを失う競合を防ぎます。IPCPはlower-down時、送信中frameがLCP Terminate-Ackの場合に限ってこれを温存し、自身の送信中frameは従来どおり中止します。常設セルフテストのstep `$60`～`$65` は、初回Request、TX busy中のframe保持、Ack後の解放、Opened到達、Opened中の再交渉、peer起点の終了、所有権解除時のlower-downを模擬transcriptで検査します。
 
 回線を発信しないgate試験では `ppp-receive-start` 後もNDM24がCONNECTEDでなければ `receive_active=false`、`lcp_state=Closed`、`transmit_active=false` のままであることを確認します。
 
@@ -407,10 +408,11 @@ deferred slotへ保持します。lower-downでは交渉済みIP/DNS address、t
 
 restart intervalは180 frame、Max-Configureは初回を含む10回です。timeout再送は
 同じIdentifierとoption列を使い、送信器が受理した時点から次の期限を数えます。
-公開診断ABI version 14はIPCP state、最後のCode/Identifier/error、local/peer
+公開診断ABI version 15はIPCP state、最後のCode/Identifier/error、local/peer
 address、Primary/Secondary DNS addressと各valid flag、再送状態、送受信count
 に加え、後段のIPv4・ICMP・UDP/NTP/DNS診断を公開します。DNS addressは既存
-fieldのoffsetを変えないようABI末尾へ追加しています。
+fieldのoffsetを変えないよう追加し、version 15ではLCP終了カウンターをABI末尾へ
+追加しています。
 
 常設セルフテストのstep `$70`～`$76`は、3つの`0.0.0.0`要求、peer
 `10.24.0.1`のAck、local `10.24.0.2`と2つのDNSのNak提案、再要求、

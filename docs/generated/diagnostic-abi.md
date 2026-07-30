@@ -44,7 +44,7 @@ ABI version: `2`. Block size: `128` bytes.
 
 ## PPP Diagnostic ABI
 
-ABI version: `14`. Block size: `431` bytes.
+ABI version: `15`. Block size: `439` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|
@@ -230,6 +230,8 @@ ABI version: `14`. Block size: `431` bytes.
 | `0x1A3` | 4 | `u32` | `icmp_inbound_drop_count` | Inbound Echo Requests rejected by validation or reply handling |
 | `0x1A7` | 4 | `bytes` | `ipcp_primary_dns_address` | Primary DNS server address negotiated through RFC 1877 IPCP option 129 |
 | `0x1AB` | 4 | `bytes` | `ipcp_secondary_dns_address` | Secondary DNS server address negotiated through RFC 1877 IPCP option 131 |
+| `0x1AF` | 4 | `u32` | `lcp_terminate_request_count` | Valid peer Terminate-Requests accepted by the LCP state machine |
+| `0x1B3` | 4 | `u32` | `lcp_terminate_ack_count` | Terminate-Acks accepted by the shared PPP transmitter |
 
 ## Mailbox ABI
 

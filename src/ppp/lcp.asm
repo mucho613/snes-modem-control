@@ -12,6 +12,7 @@
 .import pppLcpPacketEnd, pppLcpOptionLength
 .import pppLcpPeerMagic, pppLcpRestartDeadline, pppLcpTimerActive
 .import pppLcpDeferredRequest, pppLcpPollAction
+.import pppLcpTerminateRequestCount, pppLcpTerminateAckCount
 
 .export pppLcpInitialize, pppLcpParseFrame, pppLcpRunSelfTest
 
@@ -50,6 +51,10 @@
   stz pppLcpPeerMagic + 2
   stz pppLcpReceiveCount
   stz pppLcpReceiveCount + 2
+  stz pppLcpTerminateRequestCount
+  stz pppLcpTerminateRequestCount + 2
+  stz pppLcpTerminateAckCount
+  stz pppLcpTerminateAckCount + 2
   sep #$20
   .a8
   plb

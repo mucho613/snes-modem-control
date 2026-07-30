@@ -333,6 +333,8 @@ pub struct PppDiagnosticSnapshot {
     pub icmp_inbound_drop_count: u32,
     pub ipcp_primary_dns_address: [u8; 4],
     pub ipcp_secondary_dns_address: [u8; 4],
+    pub lcp_terminate_request_count: u32,
+    pub lcp_terminate_ack_count: u32,
 }
 
 impl PppDiagnosticSnapshot {
@@ -545,6 +547,8 @@ impl PppDiagnosticSnapshot {
             icmp_inbound_drop_count: read_u32(data, PPP_DIAG_ICMP_INBOUND_DROP_COUNT)?,
             ipcp_primary_dns_address: read_array(data, PPP_DIAG_IPCP_PRIMARY_DNS_ADDRESS)?,
             ipcp_secondary_dns_address: read_array(data, PPP_DIAG_IPCP_SECONDARY_DNS_ADDRESS)?,
+            lcp_terminate_request_count: read_u32(data, PPP_DIAG_LCP_TERMINATE_REQUEST_COUNT)?,
+            lcp_terminate_ack_count: read_u32(data, PPP_DIAG_LCP_TERMINATE_ACK_COUNT)?,
         })
     }
 }
@@ -959,6 +963,10 @@ mod tests {
             .copy_from_slice(&[1, 1, 1, 1]);
         data[PPP_DIAG_IPCP_SECONDARY_DNS_ADDRESS..PPP_DIAG_IPCP_SECONDARY_DNS_ADDRESS + 4]
             .copy_from_slice(&[1, 0, 0, 1]);
+        data[PPP_DIAG_LCP_TERMINATE_REQUEST_COUNT..PPP_DIAG_LCP_TERMINATE_REQUEST_COUNT + 4]
+            .copy_from_slice(&3_u32.to_le_bytes());
+        data[PPP_DIAG_LCP_TERMINATE_ACK_COUNT..PPP_DIAG_LCP_TERMINATE_ACK_COUNT + 4]
+            .copy_from_slice(&2_u32.to_le_bytes());
 
         let snapshot = PppDiagnosticSnapshot::decode(&data).unwrap();
         assert_eq!(snapshot.snapshot_sequence, 8);
@@ -1104,6 +1112,8 @@ mod tests {
         assert_eq!(snapshot.icmp_inbound_drop_count, 1);
         assert_eq!(snapshot.ipcp_primary_dns_address, [1, 1, 1, 1]);
         assert_eq!(snapshot.ipcp_secondary_dns_address, [1, 0, 0, 1]);
+        assert_eq!(snapshot.lcp_terminate_request_count, 3);
+        assert_eq!(snapshot.lcp_terminate_ack_count, 2);
     }
 
     #[test]

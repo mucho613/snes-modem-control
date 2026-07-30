@@ -55,7 +55,9 @@
 
 @service:
   jsr @servicePending
-  bcs @done
+  bcc :+
+  jmp @done
+:
   lda pppFrameReady
   beq @timer
   rep #$20
@@ -117,6 +119,27 @@
   jsr pppReleaseFrame
 :
   jsr pppIpcpLowerDown
+  lda pppReceiveEnabled
+  beq @abortTransmit
+  lda modemDriverState
+  cmp #MODEM_STATE_CONNECTED
+  bne @abortTransmit
+
+  ; A peer LCP Terminate-Request can lower IPCP after its Terminate-Ack has
+  ; already entered the shared encoder. Preserve only that LCP response;
+  ; any IPCP-owned frame still belongs to the layer being lowered.
+  lda pppTransmitActive
+  beq @done
+  lda pppTransmitBuffer + 2
+  cmp #$c0
+  bne @abortTransmit
+  lda pppTransmitBuffer + 3
+  cmp #$21
+  bne @abortTransmit
+  lda pppTransmitBuffer + 4
+  cmp #PPP_LCP_CODE_TERMINATE_ACK
+  beq @done
+@abortTransmit:
   jsr pppTransmitAbort
 
 @done:

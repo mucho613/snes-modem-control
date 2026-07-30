@@ -10,6 +10,7 @@
 .import pppLcpRequestIdentifier, pppLcpRestartRemaining
 .import pppLcpPendingAction, pppLcpPacketLength
 .import pppLcpTimerActive, pppLcpDeferredRequest
+.import pppLcpTerminateRequestCount, pppLcpTerminateAckCount
 .import pppFrameBuffer, pppTransmitBuffer, pppTransmitActive
 .import pppTransmitBegin, pppTransmitInitialize
 .import pppLcpArmRestartTimer
@@ -89,9 +90,31 @@
   bne :+
   jmp @configureNegative
 :
+  cmp #PPP_LCP_CODE_TERMINATE_REQUEST
+  beq @terminateRequest
+  cmp #PPP_LCP_CODE_TERMINATE_ACK
+  bne :+
+  jmp @returnSuccess
+:
 
-  ; Termination, maintenance, and unknown Code processing are outside this
-  ; establishment-core milestone.
+  ; Maintenance and unknown Code processing remain outside this milestone.
+  jmp @returnSuccess
+
+@terminateRequest:
+  .a8
+  rep #$20
+  .a16
+  inc pppLcpTerminateRequestCount
+  bne :+
+  inc pppLcpTerminateRequestCount + 2
+:
+  sep #$20
+  .a8
+  stz pppLcpRestartRemaining
+  stz pppLcpTimerActive
+  stz pppLcpDeferredRequest
+  lda #PPP_LCP_ACTION_TERMINATE_ACK
+  sta pppLcpPendingAction
   jmp @returnSuccess
 
 @notConfiguring:
@@ -315,7 +338,9 @@
   beq @buildSelectiveResponse
   cmp #PPP_LCP_ACTION_CONFIGURE_REJECT
   beq @buildSelectiveResponse
-  bra @busy
+  cmp #PPP_LCP_ACTION_TERMINATE_ACK
+  beq @buildTerminateAck
+  jmp @busy
 
 @buildRequest:
   .a8
@@ -366,6 +391,20 @@
 @buildSelectiveResponse:
   .a8
   jsr pppLcpBuildPeerResponse
+  bra @begin
+
+@buildTerminateAck:
+  .a8
+  lda #PPP_LCP_CODE_TERMINATE_ACK
+  sta pppTransmitBuffer + 4
+  lda pppLcpLastIdentifier
+  sta pppTransmitBuffer + 5
+  stz pppTransmitBuffer + 6
+  lda #PPP_LCP_HEADER_LENGTH
+  sta pppTransmitBuffer + 7
+  rep #$20
+  .a16
+  lda #PPP_LCP_MINIMUM_FRAME_LENGTH
 
 @begin:
   .a16
@@ -376,9 +415,21 @@
   jsr pppSnapshotBegin
   lda pppLcpPendingAction
   cmp #PPP_LCP_ACTION_CONFIGURE_REQUEST
-  bne :+
+  bne @maybeTerminateAck
   jsr pppLcpArmRestartTimer
+  bra :+
+@maybeTerminateAck:
+  cmp #PPP_LCP_ACTION_TERMINATE_ACK
+  bne @counterDone
+  rep #$20
+  .a16
+  inc pppLcpTerminateAckCount
+  bne :+
+  inc pppLcpTerminateAckCount + 2
 :
+  sep #$20
+  .a8
+@counterDone:
   stz pppLcpPendingAction
   jsr pppSnapshotEnd
   ply
@@ -552,35 +603,51 @@
 :
   lda pppLcpState
   cmp #PPP_LCP_STATE_REQUEST_SENT
-  bne @fail37
+  beq :+
+  jmp @fail37
+:
 
   ; A valid empty Nak allocates a fresh request Identifier.
   lda #PPP_LCP_CODE_CONFIGURE_NAK
   ldx #$0000
   jsr @writeEmptyPacket
   jsr pppLcpReceiveFrame
-  bcs @fail38
+  bcc :+
+  jmp @fail38
+:
   lda pppLcpRequestIdentifier
   cmp #$01
-  bne @fail38
+  beq :+
+  jmp @fail38
+:
   lda pppLcpPendingAction
   cmp #PPP_LCP_ACTION_CONFIGURE_REQUEST
-  bne @fail38
+  beq :+
+  jmp @fail38
+:
 
   ; A supported non-empty request is Acked without changing its option bytes.
   jsr pppLcpBuildPending
-  bcs @fail39
+  bcc :+
+  jmp @fail39
+:
   jsr pppTransmitInitialize
   lda #PPP_LCP_CODE_CONFIGURE_REQUEST
   ldx #$000a
   jsr @writeMruPacket
   jsr pppLcpReceiveFrame
-  bcs @fail39
+  bcc :+
+  jmp @fail39
+:
   lda pppLcpPendingAction
   cmp #PPP_LCP_ACTION_CONFIGURE_ACK
-  bne @fail39
+  beq :+
+  jmp @fail39
+:
   jsr pppLcpBuildPending
-  bcs @fail3a
+  bcc :+
+  jmp @fail3a
+:
   lda pppTransmitBuffer + 4
   cmp #PPP_LCP_CODE_CONFIGURE_ACK
   bne @fail3a
@@ -593,6 +660,28 @@
   lda pppTransmitBuffer + 9
   cmp #$04
   bne @fail3a
+
+  ; Peer termination uses the peer Identifier and an empty Ack payload.
+  jsr pppTransmitInitialize
+  lda #PPP_LCP_CODE_TERMINATE_REQUEST
+  ldx #$0042
+  jsr @writeEmptyPacket
+  jsr pppLcpReceiveFrame
+  bcs @fail3b
+  lda pppLcpPendingAction
+  cmp #PPP_LCP_ACTION_TERMINATE_ACK
+  bne @fail3b
+  jsr pppLcpBuildPending
+  bcs @fail3b
+  lda pppTransmitBuffer + 4
+  cmp #PPP_LCP_CODE_TERMINATE_ACK
+  bne @fail3b
+  lda pppTransmitBuffer + 5
+  cmp #$42
+  bne @fail3b
+  lda pppTransmitBuffer + 7
+  cmp #PPP_LCP_HEADER_LENGTH
+  bne @fail3b
 
   jsr pppLcpInitialize
   jsr pppTransmitInitialize
@@ -632,6 +721,9 @@
   bra @fail
 @fail3a:
   lda #$3a
+  bra @fail
+@fail3b:
+  lda #$3b
 
 @fail:
   pha
