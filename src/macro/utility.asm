@@ -30,6 +30,55 @@
   .i8
 .endmacro
 
+; Declaration-only synchronization at a control-flow merge. The Rust width
+; lint proves that every incoming runtime state matches the asserted widths.
+.macro assert_m8_i8
+  .a8
+  .i8
+.endmacro
+
+.macro assert_m8_i16
+  .a8
+  .i16
+.endmacro
+
+.macro assert_m16_i8
+  .a16
+  .i8
+.endmacro
+
+.macro assert_m16_i16
+  .a16
+  .i16
+.endmacro
+
+; PLP changes the runtime M/X flags without informing ca65. These wrappers
+; restore the assembler declarations and are checked against the width state
+; saved by PHP.
+.macro plp_m8_i8
+  plp
+  .a8
+  .i8
+.endmacro
+
+.macro plp_m8_i16
+  plp
+  .a8
+  .i16
+.endmacro
+
+.macro plp_m16_i8
+  plp
+  .a16
+  .i8
+.endmacro
+
+.macro plp_m16_i16
+  plp
+  .a16
+  .i16
+.endmacro
+
 .macro inc32 address
   m16
 
