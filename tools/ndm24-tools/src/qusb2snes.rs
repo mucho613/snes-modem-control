@@ -440,21 +440,33 @@ async fn read_stable_snapshot(client: &mut Client, offset: usize) -> Result<Diag
     loop {
         ensure!(
             Instant::now() < deadline,
-            "diagnostic snapshot did not stabilize; confirm that the running ROM matches the label file"
+            "diagnostic snapshot did not stabilize; confirm that the running ROM matches the label file and retry if diagnostics are changing rapidly"
         );
-        let first = client.read_address(offset, MODEM_DIAGNOSTIC_SIZE).await?;
-        let first_sequence = read_u32(&first, MODEM_DIAG_SNAPSHOT_SEQUENCE)?;
+        let first = client
+            .read_address(offset + MODEM_DIAG_SNAPSHOT_SEQUENCE, size_of::<u32>())
+            .await?;
+        let first_sequence = read_u32(&first, 0)?;
         if first_sequence & 1 != 0 {
             tokio::task::yield_now().await;
             continue;
         }
-        let second = client.read_address(offset, MODEM_DIAGNOSTIC_SIZE).await?;
-        let second_sequence = read_u32(&second, MODEM_DIAG_SNAPSHOT_SEQUENCE)?;
-        if second_sequence != first_sequence {
+
+        let snapshot = client.read_address(offset, MODEM_DIAGNOSTIC_SIZE).await?;
+        let snapshot_sequence = read_u32(&snapshot, MODEM_DIAG_SNAPSHOT_SEQUENCE)?;
+        if snapshot_sequence != first_sequence {
             tokio::task::yield_now().await;
             continue;
         }
-        return DiagnosticSnapshot::decode(&second);
+
+        let last = client
+            .read_address(offset + MODEM_DIAG_SNAPSHOT_SEQUENCE, size_of::<u32>())
+            .await?;
+        let last_sequence = read_u32(&last, 0)?;
+        if last_sequence != first_sequence {
+            tokio::task::yield_now().await;
+            continue;
+        }
+        return DiagnosticSnapshot::decode(&snapshot);
     }
 }
 
@@ -466,21 +478,33 @@ async fn read_stable_ppp_snapshot(
     loop {
         ensure!(
             Instant::now() < deadline,
-            "PPP diagnostic snapshot did not stabilize; confirm that the running ROM matches the label file"
+            "PPP diagnostic snapshot did not stabilize; confirm that the running ROM matches the label file and retry if diagnostics are changing rapidly"
         );
-        let first = client.read_address(offset, PPP_DIAGNOSTIC_SIZE).await?;
-        let first_sequence = read_u32(&first, PPP_DIAG_SNAPSHOT_SEQUENCE)?;
+        let first = client
+            .read_address(offset + PPP_DIAG_SNAPSHOT_SEQUENCE, size_of::<u32>())
+            .await?;
+        let first_sequence = read_u32(&first, 0)?;
         if first_sequence & 1 != 0 {
             tokio::task::yield_now().await;
             continue;
         }
-        let second = client.read_address(offset, PPP_DIAGNOSTIC_SIZE).await?;
-        let second_sequence = read_u32(&second, PPP_DIAG_SNAPSHOT_SEQUENCE)?;
-        if second_sequence != first_sequence {
+
+        let snapshot = client.read_address(offset, PPP_DIAGNOSTIC_SIZE).await?;
+        let snapshot_sequence = read_u32(&snapshot, PPP_DIAG_SNAPSHOT_SEQUENCE)?;
+        if snapshot_sequence != first_sequence {
             tokio::task::yield_now().await;
             continue;
         }
-        return PppDiagnosticSnapshot::decode(&second);
+
+        let last = client
+            .read_address(offset + PPP_DIAG_SNAPSHOT_SEQUENCE, size_of::<u32>())
+            .await?;
+        let last_sequence = read_u32(&last, 0)?;
+        if last_sequence != first_sequence {
+            tokio::task::yield_now().await;
+            continue;
+        }
+        return PppDiagnosticSnapshot::decode(&snapshot);
     }
 }
 
