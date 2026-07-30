@@ -112,18 +112,6 @@ impl Diagnostic {
             message: message.into(),
         }
     }
-
-    pub fn render(&self, root: &Path) -> String {
-        let path = self.path.strip_prefix(root).unwrap_or(&self.path);
-        format!(
-            "{}:{}:{}: error[asm-width:{}]: {}",
-            path.display(),
-            self.line,
-            self.column,
-            self.profile,
-            self.message
-        )
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -138,8 +126,28 @@ pub fn run(root: &Path, audit: bool) -> Result<()> {
             enforce_policy: true,
         },
     )?;
+    let mut grouped = BTreeMap::<(PathBuf, usize, usize, String), BTreeSet<&str>>::new();
     for diagnostic in &diagnostics {
-        println!("{}", diagnostic.render(root));
+        grouped
+            .entry((
+                diagnostic.path.clone(),
+                diagnostic.line,
+                diagnostic.column,
+                diagnostic.message.clone(),
+            ))
+            .or_default()
+            .insert(diagnostic.profile);
+    }
+    for ((path, line, column, message), profiles) in &grouped {
+        let path = path.strip_prefix(root).unwrap_or(path);
+        println!(
+            "{}:{}:{}: error[asm-width:{}]: {}",
+            path.display(),
+            line,
+            column,
+            profiles.iter().copied().collect::<Vec<_>>().join(","),
+            message
+        );
     }
     if diagnostics.is_empty() {
         println!("65816 width lint passed");
@@ -147,14 +155,16 @@ pub fn run(root: &Path, audit: bool) -> Result<()> {
     }
     if audit {
         println!(
-            "65816 width lint audit found {} violation(s)",
-            diagnostics.len()
+            "65816 width lint audit found {} unique violation(s) across {} profile result(s)",
+            grouped.len(),
+            diagnostics.len(),
         );
         Ok(())
     } else {
         bail!(
-            "65816 width lint failed with {} violation(s)",
-            diagnostics.len()
+            "65816 width lint failed with {} unique violation(s) across {} profile result(s)",
+            grouped.len(),
+            diagnostics.len(),
         )
     }
 }
