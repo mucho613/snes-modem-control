@@ -181,9 +181,10 @@ UDP状態と各countが初期値へ戻ったことも確認しました。この
 
 同日、NTP client追加後のsmoke ROMもrevision AのFXPAK PRO実機へ転送し、
 `ppp-self-test`（mailbox command 10、sequence 1）の合格を確認しました。step
-`$99`～`$A0`により、NTPv4要求と64bit cookie生成、重複要求保護、相関済み応答、
+`$99`～`$A1`により、NTPv4要求と64bit cookie生成、重複要求保護、相関済み応答、
 cookie不一致とKiss-o'-Deathの拒否、timeout、IPCP未接続時の拒否を実機65816上で
-検査しています。完了後はPPP診断ABI version 10、331byteのsnapshotをQUsb2Snes
+検査しています。step `$A1`は時計を60フレーム進めたときのUnix秒と小数部も
+検査します。完了後はPPP診断ABI version 10、331byteのsnapshotをQUsb2Snes
 から安定読取し、NTP状態と要求・応答・破棄・timeout countが初期値へ復帰したことも
 確認しました。この試験は固定fixtureを使い、電話回線や対向Modemには接続しません。
 
@@ -210,5 +211,12 @@ drop、NTP timeoutはすべて0です。
 この試験ではIPCP成立直後、既存`ntp.service`がPPPアドレスへ応答可能になる前に
 内蔵NTP serviceの初回委譲probeが失敗する競合も観測しました。数秒後の再起動では
 正常に委譲できたため、内蔵応答器へ有限回の再試行を追加しています。
+
+同じ実機構成で時計の進行率も再検査しました。修正前は15.021秒に対し
+`frameCounter`が903（60.114Hz）で正常なのに、内部時計は20.965秒進みました。
+原因は秒境界の表示整形がフレームループのXを破壊し、余分な反復を生じさせた
+ことです。X保存後は15.021秒に対して内部時計15.025秒、画面表示も14秒間に
+14秒進みました。NTP再取得、LCP/PAP/IPCP Opened、IPv4/UDP/NTP error 0も
+併せて確認しています。
 
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。

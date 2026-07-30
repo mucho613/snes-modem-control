@@ -26,7 +26,7 @@
 .import pppNtpPacketOffset, pppNtpTestSavedFrameCounter
 .import pppNtpTestSavedClockValid, pppNtpTestSavedClockSeconds
 .import pppNtpTestSavedClockSubsecond
-.import clockInitialize, clockSetUnixTime
+.import clockInitialize, clockSetUnixTime, clockAdvanceFrames
 .import clockValid, clockUnixSeconds, clockSubsecond
 .import clockYear, clockMonth, clockDay
 .import clockHour, clockMinute, clockSecond
@@ -598,7 +598,7 @@ receiveDone:
 .endmacro
 
 ; Request construction, correlated response, rejection, and timeout fixtures.
-; Failure steps $99-$a0 are reserved for NTP.
+; Failure steps $99-$a1 are reserved for NTP and software-clock fixtures.
 .proc pppNtpRunSelfTest
   .a8
   .i16
@@ -731,6 +731,31 @@ receiveDone:
   cmp #20
   pppNtpRequireEqual fail9c_16
 
+  ; Crossing a second boundary must not let display formatting corrupt the X
+  ; frame-loop counter. From fraction $80000000, 60 nominal NTSC frames yield
+  ; one whole second and fraction $7F943F2C.
+  rep #$20
+  .a16
+  ldx #60
+  jsr clockAdvanceFrames
+  lda clockUnixSeconds
+  cmp #$f101
+  pppNtpRequireEqual faila1_16
+  lda clockUnixSeconds + 2
+  cmp #$6553
+  pppNtpRequireEqual faila1_16
+  lda clockSubsecond
+  cmp #$3f2c
+  pppNtpRequireEqual faila1_16
+  lda clockSubsecond + 2
+  cmp #$7f94
+  pppNtpRequireEqual faila1_16
+  sep #$20
+  .a8
+  lda clockSecond
+  cmp #21
+  pppNtpRequireEqual faila1
+
   ; A stale or forged response cannot satisfy a new waiting request.
   sep #$20
   .a8
@@ -833,6 +858,12 @@ fail9f:
   bra fail
 faila0:
   lda #$a0
+  bra fail
+faila1_16:
+  sep #$20
+  .a8
+faila1:
+  lda #$a1
 fail:
   pha
   jsr cleanup

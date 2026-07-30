@@ -109,6 +109,14 @@ enum Command {
         #[arg(long)]
         once: bool,
     },
+    FrameRate {
+        #[arg(long, default_value = "ws://localhost:23074")]
+        websocket: String,
+        #[arg(long, default_value = "build/smoke/modem-control.lbl")]
+        labels: PathBuf,
+        #[arg(long, default_value_t = 10)]
+        seconds: u64,
+    },
     NtpRequest {
         #[arg(long, default_value = "ws://localhost:23074")]
         websocket: String,
@@ -334,6 +342,17 @@ async fn main() -> Result<()> {
                 once,
             )
             .await
+        }
+        Command::FrameRate {
+            websocket,
+            labels,
+            seconds,
+        } => {
+            let report =
+                qusb2snes::measure_frame_rate(&websocket, &labels, Duration::from_secs(seconds))
+                    .await?;
+            println!("{}", serde_json::to_string(&report)?);
+            Ok(())
         }
         Command::NtpRequest {
             websocket,

@@ -50,6 +50,20 @@ pub struct MailboxOutcome {
     pub output: Vec<u8>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct FrameRateReport {
+    pub elapsed_seconds: f64,
+    pub start_frame: u32,
+    pub end_frame: u32,
+    pub frame_delta: u32,
+    pub frames_per_second: f64,
+    pub start_unix_seconds: u32,
+    pub end_unix_seconds: u32,
+    pub start_subsecond: u32,
+    pub end_subsecond: u32,
+    pub clock_elapsed_seconds: f64,
+}
+
 impl Client {
     async fn connect(websocket: &str) -> Result<Self> {
         let (mut socket, _) = connect_async(websocket)
@@ -146,6 +160,52 @@ pub async fn ppp_monitor(
         }
         tokio::time::sleep(interval).await;
     }
+}
+
+pub async fn measure_frame_rate(
+    websocket: &str,
+    label_path: &Path,
+    duration: Duration,
+) -> Result<FrameRateReport> {
+    ensure!(!duration.is_zero(), "frame-rate duration must be non-zero");
+    let labels = read_labels(label_path)?;
+    let frame_counter = labels
+        .get("frameCounter")
+        .copied()
+        .context("label file does not contain frameCounter")?;
+    let offset = wram_to_usb2snes(frame_counter)?;
+    let clock_unix_seconds = labels
+        .get("clockUnixSeconds")
+        .copied()
+        .context("label file does not contain clockUnixSeconds")?;
+    let clock_offset = wram_to_usb2snes(clock_unix_seconds)?;
+    let mut client = Client::connect(websocket).await?;
+    eprintln!("attached to {}", client.device);
+
+    let start_frame = read_stable_u32(&mut client, offset).await?;
+    let (start_unix_seconds, start_subsecond) =
+        read_stable_clock(&mut client, clock_offset).await?;
+    let started = Instant::now();
+    tokio::time::sleep(duration).await;
+    let end_frame = read_stable_u32(&mut client, offset).await?;
+    let (end_unix_seconds, end_subsecond) = read_stable_clock(&mut client, clock_offset).await?;
+    let elapsed_seconds = started.elapsed().as_secs_f64();
+    let frame_delta = end_frame.wrapping_sub(start_frame);
+    let clock_elapsed_seconds = f64::from(end_unix_seconds.wrapping_sub(start_unix_seconds))
+        + (f64::from(end_subsecond) - f64::from(start_subsecond)) / 4_294_967_296.0;
+
+    Ok(FrameRateReport {
+        elapsed_seconds,
+        start_frame,
+        end_frame,
+        frame_delta,
+        frames_per_second: f64::from(frame_delta) / elapsed_seconds,
+        start_unix_seconds,
+        end_unix_seconds,
+        start_subsecond,
+        end_subsecond,
+        clock_elapsed_seconds,
+    })
 }
 
 pub async fn ntp_request(
@@ -388,6 +448,45 @@ async fn read_stable_mailbox_output(websocket: &str, mailbox_offset: usize) -> R
             "mailbox output did not stabilize"
         );
     }
+}
+
+async fn read_stable_u32(client: &mut Client, offset: usize) -> Result<u32> {
+    let mut previous: Option<Vec<u8>> = None;
+    for _ in 0..20 {
+        let current = client.read_address(offset, size_of::<u32>()).await?;
+        if previous.as_ref() == Some(&current) {
+            return Ok(u32::from_le_bytes(
+                current
+                    .as_slice()
+                    .try_into()
+                    .context("stable u32 read returned the wrong length")?,
+            ));
+        }
+        previous = Some(current);
+    }
+    bail!("u32 value at FXPAK offset 0x{offset:06x} did not stabilize")
+}
+
+async fn read_stable_clock(client: &mut Client, offset: usize) -> Result<(u32, u32)> {
+    let mut previous: Option<Vec<u8>> = None;
+    for _ in 0..20 {
+        let current = client.read_address(offset, 8).await?;
+        if previous.as_ref() == Some(&current) {
+            let seconds = u32::from_le_bytes(
+                current[0..4]
+                    .try_into()
+                    .context("clock seconds read returned the wrong length")?,
+            );
+            let subsecond = u32::from_le_bytes(
+                current[4..8]
+                    .try_into()
+                    .context("clock fraction read returned the wrong length")?,
+            );
+            return Ok((seconds, subsecond));
+        }
+        previous = Some(current);
+    }
+    bail!("clock value at FXPAK offset 0x{offset:06x} did not stabilize")
 }
 
 pub async fn read_snapshot(websocket: &str, label_path: &Path) -> Result<DiagnosticSnapshot> {

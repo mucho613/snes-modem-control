@@ -50,7 +50,7 @@ CLOCK_MINUTE_SECONDS = $0000003c
 .import clockHour, clockMinute, clockSecond, clockDisplayText
 .import clockConversionRemaining
 
-.export clockInitialize, clockPoll, clockSetUnixTime
+.export clockInitialize, clockPoll, clockSetUnixTime, clockAdvanceFrames
 
 .proc clockInitialize
   .a16
@@ -295,6 +295,7 @@ clockIsLeapYear:
   rts
 
 clockFormatDisplay:
+  phx
   ldx #$0000
   lda clockYear
   jsr @writeYear
@@ -334,6 +335,7 @@ clockFormatDisplay:
   jsr @writeTwoDigits
   rep #$20
   .a16
+  plx
   rts
 
 @writeYear:
@@ -451,7 +453,26 @@ clockFormatDisplay:
   beq @done16
   rep #$20
   .a16
+  jsr clockAdvanceFrames
+  bra @done
 
+@done16:
+  rep #$20
+  .a16
+@done:
+  ply
+  plx
+  plb
+  pla
+  rts
+.endproc
+
+; Advance an already synchronized clock by X nominal NTSC frames. This is a
+; separate entry point so the permanent self-test can exercise second-boundary
+; behavior without racing the live NMI frame counter.
+.proc clockAdvanceFrames
+  .a16
+  .i16
 @frameLoop:
   lda clockSubsecond
   clc
@@ -466,25 +487,18 @@ clockFormatDisplay:
   bne :+
   inc clockUnixSeconds + 2
 :
-  jsr @incrementCalendar
+  jsr clockIncrementCalendar
   jsr clockSetUnixTime::clockFormatDisplay
 
 @nextFrame:
   dex
   bne @frameLoop
-  bra @done
-
-@done16:
-  rep #$20
-  .a16
-@done:
-  ply
-  plx
-  plb
-  pla
   rts
+.endproc
 
-@incrementCalendar:
+.proc clockIncrementCalendar
+  .a16
+  .i16
   sep #$20
   .a8
   inc clockSecond
@@ -503,7 +517,7 @@ clockFormatDisplay:
   bcc @calendarDone
   stz clockHour
   inc clockDay
-  jsr @daysInMonth
+  jsr clockDaysInMonth
   cmp clockDay
   bcs @calendarDone
   lda #$01
@@ -523,8 +537,11 @@ clockFormatDisplay:
   rep #$20
   .a16
   rts
+.endproc
 
-@daysInMonth:
+.proc clockDaysInMonth
+  .a8
+  .i16
   lda clockMonth
   cmp #$02
   beq @calendarFebruary

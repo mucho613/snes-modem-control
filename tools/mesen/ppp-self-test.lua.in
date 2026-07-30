@@ -11,6 +11,7 @@ local STATUS_FAILED = @STATUS_FAILED@
 local SCREEN_MODE = @SCREEN_MODE_OFFSET@
 local STATUS_TILE_BUFFER = @STATUS_TILE_BUFFER_OFFSET@
 local CLOCK_VALID = @CLOCK_VALID_OFFSET@
+local FRAME_COUNTER = @FRAME_COUNTER_OFFSET@
 
 local OFFSET_VERSION = 4
 local OFFSET_SIZE = 6
@@ -25,6 +26,10 @@ local memory_type = emu.memType.snesWorkRam
 local frame_count = 0
 local command_sent = false
 local sequence = 0
+local frame_probe_started = false
+local frame_probe_host_start = 0
+local frame_probe_sfc_start = 0
+local FRAME_PROBE_LENGTH = 120
 
 local function read8(offset)
     return emu.read(MAILBOX + offset, memory_type, false)
@@ -50,6 +55,13 @@ end
 
 local function read_wram8(offset)
     return emu.read(offset, memory_type, false)
+end
+
+local function read_wram32(offset)
+    return read_wram8(offset)
+        | (read_wram8(offset + 1) << 8)
+        | (read_wram8(offset + 2) << 16)
+        | (read_wram8(offset + 3) << 24)
 end
 
 local function matches_text(offset, expected)
@@ -113,6 +125,29 @@ local function poll()
                     read16(OFFSET_SIZE)
                 ),
                 251
+            )
+            return
+        end
+
+        if not frame_probe_started then
+            frame_probe_started = true
+            frame_probe_host_start = frame_count
+            frame_probe_sfc_start = read_wram32(FRAME_COUNTER)
+            return
+        end
+        local host_frames = frame_count - frame_probe_host_start
+        if host_frames < FRAME_PROBE_LENGTH then
+            return
+        end
+        local sfc_frames = read_wram32(FRAME_COUNTER) - frame_probe_sfc_start
+        if math.abs(sfc_frames - host_frames) > 1 then
+            stop_failure(
+                string.format(
+                    "frame counter rate mismatch: SFC=%d emulator=%d",
+                    sfc_frames,
+                    host_frames
+                ),
+                244
             )
             return
         end

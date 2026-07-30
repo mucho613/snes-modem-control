@@ -493,7 +493,7 @@ offsetの補正は行いません。応答期限は要求送信後900frameです
 
 公開診断ABI version 10、331byteはstate、error、cookie、Reference ID、
 Receive/Transmit Timestamp、Unix秒、deadline、要求・応答・破棄・timeout countを
-追加します。常設セルフテストのstep `$99`～`$A0`は要求生成、重複要求保護、
+追加します。常設セルフテストのstep `$99`～`$A1`は要求生成、重複要求保護、
 相関済み応答、cookie不一致、Kiss-o'-Death、timeout、IPCP未接続時の拒否を検査
 します。MesenCEのheadless runnerとrevision AのFXPAK PRO実機で合格済みです。
 実回線試験では次を使います。

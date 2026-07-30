@@ -23,6 +23,16 @@
   phy
   php
 
+  ; RDNMI is the actual NMI source latch. Merely leaving VBlank, as observed
+  ; through HVBJOY, is not sufficient when NMITIMEN is gated around manual
+  ; controller I/O: re-enabling bit 7 while this latch is still set can fire
+  ; a second NMI for the same VBlank. Acknowledge it before counting the frame.
+  sep #$20
+  .a8
+  setDBR $00
+  lda RDNMI
+  setDBR $7e
+
   ; An NMI can interrupt main-loop code while X/Y are 8-bit. Normalize both
   ; widths after saving P so every VBlank callee gets its declared ABI.
   rep #$30

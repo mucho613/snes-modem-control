@@ -1117,6 +1117,9 @@ fn mesen_test(root: &Path, requested_mesen: Option<&Path>, timeout_seconds: u32)
     let clock_valid_offset = read_label_address(&labels, "clockValid")?
         .checked_sub(0x7e_0000)
         .context("clockValid is not in SNES WRAM bank 7E")?;
+    let frame_counter_offset = read_label_address(&labels, "frameCounter")?
+        .checked_sub(0x7e_0000)
+        .context("frameCounter is not in SNES WRAM bank 7E")?;
 
     let spec = read_spec(root)?;
     let command = *spec
@@ -1152,6 +1155,10 @@ fn mesen_test(root: &Path, requested_mesen: Option<&Path>, timeout_seconds: u32)
         .replace(
             "@CLOCK_VALID_OFFSET@",
             &format!("0x{clock_valid_offset:05X}"),
+        )
+        .replace(
+            "@FRAME_COUNTER_OFFSET@",
+            &format!("0x{frame_counter_offset:05X}"),
         );
     ensure!(
         !script.contains('@'),
@@ -1180,6 +1187,7 @@ fn mesen_test(root: &Path, requested_mesen: Option<&Path>, timeout_seconds: u32)
             Some(250) => bail!("MesenCE test rejected the mailbox ABI version"),
             Some(251) => bail!("MesenCE test rejected the mailbox block size"),
             Some(245) => bail!("MesenCE status screen is not the default"),
+            Some(244) => bail!("MesenCE frame counter rate validation failed"),
             Some(246) => bail!("MesenCE status screen header validation failed"),
             Some(247) => bail!("MesenCE application-status adapter validation failed"),
             Some(248) => bail!("MesenCE software-clock restoration validation failed"),

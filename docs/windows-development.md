@@ -62,6 +62,9 @@ cargo run -p ndm24-tools -- ppp-monitor --once
 # PPP framing の状態を継続監視（1 行 1 JSON）
 cargo run -p ndm24-tools -- ppp-monitor
 
+# frameCounterと同期後の内部時計を実時間と比較
+cargo run -p ndm24-tools -- frame-rate --seconds 15
+
 # IPCP Opened後、peerのUDP 123へNTP要求を送り、応答または失敗まで待つ
 cargo run -p ndm24-tools -- ntp-request
 
@@ -86,6 +89,12 @@ cargo run -p ndm24-tools -- mailbox freeze-trace
 cargo run -p ndm24-tools -- mailbox clear-trace
 cargo run -p ndm24-tools -- mailbox resume-trace
 ```
+
+`frame-rate`はQUsb2Snesから`frameCounter`、UTC Unix秒、32-bit小数部を安定
+読取し、指定時間後との差をJSONで返します。`frames_per_second`はNTSC実機で
+約60.1、NTP同期後の`clock_elapsed_seconds`は`elapsed_seconds`とほぼ一致する
+ことが合格条件です。画面の行更新や映像キャプチャの遅延を介さず、時計の基準と
+内部進行を分離して診断できます。
 
 ## MesenCE 自動セルフテスト
 

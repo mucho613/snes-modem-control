@@ -38,6 +38,7 @@ cargo run -p ndm24-tools -- test
 cargo run -p ndm24-tools -- mailbox ppp-self-test
 cargo run -p ndm24-tools -- monitor
 cargo run -p ndm24-tools -- ppp-monitor
+cargo run -p ndm24-tools -- frame-rate --seconds 15
 cargo run -p ndm24-tools -- ntp-request
 cargo run -p ndm24-tools -- identify --revision B
 cargo run -p ndm24-tools -- connect-test --revision B --port COM5
