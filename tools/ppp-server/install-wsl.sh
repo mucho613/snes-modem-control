@@ -10,8 +10,10 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 peer_file="${script_dir}/ndm24-lcp"
 chat_file="${script_dir}/ndm24-answer.chat"
 service_file="${script_dir}/ndm24-ppp-server.service"
+ntp_script="${script_dir}/ndm24-ntp-server.py"
+ntp_service_file="${script_dir}/ndm24-ntp-server.service"
 
-for command_name in pppd chat systemctl; do
+for command_name in pppd chat python3 systemctl; do
   if ! command -v "${command_name}" >/dev/null 2>&1; then
     echo "required command is missing: ${command_name}" >&2
     exit 1
@@ -21,6 +23,9 @@ done
 systemctl stop ndm24-ppp-server.service 2>/dev/null || true
 systemctl disable ndm24-ppp-server.service 2>/dev/null || true
 systemctl reset-failed ndm24-ppp-server.service 2>/dev/null || true
+systemctl stop ndm24-ntp-server.service 2>/dev/null || true
+systemctl disable ndm24-ntp-server.service 2>/dev/null || true
+systemctl reset-failed ndm24-ntp-server.service 2>/dev/null || true
 
 # This workstation previously used the same DFM-56U for a serial login.
 # The user has retired that use, so prevent mgetty's Restart=always service
@@ -33,6 +38,11 @@ install -o root -g root -m 0600 "${peer_file}" /etc/ppp/peers/ndm24-lcp
 install -o root -g root -m 0600 "${chat_file}" /etc/ppp/ndm24-answer.chat
 install -o root -g root -m 0644 \
   "${service_file}" /etc/systemd/system/ndm24-ppp-server.service
+install -d -o root -g root -m 0755 /usr/local/lib/ndm24
+install -o root -g root -m 0755 \
+  "${ntp_script}" /usr/local/lib/ndm24/ndm24-ntp-server.py
+install -o root -g root -m 0644 \
+  "${ntp_service_file}" /etc/systemd/system/ndm24-ntp-server.service
 
 pap_file=/etc/ppp/pap-secrets
 pap_entry=$'ndm24\tndm24-server\tndm24-test\t10.24.0.2'

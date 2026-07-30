@@ -1,0 +1,14 @@
+[Unit]
+Description=NTT DATA NDM24 closed-network NTP server
+After=ndm24-ppp-server.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/lib/ndm24/ndm24-ntp-server.py
+Restart=no
+TimeoutStopSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

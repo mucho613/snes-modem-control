@@ -10,6 +10,7 @@ param(
 $ErrorActionPreference = "Stop"
 $modemInstancePattern = '^USB\\VID_0572&PID_1329\\'
 $serviceName = "ndm24-ppp-server.service"
+$ntpServiceName = "ndm24-ntp-server.service"
 
 function Invoke-NativeChecked {
     param(
@@ -103,7 +104,7 @@ function Show-ServiceStatus {
     } | Format-List
 
     & wsl.exe -d $Distribution -u root --exec `
-        systemctl status $serviceName --no-pager
+        systemctl status $serviceName $ntpServiceName --no-pager
     if ($LASTEXITCODE -notin @(0, 3, 4)) {
         throw "systemctl status failed with exit code $LASTEXITCODE"
     }
@@ -134,10 +135,18 @@ switch ($Action) {
             "-d", $Distribution, "-u", "root",
             "--exec", "systemctl", "restart", $serviceName
         )
+        Invoke-NativeChecked "wsl.exe" @(
+            "-d", $Distribution, "-u", "root",
+            "--exec", "systemctl", "restart", $ntpServiceName
+        )
         Start-Sleep -Seconds 1
         Invoke-NativeChecked "wsl.exe" @(
             "-d", $Distribution, "-u", "root",
             "--exec", "systemctl", "is-active", $serviceName
+        )
+        Invoke-NativeChecked "wsl.exe" @(
+            "-d", $Distribution, "-u", "root",
+            "--exec", "systemctl", "is-active", $ntpServiceName
         )
         Show-ServiceStatus
     }
@@ -147,11 +156,17 @@ switch ($Action) {
     "Logs" {
         Invoke-NativeChecked "wsl.exe" @(
             "-d", $Distribution, "-u", "root",
-            "--exec", "journalctl", "-u", $serviceName,
+            "--exec", "journalctl", "-u", $serviceName, "-u", $ntpServiceName,
             "--no-pager", "-n", "200"
         )
     }
     "Stop" {
+        & wsl.exe -d $Distribution -u root --exec `
+            systemctl stop $ntpServiceName
+        if ($LASTEXITCODE -notin @(0, 5)) {
+            throw "systemctl stop failed with exit code $LASTEXITCODE"
+        }
+
         & wsl.exe -d $Distribution -u root --exec `
             systemctl stop $serviceName
         if ($LASTEXITCODE -notin @(0, 5)) {

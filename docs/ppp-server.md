@@ -12,7 +12,7 @@
 flowchart LR
     S["SFC + NDM24"] <-->|"V.22bis 2400 bit/s"| X["疑似電話交換機"]
     X <-->|"V.22bis 2400 bit/s"| D["DFM-56U"]
-    D <-->|"USB CDC ACM"| W["Ubuntu 22.04 / WSL2<br/>pppd"]
+    D <-->|"USB CDC ACM"| W["Ubuntu 22.04 / WSL2<br/>pppd + NTP"]
     P["Windows PowerShell"] -->|"usbipd / systemctl"| W
 ```
 
@@ -49,6 +49,8 @@ usbipd-winを修復または更新します。
 - `tools/ppp-server/ndm24-answer.chat`: DFM-56U初期化、着信待ち、応答
 - `tools/ppp-server/ndm24-lcp`: LCP試験用`pppd` peer profile
 - `tools/ppp-server/ndm24-ppp-server.service`: 手動起動するsystemd service
+- `tools/ppp-server/ndm24-ntp-server.py`: 閉じた試験網専用の最小NTPv4応答器
+- `tools/ppp-server/ndm24-ntp-server.service`: PPP addressを待つNTP service
 - `tools/ppp-server/install-wsl.sh`: WSL側へのroot所有ファイルの導入
 - `tools/ppp-server/ndm24-probe.chat`: 読み取り専用AT probeと応答検査
 - `tools/ppp-server/probe-modem.sh`: 回線を使わないAT probe
@@ -77,8 +79,8 @@ PowerShellから実行します。
 .\tools\ppp-server\ndm24-ppp-server.ps1 Stop
 ```
 
-`Install`は設定を`/etc/ppp`と`/etc/systemd/system`へ配置し、`pppd
-dryrun`で全optionを検査します。DFM-56UがWindows側にあり、
+`Install`は設定を`/etc/ppp`、`/etc/systemd/system`、`/usr/local/lib/ndm24`
+へ配置し、`pppd dryrun`で全optionを検査します。DFM-56UがWindows側にあり、
 `/dev/ttyACM0`が存在しない状態でも実行できます。serviceのenableやstartは
 行いません。
 
@@ -106,7 +108,8 @@ WindowsやWSLの再起動、USBの抜き差し後に必要です。
 .\tools\ppp-server\ndm24-ppp-server.ps1 Logs
 ```
 
-`Start`はDFM-56UをWSL2へattachし、serviceを手動起動します。chat scriptは
+`Start`はDFM-56UをWSL2へattachし、PPPとNTPのserviceを手動起動します。
+chat scriptは
 DFM-56Uを初期化した後、最大300秒`RING`を待ち、`ATA`の後に`CONNECT`を
 待ちます。自動再発信やserviceの自動再起動はしません。
 
@@ -173,6 +176,33 @@ cargo run -p ndm24-tools -- trace-live
 対向ログは`Logs` actionと、WSL内の`/var/log/ndm24-pppd.log`へ残ります。
 `debug`はLCPなどの制御packetを記録しますが、`show-password`は設定せず、
 PAP passwordをログへ出しません。
+
+## UDP/NTP試験
+
+NTP serviceは閉じた試験網の`10.24.0.1:123/UDP`を待ちます。PPP interfaceがまだ
+存在しない間は0.5秒ごとにbindを再試行します。portが空いていれば、外部NTP server
+へ問い合わせない内蔵応答器がVersion 3/4、Mode 3の48byte以上の要求に対して
+Stratum 1、Reference ID `LOCL`を返します。要求のTransmit Timestampを応答の
+Originate Timestampへそのまま複製するため、SFC側の64bit cookie相関も実回線で
+検査できます。時刻源はWSLのsystem clockです。
+
+既存のNTP daemonがUDP 123を所有している場合は停止や設定変更を行いません。
+内蔵応答器がそのdaemonへprobeを送り、Version 3/4、Mode 4、Stratum 1～15、
+Originate Timestampのcookie一致を確認できた場合だけ応答を委譲します。委譲中も
+30秒ごとに同じ検査を行い、応答しなくなればserviceを失敗状態にします。確認した
+WSL環境では既存の`ntp.service`がこの経路で応答します。
+
+IPCPが`Opened`になった後、Windows側で次を実行します。
+
+```powershell
+cargo run -p ndm24-tools -- ntp-request
+```
+
+コマンドはmailbox command 13を発行し、NTP stateが`Received`または`Failed`に
+なるまで待ちます。成功時はPPP診断snapshotとUnix秒、stratum、versionを表示します。
+`Logs`にはNTP要求元、client port、cookie、応答Unix秒が記録されます。合格条件は
+source/destinationを含むUDP checksum error 0、NTP drop/timeout 0、request/response
+countが各1増加し、表示Unix秒がWSLの現在時刻と回線遅延の範囲で一致することです。
 
 ## 2026-07-30 revision A 初回結果
 
