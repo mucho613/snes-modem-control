@@ -50,7 +50,7 @@ enum Task {
         timeout_seconds: u32,
     },
     AsmLint {
-        /// Report existing violations without failing; used only during migration.
+        /// Report violations without failing.
         #[arg(long)]
         audit: bool,
     },
@@ -215,12 +215,13 @@ fn main() -> Result<()> {
         Task::AsmLint { audit } => asm_lint::run(&root, audit),
         Task::Check => {
             generate(&root, true)?;
+            asm_lint::run(&root, false)?;
             run(Command::new("cargo")
                 .args(["test", "--workspace"])
                 .current_dir(&root))?;
-            build_rom(&root, RomProfile::Normal)?;
-            build_rom(&root, RomProfile::Smoke)?;
-            build_rom(&root, RomProfile::FontTest)
+            assemble_rom(&root, RomProfile::Normal)?;
+            assemble_rom(&root, RomProfile::Smoke)?;
+            assemble_rom(&root, RomProfile::FontTest)
         }
         Task::Bootstrap => bootstrap(&root),
     }
@@ -1037,6 +1038,11 @@ fn writeln(out: &mut String, line: &str) {
 }
 
 fn build_rom(root: &Path, profile: RomProfile) -> Result<()> {
+    asm_lint::run(root, false)?;
+    assemble_rom(root, profile)
+}
+
+fn assemble_rom(root: &Path, profile: RomProfile) -> Result<()> {
     let tools = find_cc65(root)?;
     let out = root.join(profile.output_directory());
     if out.exists() {
