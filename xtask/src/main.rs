@@ -10,6 +10,8 @@ use clap::{Parser, Subcommand};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
+mod asm_lint;
+
 #[derive(Debug, Parser)]
 #[command(about = "Windows-native build and generation tasks for snes-modem-control")]
 struct Cli {
@@ -46,6 +48,11 @@ enum Task {
         /// MesenCE test-runner wall-clock timeout.
         #[arg(long, default_value_t = 30)]
         timeout_seconds: u32,
+    },
+    AsmLint {
+        /// Report existing violations without failing; used only during migration.
+        #[arg(long)]
+        audit: bool,
     },
     Check,
     Bootstrap,
@@ -205,6 +212,7 @@ fn main() -> Result<()> {
             mesen,
             timeout_seconds,
         } => mesen_test(&root, mesen.as_deref(), timeout_seconds),
+        Task::AsmLint { audit } => asm_lint::run(&root, audit),
         Task::Check => {
             generate(&root, true)?;
             run(Command::new("cargo")
