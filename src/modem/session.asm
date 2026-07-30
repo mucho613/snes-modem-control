@@ -220,8 +220,7 @@ done:
   rts
 
 queueProbe:
-  .a8
-  .i8
+  assert_m8_i8
 
   ; ATM0 doubles as the liveness probe and reapplies speaker-off after every
   ; power-on or explicit raw-R reinitialization.
@@ -262,8 +261,7 @@ queueFailed:
 ; Input A is one raw modem byte. Parsing is deliberately active only in
 ; PROBING, so bytes received after readiness remain owned by the next layer.
 feedByte:
-  .a8
-  .i8
+  assert_m8_i8
 
   ; NDM24 terminates AT result lines with CR LF. Keep the text accumulated
   ; across CR and commit it on LF so READY is not published before the final

@@ -82,7 +82,7 @@
   lda #$03
   jmp @fail
 :
-  .a16
+  assert_m16_i16
   lda pppLastProtocol
   cmp #$c021
   beq :+
@@ -90,7 +90,7 @@
   lda #$04
   jmp @fail
 :
-  .a16
+  assert_m16_i16
   m8
   lda pppFrameBuffer + 0
   cmp #$ff
@@ -267,14 +267,14 @@
   lda #$10
   jmp @fail
 :
-  .a16
+  assert_m16_i16
   lda pppReceiveByteCount + 2
   beq :+
   m8
   lda #$10
   jmp @fail
 :
-  .a16
+  assert_m16_i16
   lda pppReceiveFrameCount
   cmp #$0001
   beq :+
@@ -282,14 +282,14 @@
   lda #$11
   jmp @fail
 :
-  .a16
+  assert_m16_i16
   lda pppReceiveFrameCount + 2
   beq :+
   m8
   lda #$11
   jmp @fail
 :
-  .a16
+  assert_m16_i16
   m8
   ; Encode the same frame, including a repeated peek before the opening Flag
   ; is accepted to model TX-ring backpressure.

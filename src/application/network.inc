@@ -828,7 +828,7 @@ NETWORK_COUNTER_COLUMN = 10
 
 ; A=16-bit unsigned value, X=destination.
 @writeDecimal16:
-  .a16
+  assert_m16_i16
   sta statusFormatValue
   m8
   stz statusFormatStarted
@@ -849,7 +849,7 @@ NETWORK_COUNTER_COLUMN = 10
 ; Y points to a little-endian u32. Large counters stay honest without an
 ; expensive full 32-bit decimal conversion.
 @writeCounter32:
-  .a8
+  assert_m8_i16
   lda $0002, y
   ora $0003, y
   beq @counterLow
@@ -863,7 +863,7 @@ NETWORK_COUNTER_COLUMN = 10
   rts
 
 @writeHex16:
-  .a16
+  assert_m16_i16
   sta statusFormatValue
   m8
   lda #'$'
@@ -877,7 +877,7 @@ NETWORK_COUNTER_COLUMN = 10
   rts
 
 @writeHex8:
-  .a8
+  assert_m8_i16
   pha
   lsr
   lsr

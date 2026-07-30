@@ -167,7 +167,7 @@ failed:
   rts
 
 linkIsOpen:
-  .a8
+  assert_m8_i16
   lda pppIpcpState
   cmp #PPP_IPCP_STATE_OPENED
   bne @closed
@@ -313,7 +313,7 @@ done:
   rts
 
 linkIsOpen:
-  .a8
+  assert_m8_i16
   lda pppIpcpState
   cmp #PPP_IPCP_STATE_OPENED
   bne @closed
@@ -830,7 +830,7 @@ return:
   rts
 
 prepareLink:
-  .a8
+  assert_m8_i16
   jsr pppTransmitInitialize
   jsr pppIpcpInitialize
   jsr pppIpv4Initialize
@@ -850,7 +850,7 @@ prepareLink:
   rts
 
 prepareResponse:
-  .a8
+  assert_m8_i16
   lda #PPP_UDP_FLAG_VALID
   sta pppUdpFlags
   m16
@@ -930,7 +930,7 @@ prepareResponse:
   rts
 
 cleanup:
-  .a8
+  assert_m8_i16
   m16
   lda pppNtpTestSavedFrameCounter
   sta frameCounter

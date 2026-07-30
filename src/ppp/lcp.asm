@@ -106,7 +106,7 @@
   jmp @fail
 
 @checkHeader:
-  .a16
+  assert_m16_i16
   lda pppLastFrameLength
   cmp #PPP_LCP_MINIMUM_FRAME_LENGTH
   bcs @readHeader
@@ -115,7 +115,7 @@
   jmp @fail
 
 @readHeader:
-  .a16
+  assert_m16_i16
   m8
   lda pppFrameBuffer + PPP_LCP_FRAME_OFFSET
   sta pppLcpLastCode
@@ -135,7 +135,7 @@
   jmp @fail
 
 @checkAvailable:
-  .a16
+  assert_m16_i16
   clc
   adc #PPP_LCP_FRAME_OFFSET
   sta pppLcpPacketEnd
@@ -147,7 +147,7 @@
   jmp @fail
 
 @checkConfigure:
-  .a16
+  assert_m16_i16
   m8
   lda pppLcpLastCode
   cmp #PPP_LCP_CODE_CONFIGURE_REQUEST
@@ -160,7 +160,7 @@
   m16
   ldx #PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH
 @optionLoop:
-  .a16
+  assert_m16_i16
   cpx pppLcpPacketEnd
   beq @success16
   txa
@@ -174,7 +174,7 @@
   jmp @fail
 
 @readOptionLength:
-  .a16
+  assert_m16_i16
   m8
   lda pppFrameBuffer + 1, x
   cmp #$02
@@ -183,7 +183,7 @@
   jmp @fail
 
 @checkOptionEnd:
-  .a8
+  assert_m8_i16
   m16
   and #$00ff
   sta pppLcpOptionLength
@@ -198,12 +198,12 @@
   jmp @fail
 
 @advanceOption:
-  .a16
+  assert_m16_i16
   tax
   bra @optionLoop
 
 @success16:
-  .a16
+  assert_m16_i16
   m8
 @success:
   stz pppLcpLastError

@@ -250,8 +250,7 @@ receiveDone:
 ; X is the ICMP message offset in pppFrameBuffer. Returns the folded sum in
 ; A16, treating an odd final byte as the high byte of a zero-padded word.
 checksumReceiveMessage:
-  .a16
-  .i16
+  assert_m16_i16
   stz pppIcmpChecksumAccumulator
   lda pppIpv4PayloadLength
   lsr
@@ -671,7 +670,7 @@ return:
   rts
 
 prepareRequest:
-  .a8
+  assert_m8_i16
   lda #PPP_IPV4_MINIMUM_HEADER_LENGTH
   sta pppIpv4HeaderLength
   lda #PPP_IPV4_PROTOCOL_ICMP
@@ -714,7 +713,7 @@ prepareRequest:
   rts
 
 cleanup:
-  .a8
+  assert_m8_i16
   jsr pppTransmitInitialize
   jsr pppIpcpInitialize
   jsr pppIpv4Initialize

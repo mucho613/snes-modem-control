@@ -677,7 +677,7 @@ receiveDone:
 ; X is a DNS message-relative name cursor expressed as a frame-buffer offset.
 ; A16 is returned; carry set means malformed or truncated.
 skipName:
-  .a16
+  assert_m16_i16
 nameOctet:
   lda #$0001
   jsr requireBytes
@@ -732,7 +732,7 @@ nameEnd:
 
 ; A16 bytes must be available starting at X. X is preserved.
 requireBytes:
-  .a16
+  assert_m16_i16
   sta pppDnsDataLength
   txa
   clc

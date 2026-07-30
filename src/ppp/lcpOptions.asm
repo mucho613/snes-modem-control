@@ -37,7 +37,7 @@
 
   ldx #$0000
 @clearMaps:
-  .a8
+  assert_m8_i16
   stz pppLcpOptionSeen, x
   stz pppLcpOptionDuplicate, x
   inx
@@ -47,7 +47,7 @@
   ; First pass records duplicate types without changing option order.
   ldy #PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH
 @duplicateLoop:
-  .a8
+  assert_m8_i16
   cpy pppLcpPacketEnd
   beq @classifyStart
   lda pppFrameBuffer, y
@@ -58,21 +58,21 @@
   sta pppLcpOptionDuplicate, x
   bra @duplicateAdvance
 @firstType:
-  .a8
+  assert_m8_i16
   lda #$01
   sta pppLcpOptionSeen, x
 @duplicateAdvance:
-  .a8
+  assert_m8_i16
   jsr @advanceY
   bra @duplicateLoop
 
 @classifyStart:
-  .a8
+  assert_m8_i16
   stz pppLcpHasReject
   stz pppLcpHasNak
   ldy #PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH
 @classifyLoop:
-  .a8
+  assert_m8_i16
   cpy pppLcpPacketEnd
   beq @selectPacketResponse
   jsr pppLcpClassifyPeerOption
@@ -82,35 +82,35 @@
   sta pppLcpHasReject
   bra @classifyAdvance
 @checkNak:
-  .a8
+  assert_m8_i16
   cmp #PPP_LCP_OPTION_DISPOSITION_NAK
   bne @classifyAdvance
   lda #$01
   sta pppLcpHasNak
 @classifyAdvance:
-  .a8
+  assert_m8_i16
   jsr @advanceY
   bra @classifyLoop
 
 @selectPacketResponse:
-  .a8
+  assert_m8_i16
   lda pppLcpHasReject
   beq @selectNak
   lda #PPP_LCP_ACTION_CONFIGURE_REJECT
   bra @return
 @selectNak:
-  .a8
+  assert_m8_i16
   lda pppLcpHasNak
   beq @accept
   lda #PPP_LCP_ACTION_CONFIGURE_NAK
   bra @return
 @accept:
-  .a8
+  assert_m8_i16
   jsr @commitAcceptedConfiguration
   lda #PPP_LCP_ACTION_CONFIGURE_ACK
 
 @return:
-  .a8
+  assert_m8_i16
   ply
   plx
   plb
@@ -118,7 +118,7 @@
 
 ; Advance Y by the current option's validated Length.
 @advanceY:
-  .a8
+  assert_m8_i16
   lda pppFrameBuffer + 1, y
   sta pppLcpOptionLength
   stz pppLcpOptionLength + 1
@@ -132,7 +132,7 @@
 
 ; Publish peer values only after every option was accepted.
 @commitAcceptedConfiguration:
-  .a8
+  assert_m8_i16
   stz pppLcpPeerFlags
   m16
   lda #PPP_DEFAULT_MRU
@@ -145,7 +145,7 @@
   m8
   ldy #PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH
 @commitLoop:
-  .a8
+  assert_m8_i16
   cpy pppLcpPacketEnd
   beq @commitDone
   lda pppFrameBuffer, y
@@ -160,7 +160,7 @@
   bra @commitAdvance
 
 @commitMru:
-  .a8
+  assert_m8_i16
   lda pppFrameBuffer + 3, y
   sta pppLcpPeerMru
   lda pppFrameBuffer + 2, y
@@ -171,7 +171,7 @@
   bra @commitAdvance
 
 @commitAccm:
-  .a8
+  assert_m8_i16
   lda pppFrameBuffer + 5, y
   sta pppLcpPeerAccm
   lda pppFrameBuffer + 4, y
@@ -186,14 +186,14 @@
   bra @commitAdvance
 
 @commitPap:
-  .a8
+  assert_m8_i16
   lda pppLcpPeerFlags
   ora #PPP_LCP_PEER_FLAG_PAP
   sta pppLcpPeerFlags
   bra @commitAdvance
 
 @commitMagic:
-  .a8
+  assert_m8_i16
   lda pppFrameBuffer + 5, y
   sta pppLcpPeerMagic
   lda pppFrameBuffer + 4, y
@@ -207,11 +207,11 @@
   sta pppLcpPeerFlags
 
 @commitAdvance:
-  .a8
+  assert_m8_i16
   jsr @advanceY
   jmp @commitLoop
 @commitDone:
-  .a8
+  assert_m8_i16
   rts
 .endproc
 
@@ -319,7 +319,7 @@
   pppLcpBranchEqualOrJump @fail41
   sta pppLcpPendingAction
   jsr pppLcpBuildPeerResponse
-  .a16
+  assert_m16_i16
   cmp #$0010
   pppLcpBranchEqualOrJump @fail41_16
   m8
@@ -382,7 +382,7 @@
   pppLcpBranchEqualOrJump @fail42
   sta pppLcpPendingAction
   jsr pppLcpBuildPeerResponse
-  .a16
+  assert_m16_i16
   cmp #$000d
   pppLcpBranchEqualOrJump @fail42_16
   m8
@@ -437,7 +437,7 @@
   pppLcpBranchEqualOrJump @fail43
   sta pppLcpPendingAction
   jsr pppLcpBuildPeerResponse
-  .a16
+  assert_m16_i16
   cmp #$0010
   pppLcpBranchEqualOrJump @fail43_16
   m8
@@ -460,25 +460,25 @@
   bra @return
 
 @fail40_16:
-  .a16
+  assert_m16_i16
   m8
 @fail40:
   lda #$40
   bra @fail
 @fail41_16:
-  .a16
+  assert_m16_i16
   m8
 @fail41:
   lda #$41
   bra @fail
 @fail42_16:
-  .a16
+  assert_m16_i16
   m8
 @fail42:
   lda #$42
   bra @fail
 @fail43_16:
-  .a16
+  assert_m16_i16
   m8
 @fail43:
   lda #$43
@@ -498,7 +498,7 @@
 
 ; Input A8=LCP packet length. Establish the already-validated packet bounds.
 @preparePacket:
-  .a8
+  assert_m8_i16
   sta pppLcpPacketLength
   stz pppLcpPacketLength + 1
   sta pppFrameBuffer + 7
@@ -538,7 +538,7 @@
   bra @reject
 
 @mru:
-  .a8
+  assert_m8_i16
   lda pppFrameBuffer + 1, y
   cmp #$04
   bne @nak
@@ -548,14 +548,14 @@
   bra @ack
 
 @accm:
-  .a8
+  assert_m8_i16
   lda pppFrameBuffer + 1, y
   cmp #$06
   beq @ack
   bra @nak
 
 @authentication:
-  .a8
+  assert_m8_i16
   lda pppFrameBuffer + 1, y
   cmp #$04
   bne @nak
@@ -568,7 +568,7 @@
   bra @ack
 
 @magic:
-  .a8
+  assert_m8_i16
   lda pppFrameBuffer + 1, y
   cmp #$06
   bne @reject
@@ -579,17 +579,17 @@
   beq @reject
 
 @ack:
-  .a8
+  assert_m8_i16
   plx
   lda #PPP_LCP_OPTION_DISPOSITION_ACK
   rts
 @nak:
-  .a8
+  assert_m8_i16
   plx
   lda #PPP_LCP_OPTION_DISPOSITION_NAK
   rts
 @reject:
-  .a8
+  assert_m8_i16
   plx
   lda #PPP_LCP_OPTION_DISPOSITION_REJECT
   rts
@@ -614,10 +614,10 @@
   lda #PPP_LCP_CODE_CONFIGURE_REJECT
   bra @storeCode
 @nakCode:
-  .a8
+  assert_m8_i16
   lda #PPP_LCP_CODE_CONFIGURE_NAK
 @storeCode:
-  .a8
+  assert_m8_i16
   sta pppTransmitBuffer + 4
   lda pppFrameBuffer + 5
   sta pppTransmitBuffer + 5
@@ -627,7 +627,7 @@
   ldy #PPP_LCP_FRAME_OFFSET + PPP_LCP_HEADER_LENGTH
 
 @optionLoop:
-  .a16
+  assert_m16_i16
   cpy pppLcpPacketEnd
   bne :+
   jmp @finish
@@ -644,7 +644,7 @@
   jmp @advanceInput
 
 @maybeReject:
-  .a8
+  assert_m8_i16
   pla
   cmp #PPP_LCP_OPTION_DISPOSITION_REJECT
   beq :+
@@ -653,7 +653,7 @@
   jmp @copyInputOption
 
 @writeNak:
-  .a8
+  assert_m8_i16
   lda pppFrameBuffer, y
   cmp #PPP_LCP_OPTION_MRU
   beq @writeMruNak
@@ -678,7 +678,7 @@
   bra @advanceInput
 
 @writeMruNak:
-  .a8
+  assert_m8_i16
   ldx pppLcpOutputCursor
   lda #PPP_LCP_OPTION_MRU
   sta pppTransmitBuffer, x
@@ -697,7 +697,7 @@
   bra @advanceInput
 
 @writeAccmNak:
-  .a8
+  assert_m8_i16
   ldx pppLcpOutputCursor
   lda #PPP_LCP_OPTION_ACCM
   sta pppTransmitBuffer, x
@@ -715,7 +715,7 @@
   sta pppLcpOutputCursor
   m8
 @advanceInput:
-  .a8
+  assert_m8_i16
   lda pppFrameBuffer + 1, y
   sta pppLcpOptionLength
   stz pppLcpOptionLength + 1
@@ -728,13 +728,13 @@
 
 ; Copy the rejected option exactly and leave Y at the following input option.
 @copyInputOption:
-  .a8
+  assert_m8_i16
   sty pppLcpOptionOffset
   lda pppFrameBuffer + 1, y
   sta pppLcpOptionLength
   stz pppLcpOptionLength + 1
 @copyByte:
-  .a8
+  assert_m8_i16
   ldy pppLcpOptionOffset
   ldx pppLcpOutputCursor
   lda pppFrameBuffer, y
@@ -748,12 +748,12 @@
   ldy pppLcpOptionOffset
   jmp @optionLoop
 @copyByte16:
-  .a16
+  assert_m16_i16
   m8
   bra @copyByte
 
 @finish:
-  .a16
+  assert_m16_i16
   lda pppLcpOutputCursor
   sec
   sbc #PPP_LCP_FRAME_OFFSET

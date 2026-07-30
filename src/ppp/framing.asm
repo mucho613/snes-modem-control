@@ -214,7 +214,7 @@
   rts
 
 @checkFcs:
-  .a16
+  assert_m16_i16
   lda pppDecoderFcs
   cmp #PPP_GOOD_FCS16
   beq @frameComplete
@@ -226,7 +226,7 @@
   rts
 
 @frameComplete:
-  .a16
+  assert_m16_i16
   lda pppDecoderLength
   sec
   sbc #PPP_FCS16_LENGTH

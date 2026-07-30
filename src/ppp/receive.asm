@@ -437,7 +437,7 @@ done:
   rts
 
 @cleanup:
-  .a8
+  assert_m8_i16
   jsr pppReceiveInitialize
   lda pppCarrierTestSavedModemState
   sta modemDriverState

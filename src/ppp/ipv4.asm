@@ -244,8 +244,7 @@ valid:
 
 ; X is the IPv4 header offset in pppFrameBuffer. Returns A16 folded sum.
 checksumReceiveHeader:
-  .a8
-  .i16
+  assert_m8_i16
   m16
   stz pppIpv4ChecksumAccumulator
   m8
@@ -398,8 +397,7 @@ transmitError:
   rts
 
 checksumTransmitHeader:
-  .a8
-  .i16
+  assert_m8_i16
   m16
   stz pppIpv4ChecksumAccumulator
   ldx #PPP_IPV4_FRAME_OFFSET
@@ -610,7 +608,7 @@ checksumTransmitWord:
   rts
 
 @cleanup:
-  .a8
+  assert_m8_i16
   jsr pppIpv4Initialize
   jsr pppTransmitInitialize
   jsr pppIpcpInitialize

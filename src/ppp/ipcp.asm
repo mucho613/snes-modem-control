@@ -75,7 +75,7 @@
   rts
 
 @setDefaultPeer:
-  .a8
+  assert_m8_i16
   lda #PPP_IPCP_PEER_ADDRESS_0
   sta pppIpcpPeerAddress + 0
   lda #PPP_IPCP_PEER_ADDRESS_1
@@ -221,7 +221,7 @@
   pppIpcpReturnError PPP_IPCP_ERROR_WRONG_PROTOCOL
 
 @checkHeader:
-  .a16
+  assert_m16_i16
   lda pppLastFrameLength
   cmp #PPP_IPCP_MINIMUM_FRAME_LENGTH
   bcs @readHeader
@@ -246,7 +246,7 @@
   pppIpcpReturnError PPP_IPCP_ERROR_INVALID_PACKET_LENGTH
 
 @checkAvailable:
-  .a16
+  assert_m16_i16
   clc
   adc #PPP_IPCP_FRAME_OFFSET
   sta pppIpcpPacketEnd
@@ -257,7 +257,7 @@
   pppIpcpReturnError PPP_IPCP_ERROR_TRUNCATED_PACKET
 
 @validateOptions:
-  .a16
+  assert_m16_i16
   m8
   lda pppIpcpLastCode
   cmp #PPP_IPCP_CODE_CONFIGURE_REQUEST
@@ -267,11 +267,11 @@
   jmp @dispatch
 
 @optionStart:
-  .a8
+  assert_m8_i16
   m16
   ldx #PPP_IPCP_FRAME_OFFSET + PPP_IPCP_HEADER_LENGTH
 @optionLoop:
-  .a16
+  assert_m16_i16
   cpx pppIpcpPacketEnd
   beq @dispatch
   txa
@@ -283,7 +283,7 @@
   bra @truncatedOption16
 
 @readOptionLength:
-  .a16
+  assert_m16_i16
   m8
   lda pppFrameBuffer + 1, x
   cmp #$02
@@ -291,7 +291,7 @@
   pppIpcpReturnError PPP_IPCP_ERROR_INVALID_OPTION_LENGTH
 
 @optionLength:
-  .a8
+  assert_m8_i16
   sta pppIpcpOptionLength
   stz pppIpcpOptionLength + 1
   m16
@@ -305,19 +305,19 @@
   pppIpcpReturnError PPP_IPCP_ERROR_OPTION_OVERRUN
 
 @optionAdvance:
-  .a16
+  assert_m16_i16
   tax
   m8
   m16
   bra @optionLoop
 
 @truncatedOption16:
-  .a16
+  assert_m16_i16
   m8
   pppIpcpReturnError PPP_IPCP_ERROR_TRUNCATED_OPTION
 
 @dispatch:
-  .a16
+  assert_m16_i16
   m8
   lda pppIpcpState
   cmp #PPP_IPCP_STATE_CLOSED
@@ -342,11 +342,11 @@
   jmp @success
 
 @notConfiguring:
-  .a8
+  assert_m8_i16
   pppIpcpReturnError PPP_IPCP_ERROR_NOT_CONFIGURING
 
 @configureRequest:
-  .a8
+  assert_m8_i16
   jsr pppIpcpEvaluatePeerRequest
   sta pppIpcpPendingAction
   lda pppIpcpState
@@ -365,7 +365,7 @@
   jmp @success
 
 @openedPeerRequest:
-  .a8
+  assert_m8_i16
   inc pppIpcpRequestIdentifier
   lda #(PPP_IPCP_DEFAULT_MAX_CONFIGURE - 1)
   sta pppIpcpRestartRemaining
@@ -384,7 +384,7 @@
   jmp @success
 
 @acceptableRequest:
-  .a8
+  assert_m8_i16
   lda pppIpcpState
   cmp #PPP_IPCP_STATE_ACK_RECEIVED
   beq @requestCompletesOpen
@@ -393,7 +393,7 @@
   jmp @success
 
 @requestCompletesOpen:
-  .a8
+  assert_m8_i16
   lda #PPP_IPCP_STATE_OPENED
   sta pppIpcpState
   stz pppIpcpRestartRemaining
@@ -401,7 +401,7 @@
   jmp @success
 
 @configureAck:
-  .a8
+  assert_m8_i16
   lda pppIpcpLastIdentifier
   cmp pppIpcpRequestIdentifier
   beq :+
@@ -412,7 +412,7 @@
   jsr @publishDnsValidity
 
 @applyAck:
-  .a8
+  assert_m8_i16
   lda pppIpcpState
   cmp #PPP_IPCP_STATE_REQUEST_SENT
   beq @ackReceived
@@ -445,7 +445,7 @@
   jmp @success
 
 @configureNak:
-  .a8
+  assert_m8_i16
   lda pppIpcpLastIdentifier
   cmp pppIpcpRequestIdentifier
   bne @invalidResponse
@@ -455,7 +455,7 @@
   jmp @success
 
 @configureReject:
-  .a8
+  assert_m8_i16
   lda pppIpcpLastIdentifier
   cmp pppIpcpRequestIdentifier
   bne @invalidResponse
@@ -465,11 +465,11 @@
   jmp @success
 
 @invalidResponse:
-  .a8
+  assert_m8_i16
   pppIpcpReturnError PPP_IPCP_ERROR_INVALID_RESPONSE
 
 @success:
-  .a8
+  assert_m8_i16
   stz pppIpcpLastError
   jsr pppSnapshotEnd
   ply
@@ -480,7 +480,7 @@
 
 ; Ack must reproduce every currently requested option in fixed 3/129/131 order.
 @validateAckOptions:
-  .a8
+  assert_m8_i16
   ldy #PPP_IPCP_FRAME_OFFSET + PPP_IPCP_HEADER_LENGTH
   lda pppIpcpFlags
   and #PPP_IPCP_FLAG_REQUEST_ADDRESS
@@ -578,7 +578,7 @@
 
 ; Validate all Nak options before applying any of them.
 @acceptNakOptions:
-  .a8
+  assert_m8_i16
   ldy #PPP_IPCP_FRAME_OFFSET + PPP_IPCP_HEADER_LENGTH
   stz pppIpcpHasNak
 @nakLoop:
@@ -687,7 +687,7 @@
 
 ; Reject may independently remove any exact subset of our current request.
 @acceptRejectOptions:
-  .a8
+  assert_m8_i16
   ldy #PPP_IPCP_FRAME_OFFSET + PPP_IPCP_HEADER_LENGTH
   stz pppIpcpHasReject
 @rejectLoop:
@@ -767,7 +767,7 @@
   rts
 
 @negativeResponse:
-  .a8
+  assert_m8_i16
   lda pppIpcpState
   cmp #PPP_IPCP_STATE_ACK_SENT
   beq :+
@@ -778,7 +778,7 @@
   rts
 
 @newRequest:
-  .a8
+  assert_m8_i16
   inc pppIpcpRequestIdentifier
   lda #(PPP_IPCP_DEFAULT_MAX_CONFIGURE - 1)
   sta pppIpcpRestartRemaining
@@ -964,7 +964,7 @@
   ldy #PPP_IPCP_FRAME_OFFSET + PPP_IPCP_HEADER_LENGTH
 
 @loop:
-  .a16
+  assert_m16_i16
   cpy pppIpcpPacketEnd
   bne :+
   jmp @finish
@@ -1026,12 +1026,12 @@
   m8
   bra @copyByte
 @copyDone:
-  .a16
+  assert_m16_i16
   ldy pppIpcpOptionOffset
   jmp @loop
 
 @advance:
-  .a8
+  assert_m8_i16
   lda pppFrameBuffer + 1, y
   sta pppIpcpOptionLength
   stz pppIpcpOptionLength + 1
@@ -1043,7 +1043,7 @@
   jmp @loop
 
 @finish:
-  .a16
+  assert_m16_i16
   lda pppIpcpOutputCursor
   sec
   sbc #PPP_IPCP_FRAME_OFFSET
@@ -1158,7 +1158,7 @@
   bra @begin
 
 @writeRequestAddressOption:
-  .a8
+  assert_m8_i16
   sta pppTransmitBuffer, x
   lda #PPP_IPCP_IP_ADDRESS_OPTION_LENGTH
   sta pppTransmitBuffer + 1, x
@@ -1205,7 +1205,7 @@
   jsr pppIpcpBuildPeerResponse
 
 @begin:
-  .a16
+  assert_m16_i16
   jsr pppTransmitBegin
   bcs busy16Return
   m8

@@ -242,7 +242,7 @@ busyReturn:
   pppPapReturnError PPP_PAP_ERROR_WRONG_PROTOCOL
 
 @checkHeader:
-  .a16
+  assert_m16_i16
   lda pppLastFrameLength
   cmp #PPP_PAP_MINIMUM_FRAME_LENGTH
   bcs @readHeader
@@ -267,7 +267,7 @@ busyReturn:
   pppPapReturnError PPP_PAP_ERROR_INVALID_PACKET_LENGTH
 
 @checkAvailable:
-  .a16
+  assert_m16_i16
   clc
   adc #PPP_PAP_FRAME_OFFSET
   cmp pppLastFrameLength

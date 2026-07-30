@@ -290,7 +290,7 @@ done:
   rts
 
 @prepareFrame:
-  .a8
+  assert_m8_i16
   setDBR .bankbyte(pppIpv4PollSelfTestFrameHeader)
   ldx #$0000
 @copy:
@@ -321,7 +321,7 @@ done:
   rts
 
 @cleanup:
-  .a8
+  assert_m8_i16
   lda pppIpv4PollSavedModemState
   sta modemDriverState
   jsr pppReceiveInitialize

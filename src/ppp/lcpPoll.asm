@@ -52,7 +52,7 @@
   beq @stopped
 
 @serviceExistingPending:
-  .a8
+  assert_m8_i16
   jsr @servicePending
   bcc :+
   jmp @done
@@ -82,7 +82,7 @@
   bra @timer
 
 @knownUpperProtocol:
-  .a16
+  assert_m16_i16
   m8
   lda pppLcpState
   cmp #PPP_LCP_STATE_OPENED
@@ -91,19 +91,19 @@
   bra @timer
 
 @open:
-  .a8
+  assert_m8_i16
   jsr pppLcpOpen
   bra @serviceExistingPending
 
 @stopped:
-  .a8
+  assert_m8_i16
   lda pppFrameReady
   beq @done
   jsr pppReleaseFrame
   bra @done
 
 @receiveLcp:
-  .a16
+  assert_m16_i16
   m8
   jsr pppLcpReceiveFrame
   bcs @releaseThenTimer
@@ -121,26 +121,26 @@
   beq @responsePending
 
 @releaseThenTimer:
-  .a8
+  assert_m8_i16
   jsr pppReleaseFrame
   jsr @servicePending
   bra @timer
 
 @responsePending:
-  .a8
+  assert_m8_i16
   ; A busy encoder keeps both the response action and receive-frame ownership.
   jsr @servicePending
   bcs @done
 
 @timer:
-  .a8
+  assert_m8_i16
   jsr pppLcpPollTimeout
-  .a8
+  assert_m8_i16
   jsr @servicePending
   bra @done
 
 @lowerUnavailable:
-  .a8
+  assert_m8_i16
   lda pppFrameReady
   beq :+
   jsr pppReleaseFrame
@@ -153,7 +153,7 @@
   jsr pppTransmitAbort
 
 @done:
-  .a8
+  assert_m8_i16
   mi16
   ply
   plx
@@ -167,7 +167,7 @@
 ; until success. After a response succeeds, an Opened renegotiation request is
 ; promoted from the one-byte deferred slot.
 @servicePending:
-  .a8
+  assert_m8_i16
   lda pppLcpPendingAction
   beq @serviceReady
   sta pppLcpPollAction
@@ -190,7 +190,7 @@
   bne @serviceReady
 
 @terminateAckSent:
-  .a8
+  assert_m8_i16
   lda pppFrameReady
   beq :+
   jsr pppReleaseFrame
@@ -199,7 +199,7 @@
   bra @serviceReady
 
 @responseSent:
-  .a8
+  assert_m8_i16
   lda pppFrameReady
   beq :+
   jsr pppReleaseFrame
@@ -211,11 +211,11 @@
   sta pppLcpPendingAction
 
 @serviceReady:
-  .a8
+  assert_m8_i16
   clc
   rts
 @serviceBusy:
-  .a8
+  assert_m8_i16
   sec
   rts
 .endproc
@@ -389,7 +389,7 @@
   m8
   jmp @fail65
 :
-  .a16
+  assert_m16_i16
   lda pppLcpProtocolRejectCount
   cmp #$0001
   beq :+
@@ -590,7 +590,7 @@
   rts
 
 @cleanup:
-  .a8
+  assert_m8_i16
   lda pppLcpPollSavedModemState
   sta modemDriverState
   jsr pppReceiveInitialize
@@ -600,7 +600,7 @@
 
 ; Input A=Code, X low byte=Identifier.
 @writeEmptyPacket:
-  .a8
+  assert_m8_i16
   sta pppFrameBuffer + 4
   txa
   sta pppFrameBuffer + 5

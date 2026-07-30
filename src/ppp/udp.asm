@@ -188,8 +188,7 @@ applicationDone8:
   rts
 
 checksumReceiveDatagram:
-  .a16
-  .i16
+  assert_m16_i16
   stz pppUdpChecksumAccumulator
 
   lda pppIpv4SourceAddress + 0
@@ -236,7 +235,7 @@ checksumReceiveDatagram:
   rts
 
 addChecksumWord:
-  .a16
+  assert_m16_i16
   clc
   adc pppUdpChecksumAccumulator
   sta pppUdpChecksumAccumulator
@@ -323,8 +322,7 @@ transmitError:
   rts
 
 checksumTransmitDatagram:
-  .a16
-  .i16
+  assert_m16_i16
   stz pppUdpChecksumAccumulator
 
   lda pppIpcpLocalAddress + 0
@@ -371,7 +369,7 @@ checksumTransmitDatagram:
   rts
 
 addChecksumWord:
-  .a16
+  assert_m16_i16
   clc
   adc pppUdpChecksumAccumulator
   sta pppUdpChecksumAccumulator
@@ -600,7 +598,7 @@ return:
   rts
 
 prepareDatagram:
-  .a8
+  assert_m8_i16
   lda #PPP_IPV4_MINIMUM_HEADER_LENGTH
   sta pppIpv4HeaderLength
   lda #$c0
@@ -645,7 +643,7 @@ prepareDatagram:
   rts
 
 cleanup:
-  .a8
+  assert_m8_i16
   jsr pppTransmitInitialize
   jsr pppIpcpInitialize
   jsr pppIpv4Initialize

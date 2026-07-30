@@ -53,7 +53,7 @@
   m16
   lda frameCounter
   jsr pppLcpArmRestartTimerAt
-  .a8
+  assert_m8_i16
   plb
   rts
 .endproc
@@ -85,7 +85,7 @@
   m16
   lda frameCounter
   jsr pppLcpPollTimeoutAt
-  .a8
+  assert_m8_i16
   plb
   rts
 .endproc
@@ -126,7 +126,7 @@
   rts
 
 @configuring:
-  .a8
+  assert_m8_i16
   jsr pppSnapshotBegin
   lda pppLcpRestartRemaining
   beq @finished
@@ -147,7 +147,7 @@
   rts
 
 @finished:
-  .a8
+  assert_m8_i16
   lda #PPP_LCP_STATE_STOPPED
   sta pppLcpState
   stz pppLcpRestartRemaining
@@ -160,7 +160,7 @@
   rts
 
 @unchanged:
-  .a16
+  assert_m16_i16
   m8
   plb
   clc
@@ -260,7 +260,7 @@
   m16
   lda #$fff0
   jsr pppLcpArmRestartTimerAt
-  .a8
+  assert_m8_i16
   lda pppLcpTimerActive
   pppLcpTimerRequireNonzero @fail50
   m16
@@ -271,7 +271,7 @@
   ; One frame before the deadline does nothing.
   lda #$00a3
   jsr pppLcpPollTimeoutAt
-  .a8
+  assert_m8_i16
   pppLcpTimerRequireCarryClear @fail51
   lda pppLcpPendingAction
   pppLcpTimerRequireEqual @fail51
@@ -280,7 +280,7 @@
   m16
   lda #$00a4
   jsr pppLcpPollTimeoutAt
-  .a8
+  assert_m8_i16
   pppLcpTimerRequireCarrySet @fail52
   lda pppLcpPendingAction
   cmp #PPP_LCP_ACTION_CONFIGURE_REQUEST
@@ -299,11 +299,11 @@
   m16
   lda #$0100
   jsr pppLcpArmRestartTimerAt
-  .a8
+  assert_m8_i16
   m16
   lda pppLcpRestartDeadline
   jsr pppLcpPollTimeoutAt
-  .a8
+  assert_m8_i16
   pppLcpTimerRequireCarrySet @fail53
   lda pppLcpState
   cmp #PPP_LCP_STATE_STOPPED
@@ -323,11 +323,11 @@
   m16
   lda #$0200
   jsr pppLcpArmRestartTimerAt
-  .a8
+  assert_m8_i16
   m16
   lda pppLcpRestartDeadline
   jsr pppLcpPollTimeoutAt
-  .a8
+  assert_m8_i16
   pppLcpTimerRequireCarrySet @fail54
   lda pppLcpState
   cmp #PPP_LCP_STATE_REQUEST_SENT
@@ -366,29 +366,29 @@
   bra @return
 
 @fail50_16:
-  .a16
+  assert_m16_i16
   m8
 @fail50:
   lda #$50
   bra @fail
 @fail51:
-  .a8
+  assert_m8_i16
   lda #$51
   bra @fail
 @fail52:
-  .a8
+  assert_m8_i16
   lda #$52
   bra @fail
 @fail53:
-  .a8
+  assert_m8_i16
   lda #$53
   bra @fail
 @fail54:
-  .a8
+  assert_m8_i16
   lda #$54
   bra @fail
 @fail55_16:
-  .a16
+  assert_m16_i16
   m8
 @fail55:
   lda #$55

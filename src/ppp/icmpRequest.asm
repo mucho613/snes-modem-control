@@ -551,7 +551,7 @@ return:
   rts
 
 prepareLink:
-  .a8
+  assert_m8_i16
   jsr pppTransmitInitialize
   jsr pppIpcpInitialize
   jsr pppIpv4Initialize
@@ -570,7 +570,7 @@ prepareLink:
   rts
 
 setDestination:
-  .a8
+  assert_m8_i16
   lda #$01
   sta pppIcmpRequestDestination + 0
   sta pppIcmpRequestDestination + 1
@@ -579,7 +579,7 @@ setDestination:
   rts
 
 prepareReply:
-  .a8
+  assert_m8_i16
   ldx #$0000
 :
   lda pppIcmpRequestDestination, x
@@ -611,7 +611,7 @@ prepareReply:
   rts
 
 cleanup:
-  .a16
+  assert_m16_i16
   lda pppIcmpRequestTestSavedFrameCounter
   sta frameCounter
   lda pppIcmpRequestTestSavedFrameCounter + 2

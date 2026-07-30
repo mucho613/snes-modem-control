@@ -123,7 +123,7 @@ invalid:
   pppIncrement32 pppTransmitAbortCount
   jsr pppSnapshotEnd
 abortDone:
-  .a8
+  assert_m8_i16
   plb
   rts
 .endproc

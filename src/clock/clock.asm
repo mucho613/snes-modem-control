@@ -311,7 +311,7 @@ clockFormatDisplay:
   rts
 
 @writeYear:
-  .a16
+  assert_m16_i16
   ldy #'0'
 @thousands:
   cmp #1000
@@ -368,7 +368,7 @@ clockFormatDisplay:
   rts
 
 @writeTwoDigits:
-  .a8
+  assert_m8_i16
   phy
   ldy #'0'
 @twoDigitTens:

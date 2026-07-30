@@ -70,7 +70,7 @@
   bra @timer
 
 @open:
-  .a8
+  assert_m8_i16
   jsr pppIpcpLowerUp
   bra @service
 
@@ -148,7 +148,7 @@
 ; Carry set means encoder backpressure. Response packets retain the receive
 ; frame until accepted; a renegotiation request is then promoted.
 @servicePending:
-  .a8
+  assert_m8_i16
   lda pppIpcpPendingAction
   beq @ready
   sta pppIpcpPollAction

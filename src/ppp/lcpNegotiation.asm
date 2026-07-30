@@ -48,7 +48,7 @@
   stz pppLcpLastError
   jsr pppSnapshotEnd
 @return:
-  .a8
+  assert_m8_i16
   plb
   rts
 .endproc
@@ -74,7 +74,7 @@
   jmp @returnFailure
 
 @parsed:
-  .a8
+  assert_m8_i16
   lda pppLcpState
   cmp #PPP_LCP_STATE_CLOSED
   beq @notConfiguring
@@ -112,12 +112,12 @@
   jmp @returnSuccess
 
 @unknownCode:
-  .a8
+  assert_m8_i16
   jsr pppLcpRejectCode
   jmp @returnSuccess
 
 @terminateRequest:
-  .a8
+  assert_m8_i16
   m16
   inc pppLcpTerminateRequestCount
   bne :+
@@ -132,13 +132,13 @@
   jmp @returnSuccess
 
 @notConfiguring:
-  .a8
+  assert_m8_i16
   lda #PPP_LCP_ERROR_NOT_CONFIGURING
   sta pppLcpLastError
   jmp @returnFailure
 
 @configureRequest:
-  .a8
+  assert_m8_i16
   jsr pppLcpEvaluatePeerRequest
   sta pppLcpPendingAction
   lda pppLcpState
@@ -157,7 +157,7 @@
   jmp @returnSuccess
 
 @openedPeerRequest:
-  .a8
+  assert_m8_i16
   inc pppLcpRequestIdentifier
   lda #(PPP_LCP_DEFAULT_MAX_CONFIGURE - 1)
   sta pppLcpRestartRemaining
@@ -176,7 +176,7 @@
   jmp @returnSuccess
 
 @acceptableRequest:
-  .a8
+  assert_m8_i16
   lda pppLcpState
   cmp #PPP_LCP_STATE_ACK_RECEIVED
   beq @requestCompletesOpen
@@ -185,7 +185,7 @@
   jmp @returnSuccess
 
 @requestCompletesOpen:
-  .a8
+  assert_m8_i16
   lda #PPP_LCP_STATE_OPENED
   sta pppLcpState
   stz pppLcpRestartRemaining
@@ -193,7 +193,7 @@
   jmp @returnSuccess
 
 @configureAck:
-  .a8
+  assert_m8_i16
   lda pppLcpLastIdentifier
   cmp pppLcpRequestIdentifier
   bne @invalidResponse
@@ -215,7 +215,7 @@
   bra @returnSuccess
 
 @ackReceived:
-  .a8
+  assert_m8_i16
   lda #PPP_LCP_STATE_ACK_RECEIVED
   sta pppLcpState
   lda #PPP_LCP_DEFAULT_MAX_CONFIGURE
@@ -223,7 +223,7 @@
   bra @returnSuccess
 
 @ackCompletesOpen:
-  .a8
+  assert_m8_i16
   lda #PPP_LCP_STATE_OPENED
   sta pppLcpState
   stz pppLcpRestartRemaining
@@ -231,14 +231,14 @@
   bra @returnSuccess
 
 @restartAfterDuplicateAck:
-  .a8
+  assert_m8_i16
   lda #PPP_LCP_STATE_REQUEST_SENT
   sta pppLcpState
   jsr @newRequest
   bra @returnSuccess
 
 @configureNegative:
-  .a8
+  assert_m8_i16
   lda pppLcpLastIdentifier
   cmp pppLcpRequestIdentifier
   bne @invalidResponse
@@ -256,25 +256,25 @@
   bra @negativeNewRequest
 
 @negativeKeepsAckSent:
-  .a8
+  assert_m8_i16
   lda #PPP_LCP_STATE_ACK_SENT
   sta pppLcpState
 @negativeNewRequest:
-  .a8
+  assert_m8_i16
   jsr @newRequest
   bra @returnSuccess
 
 @invalidResponse16:
-  .a16
+  assert_m16_i16
   m8
 @invalidResponse:
-  .a8
+  assert_m8_i16
   lda #PPP_LCP_ERROR_INVALID_RESPONSE
   sta pppLcpLastError
   jmp @returnFailure
 
 @returnSuccess:
-  .a8
+  assert_m8_i16
   stz pppLcpLastError
   jsr pppSnapshotEnd
   ply
@@ -284,7 +284,7 @@
   rts
 
 @returnFailure:
-  .a8
+  assert_m8_i16
   jsr pppSnapshotEnd
   ply
   plx
@@ -296,7 +296,7 @@
 ; response require a new Configure-Request. Timeout retransmission will keep
 ; the current Identifier in the next milestone.
 @newRequest:
-  .a8
+  assert_m8_i16
   inc pppLcpRequestIdentifier
   lda #(PPP_LCP_DEFAULT_MAX_CONFIGURE - 1)
   sta pppLcpRestartRemaining
@@ -398,7 +398,7 @@
   jmp @busy
 
 @buildRequest:
-  .a8
+  assert_m8_i16
   lda #PPP_LCP_CODE_CONFIGURE_REQUEST
   sta pppTransmitBuffer + 4
   lda pppLcpRequestIdentifier
@@ -411,11 +411,11 @@
   jmp @begin
 
 @copyResponse:
-  .a8
+  assert_m8_i16
   m16
   ldx #$0000
 @copyLoop:
-  .a16
+  assert_m16_i16
   cpx pppLcpPacketLength
   beq @selectResponseCode
   m8
@@ -426,10 +426,10 @@
   bra @copyLoop
 
 @selectResponseCode:
-  .a16
+  assert_m16_i16
   m8
   lda #PPP_LCP_CODE_CONFIGURE_ACK
-  .a8
+  assert_m8_i16
   sta pppTransmitBuffer + PPP_LCP_FRAME_OFFSET
   m16
   lda pppLcpPacketLength
@@ -438,12 +438,12 @@
   jmp @begin
 
 @buildSelectiveResponse:
-  .a8
+  assert_m8_i16
   jsr pppLcpBuildPeerResponse
   jmp @begin
 
 @buildTerminateAck:
-  .a8
+  assert_m8_i16
   lda #PPP_LCP_CODE_TERMINATE_ACK
   sta pppTransmitBuffer + 4
   lda pppLcpLastIdentifier
@@ -456,7 +456,7 @@
   jmp @begin
 
 @buildProtocolReject:
-  .a8
+  assert_m8_i16
   lda #PPP_LCP_CODE_PROTOCOL_REJECT
   sta pppTransmitBuffer + 4
   lda pppLcpRejectIdentifier
@@ -496,7 +496,7 @@
   ldx #PPP_UNCOMPRESSED_HEADER_LENGTH - 2
   ldy #PPP_UNCOMPRESSED_HEADER_LENGTH + PPP_LCP_HEADER_LENGTH
 @copyRejectedFrame:
-  .a16
+  assert_m16_i16
   lda pppLcpPacketEnd
   beq @protocolRejectLength
   m8
@@ -509,14 +509,14 @@
   bra @copyRejectedFrame
 
 @protocolRejectLength:
-  .a16
+  assert_m16_i16
   lda pppLcpOutputCursor
   clc
   adc #PPP_UNCOMPRESSED_HEADER_LENGTH
   jmp @begin
 
 @buildCodeReject:
-  .a8
+  assert_m8_i16
   lda #PPP_LCP_CODE_CODE_REJECT
   sta pppTransmitBuffer + 4
   lda pppLcpRejectIdentifier
@@ -557,7 +557,7 @@
   ldx #PPP_LCP_FRAME_OFFSET
   ldy #PPP_UNCOMPRESSED_HEADER_LENGTH + PPP_LCP_HEADER_LENGTH
 @copyRejectedLcpPacket:
-  .a16
+  assert_m16_i16
   lda pppLcpPacketEnd
   beq @codeRejectLength
   m8
@@ -570,13 +570,13 @@
   bra @copyRejectedLcpPacket
 
 @codeRejectLength:
-  .a16
+  assert_m16_i16
   lda pppLcpOutputCursor
   clc
   adc #PPP_UNCOMPRESSED_HEADER_LENGTH
 
 @begin:
-  .a16
+  assert_m16_i16
   jsr pppTransmitBegin
   bcs @busy16
   m8
@@ -625,10 +625,10 @@
   rts
 
 @busy16:
-  .a16
+  assert_m16_i16
   m8
 @busy:
-  .a8
+  assert_m8_i16
   ply
   plx
   plb
@@ -925,7 +925,7 @@
 
 ; Input A=Code, X low byte=Identifier.
 @writeEmptyPacket:
-  .a8
+  assert_m8_i16
   sta pppFrameBuffer + 4
   txa
   sta pppFrameBuffer + 5
@@ -942,7 +942,7 @@
 
 ; Input A=Code, X low byte=Identifier. Adds MRU 1500.
 @writeMruPacket:
-  .a8
+  assert_m8_i16
   sta pppFrameBuffer + 4
   txa
   sta pppFrameBuffer + 5
