@@ -1,5 +1,5 @@
-//! RFC 1661 LCP establishment and peer-initiated termination reference
-//! implementation.
+//! RFC 1661 LCP establishment, peer-initiated termination, and opened-state
+//! maintenance reference implementation.
 
 use super::{
     Code, ConfigurationOption, EncodeError, OptionParseError, OptionType, Packet, ParseError,
@@ -72,7 +72,9 @@ pub enum Action {
 pub enum IgnoreReason {
     MalformedPacket(ParseError),
     MalformedOptions(OptionParseError),
+    MalformedEchoRequest,
     InvalidConfigureResponse,
+    UnexpectedMagicNumber { expected: u32, actual: u32 },
     UnsupportedCode(u8),
     NotConfiguring,
 }
@@ -277,12 +279,69 @@ impl Machine {
             Some(Code::ConfigureReject) => self.receive_configure_reject(packet, now_ms),
             Some(Code::TerminateRequest) => self.receive_terminate_request(packet),
             Some(Code::TerminateAck) => Ok(Transition::default()),
+            Some(Code::EchoRequest) => self.receive_echo_request(packet),
+            Some(Code::EchoReply | Code::DiscardRequest) => {
+                if self.state == State::Opened {
+                    Ok(Transition::default())
+                } else {
+                    Ok(Transition {
+                        actions: Vec::new(),
+                        ignored: Some(IgnoreReason::NotConfiguring),
+                    })
+                }
+            }
             None => self.receive_unknown_code(input, packet),
             Some(code) => Ok(Transition {
                 actions: Vec::new(),
                 ignored: Some(IgnoreReason::UnsupportedCode(code as u8)),
             }),
         }
+    }
+
+    fn receive_echo_request(&mut self, packet: Packet<'_>) -> Result<Transition, MachineError> {
+        if self.state != State::Opened {
+            return Ok(Transition {
+                actions: Vec::new(),
+                ignored: Some(IgnoreReason::NotConfiguring),
+            });
+        }
+        if packet.data.len() < 4 {
+            return Ok(Transition {
+                actions: Vec::new(),
+                ignored: Some(IgnoreReason::MalformedEchoRequest),
+            });
+        }
+
+        let actual_magic = u32::from_be_bytes(packet.data[..4].try_into().unwrap());
+        let peer_configuration = self.peer_configuration.unwrap_or_default();
+        let expected_magic = peer_configuration.magic_number.unwrap_or(0);
+        if actual_magic != expected_magic {
+            return Ok(Transition {
+                actions: Vec::new(),
+                ignored: Some(IgnoreReason::UnexpectedMagicNumber {
+                    expected: expected_magic,
+                    actual: actual_magic,
+                }),
+            });
+        }
+
+        // This implementation does not request a local Magic-Number option, so
+        // RFC 1661 requires zero in transmitted Echo packets. Preserve as much
+        // uninterpreted Data as fits the peer's negotiated MRU.
+        let peer_mru = usize::from(peer_configuration.transmit_mru.max(8));
+        let echo_data_length = packet.data[4..].len().min(peer_mru - 8);
+        let mut response_data = Vec::with_capacity(4 + echo_data_length);
+        response_data.extend_from_slice(&0_u32.to_be_bytes());
+        response_data.extend_from_slice(&packet.data[4..4 + echo_data_length]);
+
+        Ok(Transition {
+            actions: vec![Action::SendPacket(encode_packet(
+                Code::EchoReply as u8,
+                packet.identifier,
+                &response_data,
+            )?)],
+            ignored: None,
+        })
     }
 
     fn receive_terminate_request(
@@ -765,6 +824,25 @@ mod tests {
         Machine::new(local_options, Settings::default()).unwrap()
     }
 
+    fn opened_machine(peer_options: &[u8]) -> Machine {
+        let mut machine = machine(&[]);
+        machine.open(0).unwrap();
+        let mut request = vec![Code::ConfigureRequest as u8, 0x44, 0, 0];
+        request.extend_from_slice(peer_options);
+        let length = u16::try_from(request.len()).unwrap().to_be_bytes();
+        request[2..4].copy_from_slice(&length);
+        machine.receive(&request, 1, SfcPolicy::default()).unwrap();
+        machine
+            .receive(
+                &[Code::ConfigureAck as u8, 1, 0, 4],
+                2,
+                SfcPolicy::default(),
+            )
+            .unwrap();
+        assert_eq!(machine.state(), State::Opened);
+        machine
+    }
+
     #[test]
     fn crossed_empty_requests_reach_opened() {
         let mut machine = machine(&[]);
@@ -900,6 +978,83 @@ mod tests {
                 magic_number: Some(0x1234_5678),
             })]
         );
+    }
+
+    #[test]
+    fn opened_echo_request_receives_reply_with_same_identifier_and_data() {
+        let mut machine = opened_machine(&[]);
+        let transition = machine
+            .receive(
+                &[9, 0x5a, 0, 11, 0, 0, 0, 0, b'a', b'b', b'c'],
+                3,
+                SfcPolicy::default(),
+            )
+            .unwrap();
+        assert_eq!(
+            packet(&transition.actions[0]),
+            &[10, 0x5a, 0, 11, 0, 0, 0, 0, b'a', b'b', b'c']
+        );
+        assert_eq!(machine.state(), State::Opened);
+    }
+
+    #[test]
+    fn echo_request_validates_peer_magic_and_obeys_peer_mru() {
+        let mut machine = opened_machine(&[
+            1, 4, 0, 9, // peer MRU
+            5, 6, 0x12, 0x34, 0x56, 0x78, // peer Magic-Number
+        ]);
+        let transition = machine
+            .receive(
+                &[9, 0x5a, 0, 11, 0x12, 0x34, 0x56, 0x78, b'a', b'b', b'c'],
+                3,
+                SfcPolicy::default(),
+            )
+            .unwrap();
+        assert_eq!(
+            packet(&transition.actions[0]),
+            &[10, 0x5a, 0, 9, 0, 0, 0, 0, b'a']
+        );
+    }
+
+    #[test]
+    fn echo_request_with_unexpected_peer_magic_is_silently_discarded() {
+        let mut machine = opened_machine(&[5, 6, 0x12, 0x34, 0x56, 0x78]);
+        let transition = machine
+            .receive(
+                &[9, 0x5a, 0, 8, 0xde, 0xad, 0xbe, 0xef],
+                3,
+                SfcPolicy::default(),
+            )
+            .unwrap();
+        assert!(transition.actions.is_empty());
+        assert_eq!(
+            transition.ignored,
+            Some(IgnoreReason::UnexpectedMagicNumber {
+                expected: 0x1234_5678,
+                actual: 0xdead_beef,
+            })
+        );
+    }
+
+    #[test]
+    fn echo_request_is_discarded_outside_opened_state() {
+        let mut machine = machine(&[]);
+        machine.open(0).unwrap();
+        let transition = machine
+            .receive(&[9, 0x5a, 0, 8, 0, 0, 0, 0], 1, SfcPolicy::default())
+            .unwrap();
+        assert!(transition.actions.is_empty());
+        assert_eq!(transition.ignored, Some(IgnoreReason::NotConfiguring));
+    }
+
+    #[test]
+    fn echo_request_without_complete_magic_number_is_silently_discarded() {
+        let mut machine = opened_machine(&[]);
+        let transition = machine
+            .receive(&[9, 0x5a, 0, 7, 0, 0, 0], 3, SfcPolicy::default())
+            .unwrap();
+        assert!(transition.actions.is_empty());
+        assert_eq!(transition.ignored, Some(IgnoreReason::MalformedEchoRequest));
     }
 
     #[test]
