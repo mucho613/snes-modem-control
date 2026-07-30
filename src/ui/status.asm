@@ -50,7 +50,8 @@ STATUS_VALUE_COLUMN = 7
 .import frameCounter
 .import controller1Input, controller1InputPulse
 .import modemDriverState
-.import pppLcpState, pppPapState, pppIpcpState
+.import pppLcpState, pppLcpPeerFlags
+.import pppPapState, pppChapState, pppIpcpState
 .import pppIpcpFlags, pppIpcpLocalAddress, pppIpcpPeerAddress
 .import terminalVerticalScroll
 .import screenMode, statusPage, statusRenderedPage, statusDirectionLatch
@@ -146,7 +147,7 @@ STATUS_VALUE_COLUMN = 7
 
   statusWriteImmediate 0, 0, "MODEM  "
   statusWriteImmediate 1, 0, "LCP    "
-  statusWriteImmediate 2, 0, "PAP    "
+  statusWriteImmediate 2, 0, "AUTH   "
   statusWriteImmediate 3, 0, "IPCP   "
   statusWriteImmediate 4, 0, "LOCAL  "
   statusWriteImmediate 5, 0, "PEER   "
@@ -223,6 +224,11 @@ STATUS_VALUE_COLUMN = 7
   jsr @writePppState
 
   statusClearValue 2
+  lda pppLcpPeerFlags
+  and #PPP_LCP_PEER_FLAG_CHAP_MD5
+  beq :+
+  jmp @chap
+:
   lda pppPapState
   cmp #PPP_PAP_STATE_OPENED
   statusJumpIfEqual @papOpen
@@ -232,17 +238,42 @@ STATUS_VALUE_COLUMN = 7
   statusJumpIfEqual @papNegotiating
   cmp #PPP_PAP_STATE_FAILED
   statusJumpIfEqual @papFailed
-  statusWriteImmediate 2, STATUS_VALUE_COLUMN, "INACTIVE"
+  statusWriteImmediate 2, STATUS_VALUE_COLUMN, "PAP INACTIVE"
   jmp @papDone
 @papOpen:
-  statusWriteImmediate 2, STATUS_VALUE_COLUMN, "OPEN"
+  statusWriteImmediate 2, STATUS_VALUE_COLUMN, "PAP OPEN"
   jmp @papDone
 @papNegotiating:
-  statusWriteImmediate 2, STATUS_VALUE_COLUMN, "NEGOTIATING"
+  statusWriteImmediate 2, STATUS_VALUE_COLUMN, "PAP NEGOTIATING"
   jmp @papDone
 @papFailed:
-  statusWriteImmediate 2, STATUS_VALUE_COLUMN, "FAILED"
+  statusWriteImmediate 2, STATUS_VALUE_COLUMN, "PAP FAILED"
 @papDone:
+  jmp @authDone
+
+@chap:
+  lda pppChapState
+  cmp #PPP_CHAP_STATE_OPENED
+  statusJumpIfEqual @chapOpen
+  cmp #PPP_CHAP_STATE_WAITING_CHALLENGE
+  statusJumpIfEqual @chapNegotiating
+  cmp #PPP_CHAP_STATE_RESPONSE_PENDING
+  statusJumpIfEqual @chapNegotiating
+  cmp #PPP_CHAP_STATE_WAITING_RESULT
+  statusJumpIfEqual @chapNegotiating
+  cmp #PPP_CHAP_STATE_FAILED
+  statusJumpIfEqual @chapFailed
+  statusWriteImmediate 2, STATUS_VALUE_COLUMN, "CHAP INACTIVE"
+  jmp @authDone
+@chapOpen:
+  statusWriteImmediate 2, STATUS_VALUE_COLUMN, "CHAP OPEN"
+  jmp @authDone
+@chapNegotiating:
+  statusWriteImmediate 2, STATUS_VALUE_COLUMN, "CHAP NEGOTIATING"
+  jmp @authDone
+@chapFailed:
+  statusWriteImmediate 2, STATUS_VALUE_COLUMN, "CHAP FAILED"
+@authDone:
 
   statusClearValue 3
   lda pppIpcpState

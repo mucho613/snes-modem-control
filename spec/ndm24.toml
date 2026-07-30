@@ -292,8 +292,8 @@ description = "Frame at which the current generic AT transaction started"
 
 [ppp_diagnostic]
 magic = [0x50, 0x50, 0x50, 0x31]
-version = 21
-size = 493
+version = 22
+size = 511
 
 [[ppp_diagnostic.fields]]
 name = "magic"
@@ -1722,6 +1722,83 @@ offset = 492
 size = 1
 type = "u8"
 description = "Length of the staged PAP password"
+
+[[ppp_diagnostic.fields]]
+name = "chap_state"
+offset = 493
+size = 1
+type = "u8"
+description = "CHAP-MD5 client state"
+
+[[ppp_diagnostic.fields]]
+name = "chap_last_code"
+offset = 494
+size = 1
+type = "u8"
+description = "Most recently received CHAP code"
+
+[[ppp_diagnostic.fields]]
+name = "chap_last_identifier"
+offset = 495
+size = 1
+type = "u8"
+description = "Most recently received CHAP Identifier"
+
+[[ppp_diagnostic.fields]]
+name = "chap_last_error"
+offset = 496
+size = 1
+type = "u8"
+description = "Most recent CHAP parser error"
+
+[[ppp_diagnostic.fields]]
+name = "chap_response_identifier"
+offset = 497
+size = 1
+type = "u8"
+description = "Identifier of the most recently emitted CHAP Response"
+
+[[ppp_diagnostic.fields]]
+name = "chap_failure"
+offset = 498
+size = 1
+type = "u8"
+description = "Terminal CHAP failure reason"
+
+[[ppp_diagnostic.fields]]
+name = "chap_challenge_length"
+offset = 499
+size = 1
+type = "u8"
+description = "Length of the retained CHAP Challenge; bytes are never published"
+
+[[ppp_diagnostic.fields]]
+name = "chap_peer_name_length"
+offset = 500
+size = 1
+type = "u8"
+description = "Length of the peer name in the last CHAP Challenge"
+
+[[ppp_diagnostic.fields]]
+name = "chap_packet_length"
+offset = 501
+size = 2
+type = "u16"
+description = "Declared length of the last CHAP packet"
+
+[[ppp_diagnostic.fields]]
+name = "chap_receive_count"
+offset = 503
+size = 4
+type = "u32"
+description = "Received CHAP packets"
+
+[[ppp_diagnostic.fields]]
+name = "chap_transmit_count"
+offset = 507
+size = 4
+type = "u32"
+description = "Transmitted CHAP Responses"
 
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]

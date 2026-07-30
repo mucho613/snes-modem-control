@@ -370,4 +370,11 @@ Git対象外の`build/hardware-tests/nifty-reference/`だけに保持してい�
 PAP fallbackは観測されなかったため、NDM24による実回線発信は行わず、
 CHAP-MD5 client実装まで保留しました。
 
+同日、65816版CHAP-MD5 clientを追加し、MesenCE常設セルフテストで
+MD5(`abc`)の標準vectorと、閉じたChallenge/Response/Success transcriptを
+検査しました。Response Valueは別実装で計算した
+`MD5(Identifier || lab secret || Challenge)`と一致し、Success後に`Opened`へ
+到達しました。Challenge、digest、MD5入力・中間状態のWRAM消去も同じ経路に
+組み込みました。この時点ではNDM24からNiftyへの実発信はまだ行っていません。
+
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。

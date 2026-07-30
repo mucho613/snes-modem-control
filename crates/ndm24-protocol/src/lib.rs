@@ -355,6 +355,17 @@ pub struct PppDiagnosticSnapshot {
     pub pap_credential_flags: u8,
     pub pap_peer_id_length: u8,
     pub pap_password_length: u8,
+    pub chap_state: u8,
+    pub chap_last_code: u8,
+    pub chap_last_identifier: u8,
+    pub chap_last_error: u8,
+    pub chap_response_identifier: u8,
+    pub chap_failure: u8,
+    pub chap_challenge_length: u8,
+    pub chap_peer_name_length: u8,
+    pub chap_packet_length: u16,
+    pub chap_receive_count: u32,
+    pub chap_transmit_count: u32,
 }
 
 impl PppDiagnosticSnapshot {
@@ -595,6 +606,17 @@ impl PppDiagnosticSnapshot {
             pap_credential_flags: data[PPP_DIAG_PAP_CREDENTIAL_FLAGS],
             pap_peer_id_length: data[PPP_DIAG_PAP_PEER_ID_LENGTH],
             pap_password_length: data[PPP_DIAG_PAP_PASSWORD_LENGTH],
+            chap_state: data[PPP_DIAG_CHAP_STATE],
+            chap_last_code: data[PPP_DIAG_CHAP_LAST_CODE],
+            chap_last_identifier: data[PPP_DIAG_CHAP_LAST_IDENTIFIER],
+            chap_last_error: data[PPP_DIAG_CHAP_LAST_ERROR],
+            chap_response_identifier: data[PPP_DIAG_CHAP_RESPONSE_IDENTIFIER],
+            chap_failure: data[PPP_DIAG_CHAP_FAILURE],
+            chap_challenge_length: data[PPP_DIAG_CHAP_CHALLENGE_LENGTH],
+            chap_peer_name_length: data[PPP_DIAG_CHAP_PEER_NAME_LENGTH],
+            chap_packet_length: read_u16(data, PPP_DIAG_CHAP_PACKET_LENGTH)?,
+            chap_receive_count: read_u32(data, PPP_DIAG_CHAP_RECEIVE_COUNT)?,
+            chap_transmit_count: read_u32(data, PPP_DIAG_CHAP_TRANSMIT_COUNT)?,
         })
     }
 }
@@ -1047,6 +1069,20 @@ mod tests {
         data[PPP_DIAG_PAP_CREDENTIAL_FLAGS] = 7;
         data[PPP_DIAG_PAP_PEER_ID_LENGTH] = 8;
         data[PPP_DIAG_PAP_PASSWORD_LENGTH] = 24;
+        data[PPP_DIAG_CHAP_STATE] = 4;
+        data[PPP_DIAG_CHAP_LAST_CODE] = 3;
+        data[PPP_DIAG_CHAP_LAST_IDENTIFIER] = 0x27;
+        data[PPP_DIAG_CHAP_LAST_ERROR] = 0;
+        data[PPP_DIAG_CHAP_RESPONSE_IDENTIFIER] = 0x27;
+        data[PPP_DIAG_CHAP_FAILURE] = 0;
+        data[PPP_DIAG_CHAP_CHALLENGE_LENGTH] = 16;
+        data[PPP_DIAG_CHAP_PEER_NAME_LENGTH] = 6;
+        data[PPP_DIAG_CHAP_PACKET_LENGTH..PPP_DIAG_CHAP_PACKET_LENGTH + 2]
+            .copy_from_slice(&21_u16.to_le_bytes());
+        data[PPP_DIAG_CHAP_RECEIVE_COUNT..PPP_DIAG_CHAP_RECEIVE_COUNT + 4]
+            .copy_from_slice(&2_u32.to_le_bytes());
+        data[PPP_DIAG_CHAP_TRANSMIT_COUNT..PPP_DIAG_CHAP_TRANSMIT_COUNT + 4]
+            .copy_from_slice(&1_u32.to_le_bytes());
 
         let snapshot = PppDiagnosticSnapshot::decode(&data).unwrap();
         assert_eq!(snapshot.snapshot_sequence, 8);
@@ -1214,6 +1250,17 @@ mod tests {
         assert_eq!(snapshot.pap_credential_flags, 7);
         assert_eq!(snapshot.pap_peer_id_length, 8);
         assert_eq!(snapshot.pap_password_length, 24);
+        assert_eq!(snapshot.chap_state, 4);
+        assert_eq!(snapshot.chap_last_code, 3);
+        assert_eq!(snapshot.chap_last_identifier, 0x27);
+        assert_eq!(snapshot.chap_last_error, 0);
+        assert_eq!(snapshot.chap_response_identifier, 0x27);
+        assert_eq!(snapshot.chap_failure, 0);
+        assert_eq!(snapshot.chap_challenge_length, 16);
+        assert_eq!(snapshot.chap_peer_name_length, 6);
+        assert_eq!(snapshot.chap_packet_length, 21);
+        assert_eq!(snapshot.chap_receive_count, 2);
+        assert_eq!(snapshot.chap_transmit_count, 1);
     }
 
     #[test]

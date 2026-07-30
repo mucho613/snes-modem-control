@@ -306,8 +306,8 @@
   rtl
 .endproc
 
-; Erase the PAP Peer-ID and Password source bytes as soon as the shared
-; encoder no longer needs them. Header fields remain available for diagnostics.
+; Erase PAP credentials or a CHAP response as soon as the shared encoder no
+; longer needs them. Header fields remain available for diagnostics.
 .proc pppPapScrubTransmitBuffer
   .a8
   .i16
@@ -316,10 +316,18 @@
   setDBR $7e
   lda pppTransmitBuffer + 2
   cmp #$c0
+  beq @pap
+  cmp #$c2
   bne @done
   lda pppTransmitBuffer + 3
   cmp #$23
   bne @done
+  bra @wipe
+@pap:
+  lda pppTransmitBuffer + 3
+  cmp #$23
+  bne @done
+@wipe:
   ldx #PPP_UNCOMPRESSED_HEADER_LENGTH + PPP_PAP_HEADER_LENGTH
   lda #$00
 :

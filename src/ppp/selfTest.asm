@@ -21,6 +21,7 @@
 .import pppLcpPollRunSelfTest
 .import pppPapRunSelfTest
 .import pppPapCredentialsRunSelfTest
+.import pppMd5RunSelfTest, pppChapRunSelfTest
 .import pppIpcpRunSelfTest
 .import pppIpcpPollRunSelfTest
 .import pppIpv4RunSelfTest
@@ -51,6 +52,14 @@
   jsr pppSnapshotBegin
 
   jsl pppPapCredentialsRunSelfTest
+  bcc :+
+  jmp @fail
+:
+  jsl pppMd5RunSelfTest
+  bcc :+
+  jmp @fail
+:
+  jsl pppChapRunSelfTest
   bcc :+
   jmp @fail
 :

@@ -18,7 +18,7 @@
 .import pppPapCredentialFlags
 .import pppPapScrubTransmitBuffer
 
-.export pppTransmitInitialize, pppTransmitBegin, pppTransmitPoll
+.export pppTransmitInitialize, pppTransmitBegin, pppTransmitBeginLong, pppTransmitPoll
 .export pppTransmitAbort
 .export pppTransmitPeek, pppTransmitAdvance
 
@@ -106,6 +106,14 @@ invalid:
   plb
   sec
   rts
+.endproc
+
+; Bank-safe entry point for protocol builders placed in BANK1_CODE.
+.proc pppTransmitBeginLong
+  .a16
+  .i16
+  jsr pppTransmitBegin
+  rtl
 .endproc
 
 ; Cancel an owned frame without resetting lifetime diagnostics.

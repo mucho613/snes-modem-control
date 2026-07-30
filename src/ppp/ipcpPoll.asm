@@ -10,6 +10,7 @@
 .import pppTransmitActive, pppTransmitBuffer
 .import pppTransmitAbort, pppTransmitInitialize
 .import pppLcpState, pppPapState
+.import pppAuthenticationReady
 .import pppLcpInitialize, pppPapInitialize
 .import pppLastProtocol, pppLastFrameLength, pppFrameBuffer
 .import pppIpcpState, pppIpcpPendingAction, pppIpcpDeferredRequest
@@ -41,9 +42,8 @@
   lda pppLcpState
   cmp #PPP_LCP_STATE_OPENED
   bne @lowerDown
-  lda pppPapState
-  cmp #PPP_PAP_STATE_OPENED
-  bne @lowerDown
+  jsl pppAuthenticationReady
+  bcs @lowerDown
 
   lda pppIpcpState
   cmp #PPP_IPCP_STATE_CLOSED

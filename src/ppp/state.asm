@@ -90,6 +90,10 @@
 .export pppLcpLocalTerminateTimeoutCount
 .export pppLcpLocalMagic, pppLcpLocalFlags, pppLcpLoopbackCount
 .export pppPapCredentialFlags, pppPapPeerIdLength, pppPapPasswordLength
+.export pppChapState, pppChapLastCode, pppChapLastIdentifier
+.export pppChapLastError, pppChapResponseIdentifier, pppChapFailure
+.export pppChapChallengeLength, pppChapPeerNameLength, pppChapPacketLength
+.export pppChapReceiveCount, pppChapTransmitCount
 
 pppDiagnosticState:
 pppDiagnosticMagic: .res $4
@@ -296,6 +300,17 @@ pppLcpLoopbackCount: .res $4
 pppPapCredentialFlags: .res $1
 pppPapPeerIdLength: .res $1
 pppPapPasswordLength: .res $1
+pppChapState: .res $1
+pppChapLastCode: .res $1
+pppChapLastIdentifier: .res $1
+pppChapLastError: .res $1
+pppChapResponseIdentifier: .res $1
+pppChapFailure: .res $1
+pppChapChallengeLength: .res $1
+pppChapPeerNameLength: .res $1
+pppChapPacketLength: .res $2
+pppChapReceiveCount: .res $4
+pppChapTransmitCount: .res $4
 pppDiagnosticStateEnd:
 
 .assert pppDiagnosticMagic - pppDiagnosticState = PPP_DIAG_MAGIC, error, "PPP diagnostic magic offset"
@@ -502,6 +517,17 @@ pppDiagnosticStateEnd:
 .assert pppPapCredentialFlags - pppDiagnosticState = PPP_DIAG_PAP_CREDENTIAL_FLAGS, error, "PPP PAP credential flags offset"
 .assert pppPapPeerIdLength - pppDiagnosticState = PPP_DIAG_PAP_PEER_ID_LENGTH, error, "PPP PAP Peer-ID length offset"
 .assert pppPapPasswordLength - pppDiagnosticState = PPP_DIAG_PAP_PASSWORD_LENGTH, error, "PPP PAP password length offset"
+.assert pppChapState - pppDiagnosticState = PPP_DIAG_CHAP_STATE, error, "PPP CHAP state offset"
+.assert pppChapLastCode - pppDiagnosticState = PPP_DIAG_CHAP_LAST_CODE, error, "PPP CHAP code offset"
+.assert pppChapLastIdentifier - pppDiagnosticState = PPP_DIAG_CHAP_LAST_IDENTIFIER, error, "PPP CHAP identifier offset"
+.assert pppChapLastError - pppDiagnosticState = PPP_DIAG_CHAP_LAST_ERROR, error, "PPP CHAP error offset"
+.assert pppChapResponseIdentifier - pppDiagnosticState = PPP_DIAG_CHAP_RESPONSE_IDENTIFIER, error, "PPP CHAP response identifier offset"
+.assert pppChapFailure - pppDiagnosticState = PPP_DIAG_CHAP_FAILURE, error, "PPP CHAP failure offset"
+.assert pppChapChallengeLength - pppDiagnosticState = PPP_DIAG_CHAP_CHALLENGE_LENGTH, error, "PPP CHAP challenge length offset"
+.assert pppChapPeerNameLength - pppDiagnosticState = PPP_DIAG_CHAP_PEER_NAME_LENGTH, error, "PPP CHAP peer-name length offset"
+.assert pppChapPacketLength - pppDiagnosticState = PPP_DIAG_CHAP_PACKET_LENGTH, error, "PPP CHAP packet length offset"
+.assert pppChapReceiveCount - pppDiagnosticState = PPP_DIAG_CHAP_RECEIVE_COUNT, error, "PPP CHAP receive count offset"
+.assert pppChapTransmitCount - pppDiagnosticState = PPP_DIAG_CHAP_TRANSMIT_COUNT, error, "PPP CHAP transmit count offset"
 .assert pppDiagnosticStateEnd - pppDiagnosticState = PPP_DIAGNOSTIC_SIZE, error, "PPP diagnostic ABI size"
 
 ; Decoder and pump scratch fields are private and intentionally excluded from
@@ -538,6 +564,9 @@ pppDiagnosticStateEnd:
 .export pppDnsQueryCursor, pppDnsLabelPosition, pppDnsLabelLength
 .export pppDnsTestSavedFrameCounter
 .export pppPapPeerId, pppPapPassword
+.export pppChapChallenge, pppChapDigest
+.export pppMd5Message, pppMd5State, pppMd5Working, pppMd5Temporary
+.export pppMd5Round, pppMd5WordIndex, pppMd5BlockOffset, pppMd5MessageLength
 pppLastEvent: .res $1
 pppLastInvalidReason: .res $1
 pppDecoderScratchByte: .res $1
@@ -597,6 +626,16 @@ pppDnsLabelLength: .res $1
 pppDnsTestSavedFrameCounter: .res $4
 pppPapPeerId: .res PPP_PAP_MAXIMUM_PEER_ID_LENGTH
 pppPapPassword: .res PPP_PAP_MAXIMUM_PASSWORD_LENGTH
+pppChapChallenge: .res PPP_CHAP_MAXIMUM_CHALLENGE_LENGTH
+pppChapDigest: .res PPP_CHAP_MD5_VALUE_LENGTH
+pppMd5Message: .res PPP_MD5_MESSAGE_BUFFER_LENGTH
+pppMd5State: .res $10
+pppMd5Working: .res $10
+pppMd5Temporary: .res $4
+pppMd5Round: .res $1
+pppMd5WordIndex: .res $1
+pppMd5BlockOffset: .res $1
+pppMd5MessageLength: .res $2
 pppLcpOptionSeen: .res $100
 pppLcpOptionDuplicate: .res $100
 pppIpcpOptionSeen: .res $100

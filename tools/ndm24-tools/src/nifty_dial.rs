@@ -73,8 +73,8 @@ async fn run_once(websocket: &str, labels: &Path, credentials: &PapCredentials) 
     credentials
         .upload(websocket, labels, SETUP_TIMEOUT)
         .await
-        .context("stage transient PAP credentials")?;
-    println!("PAP credentials staged in transient WRAM");
+        .context("stage transient PPP authentication credentials")?;
+    println!("PPP authentication credentials staged in transient WRAM");
 
     qusb2snes::mailbox_command(
         websocket,
@@ -112,8 +112,13 @@ async fn run_once(websocket: &str, labels: &Path, credentials: &PapCredentials) 
         resolver != [0, 0, 0, 0],
         "IPCP opened without a primary DNS address"
     );
+    let authentication = if snapshot.lcp_peer_flags & 0x10 != 0 {
+        "CHAP-MD5"
+    } else {
+        "PAP"
+    };
     println!(
-        "PPP opened with PAP; primary DNS {}",
+        "PPP opened with {authentication}; primary DNS {}",
         Ipv4Addr::from(resolver)
     );
 

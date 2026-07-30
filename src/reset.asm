@@ -18,6 +18,7 @@
 .import pppLcpPoll
 .import pppPapInitialize, pppPapPoll
 .import pppPapCredentialsInitialize
+.import pppChapInitialize, pppChapPoll
 .import pppIpcpInitialize, pppIpcpPoll
 .import pppIpv4Initialize, pppIpv4Poll
 .import pppIcmpInitialize
@@ -77,6 +78,7 @@
   jsr pppLcpInitialize
   jsr pppPapInitialize
   jsl pppPapCredentialsInitialize
+  jsl pppChapInitialize
   jsr pppIpcpInitialize
   jsr pppIpv4Initialize
   jsr pppIcmpInitialize
@@ -130,6 +132,7 @@
     jsr pppReceivePoll
     jsr pppLcpPoll
     jsr pppPapPoll
+    jsl pppChapPoll
     jsr pppIpcpPoll
     jsr pppIpv4Poll
     jsr pppIcmpRequestPoll

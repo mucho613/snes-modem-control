@@ -10,6 +10,7 @@
 .import pppReceiveInitialize
 .import pppTransmitInitialize
 .import pppLcpState, pppPapState, pppIpcpState
+.import pppAuthenticationReady
 .import pppLcpInitialize, pppPapInitialize, pppIpcpInitialize
 .import pppLastProtocol, pppLastFrameLength, pppFrameBuffer
 .import pppIpcpLocalAddress, pppIpcpFlags
@@ -50,9 +51,8 @@
   beq :+
   jmp releaseIfOwned
 :
-  lda pppPapState
-  cmp #PPP_PAP_STATE_OPENED
-  beq :+
+  jsl pppAuthenticationReady
+  bcc :+
   jmp releaseIfOwned
 :
   lda pppIpcpState

@@ -2,7 +2,8 @@
 
 ## 状態
 
-実回線試験用のSFC側PAP資格情報経路とWindows CLIは実装済みです。
+実回線試験用のSFC側一時資格情報経路、PAP/CHAP-MD5 client、Windows CLIは
+実装済みです。
 2026-07-31にDFM-56Uをアナログ電話ポートへ単独接続し、WSL2の`pppd`
 clientで基準試験を行いました。NDM24によるNiftyへの発信はまだ行っていません。
 NDM24とDFM-56Uを同じ回線へ同時接続しません。
@@ -20,11 +21,11 @@ option streamへ渡し、引数や一時設定ファイルには置きません�
 保存前にID、password、PAP/CHAP payloadをredactし、30秒のPPP観測後または
 全体120秒で終了してDTRを落とします。
 
-SFC側は現在PAP clientを実装し、CHAP要求にはPAPをConfigure-Nakします。
 DFM-56U基準試験ではNiftyがCHAP-MD5を要求し、そのままChallenge、
 Response、Successへ進みました。PAPへのfallbackは観測されていません。
-合意した停止条件に従い、NDM24の実回線試験はCHAP-MD5 clientを実装・検証
-するまで保留します。
+SFC側も同じCHAP-MD5を優先して受理し、PAPは閉じたfixtureとの互換性のため
+残します。MD5標準vectorと完全なChallenge/Response/Success transcriptは
+MesenCE常設セルフテストで検証します。
 
 基準試験で観測した条件は次のとおりです。
 
@@ -60,7 +61,8 @@ CLIは公式に記載された文字だけを受理します。
 コマンドライン引数、環境変数、設定ファイル、ROM、source、Git管理ファイル、
 JSON reportへは保存しません。
 
-転送はmailbox ABI version 9の3命令を使います。
+転送はmailbox ABI version 9の3命令を使います。命令名は互換性のため
+`pap_*`のままですが、格納先はPAP/CHAP-MD5共通です。
 
 1. `pap_credentials_clear`
 2. `pap_peer_id_set`

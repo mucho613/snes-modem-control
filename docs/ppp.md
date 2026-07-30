@@ -4,7 +4,7 @@
 
 最初のPPPマイルストーンは、NDM24から受け取る任意位置で分割されたbyte列を、FCS検証済みのPPPフレームへ復元する層です。`crates/ndm24-ppp` を仕様の参照実装とし、同じ状態遷移と試験ベクトルを65816へ移植しています。
 
-現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP、PAP client、IPCP、IPv4 packet層、ICMP Echo responder/requester、UDP datagram層、NTP client、最小DNS A clientまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ack、IPCP `Opened`まで確認し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。同日にIPv4、ICMP Echo、UDP/NTP/DNSはMesenCE、FXPAK PRO実機、疑似PSTNのV.22bis 2400 bit/s回線上で送受信に合格しました。さらにWSL2のNATを介し、SFC実機から公開IPv4 `1.1.1.1`へのICMP Echo往復と公開DNS問い合わせにも合格しています。NTPでは2回連続で相関済み応答からUnix秒を取得しています。TCPは未実装です。
+現時点ではRFC 1662の非同期HDLC-like framingに加え、65816版LCP、PAP/CHAP-MD5 client、IPCP、IPv4 packet層、ICMP Echo responder/requester、UDP datagram層、NTP client、最小DNS A clientまで実装済みです。受信FCS検証、unescape、Flag境界、最大長判定、再同期、送信FCS付加、escapeはNDM24のRX/TXリングへ上限付きで接続しています。2026-07-30にrevision AとWSL2 `pppd`の実対向でLCP `Opened`、PAP Authenticate-Request/Ack、IPCP `Opened`まで確認し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。同日にIPv4、ICMP Echo、UDP/NTP/DNSはMesenCE、FXPAK PRO実機、疑似PSTNのV.22bis 2400 bit/s回線上で送受信に合格しました。さらにWSL2のNATを介し、SFC実機から公開IPv4 `1.1.1.1`へのICMP Echo往復と公開DNS問い合わせにも合格しています。NTPでは2回連続で相関済み応答からUnix秒を取得しています。CHAP-MD5はMesenCEの閉じたtranscriptまで合格し、実回線試験は未実施です。TCPは未実装です。
 
 PPP接続は次の順序で進みます。
 
@@ -74,6 +74,9 @@ Rust参照実装は全入力分割位置、破損FCSからの再同期、Flag直
 - `src/ppp/lcpPoll.asm`: main-loop、frame所有権、送信直列化
 - `src/ppp/pap.asm`: PAP client、packet parser、restart timer
 - `src/ppp/papPoll.asm`: LCP/PAP frame振り分け、共有送信器との直列化
+- `src/ppp/chap.asm`: CHAP-MD5 client、packet parser、Response生成
+- `src/ppp/chapPoll.asm`: CHAP frame振り分け、共有送信器との直列化
+- `src/ppp/md5.asm`: CHAP用の最大2-block MD5
 - `src/ppp/ipcp.asm`: IPCP parser、address交渉、restart timer
 - `src/ppp/ipcpPoll.asm`: PAP/IPCP frame所有権、共有送信器との直列化
 - `src/ppp/ipv4.asm`: IPv4 parser、header checksum、送信header生成
@@ -484,8 +487,19 @@ Algorithm 5を受理し、
 fixtureとの互換性のため引き続き受理します。Nifty基準試験で観測した
 MRU 1524、ACCM 0、CHAP-MD5、PFC、ACFCのRequestでは、PFC/ACFCを先に
 Rejectし、圧縮optionが除かれた再RequestをCHAP-MD5としてAckする方針です。
-65816版では選択結果をpeer flagへ原子的に公開し、LCP以降のCHAP frameを
-既知の上位protocolとして保持します。CHAP状態機械とMD5は未実装です。
+65816版では選択結果をpeer flagへ原子的に公開し、`src/ppp/chapPoll.asm`が
+LCP以降のCHAP frameを所有します。`src/ppp/chap.asm`はChallengeを最大64byte
+まで保持し、Identifierを照合してResponse、Success、Failureを処理します。
+`src/ppp/md5.asm`は最大2 blockのMD5を実装し、`abc`の標準vectorに加えて
+`Identifier || lab secret || Challenge`から生成したResponse Valueを常設
+MesenCEセルフテストで照合します。IPCP/IPv4はLCPで選択されたPAPまたは
+CHAP-MD5が`Opened`になるまで開始しません。
+
+資格情報はPAPとCHAP-MD5で同じ一時WRAM領域を共用します。実資格情報を使う
+場合、CHAP Response Valueと送信元bufferもsensitiveとして扱い、送信完了・
+中断・切断時にzero化します。診断ABI version 22にはCHAPの状態、code、
+Identifier、Challenge/peer-name長、packet長、送受信件数だけを公開し、
+Challenge、secret、Response Valueは公開しません。
 
 ## 65816 IPCP client
 

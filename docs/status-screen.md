@@ -20,11 +20,13 @@
 ```text
 MODEM  CONNECTED
 LCP    OPEN
-PAP    OPEN
+AUTH   PAP OPEN
 IPCP   OPEN
 LOCAL  10.24.0.2
 PEER   10.24.0.1
 ```
+
+`AUTH`はLCPで選択された方式に応じて`PAP ...`または`CHAP ...`を表示します。
 
 ## NTP
 

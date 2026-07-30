@@ -23,7 +23,8 @@
 
 .export pppReceiveInitialize, pppReceivePoll
 .export pppReceiveStart, pppReceiveStop
-.export pppReceivePushByte, pppReceivePushConnectedByte, pppReleaseFrame
+.export pppReceivePushByte, pppReceivePushConnectedByte
+.export pppReleaseFrame, pppReleaseFrameLong
 .export pppCarrierLossRunSelfTest
 
 ; Initialize permanent receive diagnostics and decoder state at boot.
@@ -523,4 +524,11 @@ pppCarrierLossSelfTestLineEnd:
   jsr pppSnapshotEnd
   plb
   rts
+.endproc
+
+.proc pppReleaseFrameLong
+  .a8
+  .i16
+  jsr pppReleaseFrame
+  rtl
 .endproc

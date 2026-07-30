@@ -457,24 +457,33 @@ pub async fn wait_ppp_network_opened(
 ) -> Result<PppDiagnosticSnapshot> {
     const LCP_STATE_OPENED: u8 = 9;
     const PAP_STATE_OPENED: u8 = 3;
+    const CHAP_STATE_OPENED: u8 = 4;
+    const LCP_PEER_FLAG_CHAP_MD5: u8 = 0x10;
     const IPCP_STATE_OPENED: u8 = 9;
 
     let started = Instant::now();
     loop {
         let snapshot = read_ppp_snapshot(websocket, label_path).await?;
+        let authentication_opened = if snapshot.lcp_peer_flags & LCP_PEER_FLAG_CHAP_MD5 != 0 {
+            snapshot.chap_state == CHAP_STATE_OPENED
+        } else {
+            snapshot.pap_state == PAP_STATE_OPENED
+        };
         if snapshot.lcp_state == LCP_STATE_OPENED
-            && snapshot.pap_state == PAP_STATE_OPENED
+            && authentication_opened
             && snapshot.ipcp_state == IPCP_STATE_OPENED
         {
             return Ok(snapshot);
         }
         ensure!(
             started.elapsed() < timeout,
-            "timed out waiting for PPP network phase: LCP={}, PAP={}, IPCP={}, PAP failure=0x{:02x}, IPCP error=0x{:02x}",
+            "timed out waiting for PPP network phase: LCP={}, PAP={}, CHAP={}, IPCP={}, PAP failure=0x{:02x}, CHAP failure=0x{:02x}, IPCP error=0x{:02x}",
             snapshot.lcp_state,
             snapshot.pap_state,
+            snapshot.chap_state,
             snapshot.ipcp_state,
             snapshot.pap_failure,
+            snapshot.chap_failure,
             snapshot.ipcp_last_error
         );
         tokio::time::sleep(Duration::from_millis(100)).await;

@@ -44,7 +44,7 @@ ABI version: `2`. Block size: `128` bytes.
 
 ## PPP Diagnostic ABI
 
-ABI version: `21`. Block size: `493` bytes.
+ABI version: `22`. Block size: `511` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|
@@ -252,6 +252,17 @@ ABI version: `21`. Block size: `493` bytes.
 | `0x1EA` | 1 | `u8` | `pap_credential_flags` | PAP credential presence and transient-sensitive mode flags; never contains credential bytes |
 | `0x1EB` | 1 | `u8` | `pap_peer_id_length` | Length of the staged PAP Peer-ID |
 | `0x1EC` | 1 | `u8` | `pap_password_length` | Length of the staged PAP password |
+| `0x1ED` | 1 | `u8` | `chap_state` | CHAP-MD5 client state |
+| `0x1EE` | 1 | `u8` | `chap_last_code` | Most recently received CHAP code |
+| `0x1EF` | 1 | `u8` | `chap_last_identifier` | Most recently received CHAP Identifier |
+| `0x1F0` | 1 | `u8` | `chap_last_error` | Most recent CHAP parser error |
+| `0x1F1` | 1 | `u8` | `chap_response_identifier` | Identifier of the most recently emitted CHAP Response |
+| `0x1F2` | 1 | `u8` | `chap_failure` | Terminal CHAP failure reason |
+| `0x1F3` | 1 | `u8` | `chap_challenge_length` | Length of the retained CHAP Challenge; bytes are never published |
+| `0x1F4` | 1 | `u8` | `chap_peer_name_length` | Length of the peer name in the last CHAP Challenge |
+| `0x1F5` | 2 | `u16` | `chap_packet_length` | Declared length of the last CHAP packet |
+| `0x1F7` | 4 | `u32` | `chap_receive_count` | Received CHAP packets |
+| `0x1FB` | 4 | `u32` | `chap_transmit_count` | Transmitted CHAP Responses |
 
 ## Mailbox ABI
 
