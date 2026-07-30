@@ -3,6 +3,8 @@
 //! PAP credentials are carried in plaintext on the link. Callers should not
 //! include packet data in ordinary diagnostics or logs.
 
+pub mod client;
+
 pub const PROTOCOL: u16 = 0xc023;
 pub const HEADER_LENGTH: usize = 4;
 
