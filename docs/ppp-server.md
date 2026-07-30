@@ -148,9 +148,16 @@ Ubuntuの`pppd`はpeer profileより前に`/etc/ppp/options`も読みます。�
 
 PPP受信は発信前に有効化します。`CONNECT`後に有効化すると、対向が先に送った
 LCP frameの途中からdecoderへ渡され、FCS errorやRX ring overflowを生じる
-可能性があります。
+可能性があります。NDM24の電源投入やraw `R`による起動時probeは回線設定を
+V.22bisへ固定しません。発呼のたびに次の設定列を適用します。`AT&F`は以前の
+設定を既定値へ戻すため、speakerを無効化する`ATM0`を必ずその直後に送ります。
 
 ```powershell
+cargo run -p ndm24-tools -- at 'AT&F' --expect ok --timeout-frames 300 --timeout-seconds 15
+cargo run -p ndm24-tools -- at ATM0 --expect ok --timeout-frames 300 --timeout-seconds 15
+cargo run -p ndm24-tools -- at 'AT%B2400' --expect ok --timeout-frames 300 --timeout-seconds 15
+cargo run -p ndm24-tools -- at ATS7=60 --expect ok --timeout-frames 300 --timeout-seconds 15
+cargo run -p ndm24-tools -- at ATX3 --expect ok --timeout-frames 300 --timeout-seconds 15
 cargo run -p ndm24-tools -- mailbox ppp-receive-start
 cargo run -p ndm24-tools -- at ATDT0 --expect connect --timeout-frames 3900 --timeout-seconds 75
 ```
@@ -258,6 +265,36 @@ WSL2の`ppp0`を照合し、次を確認しました。
 timer、pending/deferred送信は初期化されました。切断後のFCS error、
 invalid、overflowは0、同じRX burstの末尾12byteは既存仕様どおり消費され、
 `pending-rx`は空でした。DFM-56UもWindowsのCOM5へ正常に戻っています。
+
+## 2026-07-30 revision A IPv4/ICMP Echo結果
+
+IPCP確立後、WSL2の`ppp0`からSFCへ次を実行し、疑似PSTN上で最初のIPv4 packet
+送受信を確認しました。
+
+```bash
+ping -c 4 -W 5 10.24.0.2
+ping -c 1 -W 6 -s 0 10.24.0.2
+ping -c 1 -W 6 -s 1 10.24.0.2
+ping -c 1 -W 6 -s 17 10.24.0.2
+ping -c 1 -W 6 -s 127 10.24.0.2
+```
+
+- 標準56byte payloadは4送信/4応答、packet loss 0%、平均RTT
+  1274.690 msだった。
+- 0、1、17、127byte payloadも各1回応答し、偶数長と奇数長の両方に合格した。
+- SFC診断のIPv4受信/受理/送信は8/8/8、ICMP Echo Request受信/ICMP送信は
+  8/8だった。
+- PPP受信frameは14、送信frameは17、FCS error、invalid、overflow、
+  backpressure、abortはすべて0だった。
+- IPv4 checksum error/dropとICMP checksum error/dropもすべて0だった。
+- 最後の127byte payloadではIPv4 total length 155、ICMP payload length
+  127を記録し、Echo Replyを正常に返した。
+
+この試験の直前、SFC再起動後に起動時probeだけで`ATDT0`を送った2回は、対向
+DFM-56Uが`RING`を受けて`ATA`を送った後に`NO CARRIER`となりました。
+`AT&F`、`ATM0`、`AT%B2400`、`ATS7=60`、`ATX3`の合格済み設定列を再適用すると
+約18秒で`CONNECT`しました。したがって発呼前設定列は電源状態に依存させず、
+毎回適用する試験前提とします。
 
 試験終了時は必ず停止します。
 

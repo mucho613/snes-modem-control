@@ -124,7 +124,9 @@ LCP試験に続き、PAP Authenticate-Request/Ack、IPCP `Opened`、SFC側local
 | PPP IPCPセルフテスト | 合格 (2026-07-30) | 未実施 |
 | PPP IPCP実対向 | 合格 (2026-07-30) | 未実施 |
 | PPP IPv4セルフテスト | 合格 (2026-07-30) | 未実施 |
-| PPP IPv4実対向 | 未実施 | 未実施 |
+| PPP ICMP Echoセルフテスト | 合格 (2026-07-30) | 未実施 |
+| PPP IPv4実対向 | 合格 (2026-07-30) | 未実施 |
+| PPP ICMP Echo実対向 | 合格 (2026-07-30) | 未実施 |
 
 revision B の最新の疑似 PSTN connect 合格記録は test ID `unix-1785329111-revision-b` です。`AT&F`、`AT%B2400`、`ATS7=60`、`ATX3`、`ATDT0` のechoはすべて完全で、各transaction前後のRX discard counterは0のままでした。DFM-56U は `RING`、`CONNECT 115200` を返し、NDM24 は `CONNECT 2400` を受信して `CONNECTED` へ遷移しました。10秒保持中の未処理RXは0byteです。DFM-56UのDTRを下げた直後にはキャリア切断過渡の `07 99 62 A1 74 DD 6B EE 1E` が入り、続く `NO CARRIER` を受信して `READY` へ戻りました。最終snapshotはRX read/write indexがともに105、TX read/write indexがともに42で、error、timeout、RX/TX overflow、`poll_budget_yield`、discard、terminal droppedがすべて0です。transaction別trace、双方のAT transcript、切断前後のraw RX列は `build/hardware-tests/unix-1785329111-revision-b/connect-test.json` に保存されています。旧schemaのJSONでは `poll_budget_yield` と同じ値が `poll_limit` という名前で記録されています。
 
@@ -157,5 +159,13 @@ revision Bでも同じNMITIMEN gating最終実装を再試験しました。交�
 step `$88`～`$8C`により、奇数長Echo checksum、Echo Reply生成、共有PPP送信器が
 busyな間のrequest保持と再試行、破損checksum拒否を実機65816上で検査しています。
 この試験は固定fixtureを使い、電話回線や対向Modemには接続しません。
+
+同日、revision AとDFM-56Uを疑似PSTNのV.22bis 2400 bit/sで接続し、WSL2の
+`10.24.0.1`からSFCの`10.24.0.2`へICMP Echoを送信しました。標準56byte
+payloadを4回、追加で0、1、17、127byte payloadを各1回送信し、8要求すべてで
+Echo Replyを受信してpacket loss 0%でした。最後のSFC診断はIPv4受信/受理/送信
+が8/8/8、ICMP Echo Request受信とICMP送信が8/8でした。PPP FCS error、
+invalid、overflow、IPv4 checksum error/drop、ICMP checksum error/dropは
+すべて0です。奇数長を含む可変payloadの実回線checksum処理も合格とします。
 
 実機試験を行うまでは、ビルド成功をハードウェア合格として扱いません。差が出た場合は診断 snapshot、trace、QUsb2Snes 時刻、必要に応じてロジックアナライザ capture を同じ試験 ID に紐付けます。

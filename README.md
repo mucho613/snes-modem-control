@@ -4,7 +4,7 @@
 
 スーパーファミコンと NTT DATA NDM24 をコントローラーポート経由で通信させるための、実験用ドライバと Windows 向け開発ツールです。JRA PAT の実通信をロジックアナライザで観測した結果を基準に、初期化、非同期送受信、状態管理、常設診断機能を整理しています。
 
-現時点の到達点は、NDM24 固有の `R` 初期化、`ATM0` による応答確認とスピーカー無効化、256 バイトの送受信リング、32文字幅ターミナル、QUsb2Snes 経由の監視・テスト・ROM 転送です。PPPはRFC 1662非同期フレーミング、LCP、PAP client、IPCP、IPv4 packet層、ICMP Echo responderをRust参照実装と65816へ実装し、NDM24のRX/TXリングへ中断・再開可能な形で接続済みです。revision AとDFM-56Uを使うWSL2対向環境ではLCP、PAP認証、IPCPまで実対向で合格し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。IPv4とICMP EchoはMesenCEおよびFXPAK PRO実機の常設セルフテストまで合格しています。実回線上のIPv4/ICMP送受信、UDP、TCP、NTPはまだ実装・検証していません。
+現時点の到達点は、NDM24 固有の `R` 初期化、`ATM0` による応答確認とスピーカー無効化、256 バイトの送受信リング、32文字幅ターミナル、QUsb2Snes 経由の監視・テスト・ROM 転送です。PPPはRFC 1662非同期フレーミング、LCP、PAP client、IPCP、IPv4 packet層、ICMP Echo responderをRust参照実装と65816へ実装し、NDM24のRX/TXリングへ中断・再開可能な形で接続済みです。revision AとDFM-56Uを使うWSL2対向環境ではLCP、PAP認証、IPCPまで実対向で合格し、SFC側`10.24.0.2`と対向`10.24.0.1`を確定しました。IPv4とICMP EchoはMesenCEおよびFXPAK PRO実機の常設セルフテストに加え、疑似PSTNのV.22bis 2400 bit/s回線上でも送受信に合格しています。UDP、TCP、NTPはまだ実装・検証していません。
 
 ## Windows での開始
 
