@@ -67,7 +67,7 @@
   plx
   pld
   plb
-  plp
+  plp_m16_i16
   pla
   rts
 .endproc

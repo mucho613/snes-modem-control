@@ -13,8 +13,9 @@
 .import modemLastDataReport, modemLastStatusReport, modemLastDiscardReason
 .import modemTransmitReadIndex, modemTransmitWriteIndex
 .import modemSnapshotBegin, modemSnapshotEnd
+.import modemSnapshotBeginI8, modemSnapshotEndI8
 .import modemStoreReceivedByte, modemRecordPollBudgetYield
-.import modemTransfer9, modemRecordTrace, modemSetState
+.import modemTransfer9, modemRecordTrace, modemSetState, modemSetStateI8
 
 .export modemPoll
 .proc modemPoll
@@ -59,7 +60,7 @@
   lda #$20
   sta modemPollStage
   suspendNmi nmitimenShadow
-  jsr modemSnapshotBegin
+  jsr modemSnapshotBeginI8
   lda #$21
   sta modemPollStage
   stz modemPollTick
@@ -78,7 +79,7 @@
   bcc @readCompleteReport
 
   lda #MODEM_STATE_PROBING
-  jsr modemSetState
+  jsr modemSetStateI8
   lda #$22
   sta modemPollStage
 
@@ -189,7 +190,7 @@
   lda #MODEM_LATCH_ASSERT
   sta .lobyte(JOYOUT)
   stz .lobyte(JOYOUT)
-  jsr modemSnapshotEnd
+  jsr modemSnapshotEndI8
   restoreNmi nmitimenShadow
   lda #$26
   sta modemPollStage
@@ -202,7 +203,7 @@
   plx
   pld
   plb
-  plp
+  plp_m16_i16
   pla
   rts
 .endproc

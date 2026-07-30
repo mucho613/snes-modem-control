@@ -22,6 +22,7 @@
 .export modemInitializeDiagnostics
 .export modemResetQueues
 .export modemSnapshotBegin, modemSnapshotEnd
+.export modemSnapshotBeginI8, modemSnapshotEndI8
 .export modemStoreReceivedByte, modemRecordDiscard
 .export modemReadByte, modemQueueByte
 .export modemPeekTransmitByte, modemConsumeTransmitByte
@@ -121,6 +122,7 @@
 
 .proc modemSnapshotBegin
   .a8
+  .i16
   pha
   modemIncrement32 modemSnapshotSequence
   pla
@@ -129,6 +131,25 @@
 
 .proc modemSnapshotEnd
   .a8
+  .i16
+  pha
+  modemIncrement32 modemSnapshotSequence
+  pla
+  rts
+.endproc
+
+.proc modemSnapshotBeginI8
+  .a8
+  .i8
+  pha
+  modemIncrement32 modemSnapshotSequence
+  pla
+  rts
+.endproc
+
+.proc modemSnapshotEndI8
+  .a8
+  .i8
   pha
   modemIncrement32 modemSnapshotSequence
   pla
@@ -175,6 +196,7 @@ overflow:
 ; Input A is a MODEM_DISCARD_* value.
 .proc modemRecordDiscard
   .a8
+  .i8
   sta modemLastDiscardReason
   modemIncrement32 modemReceiveDiscardedCount
   rts
@@ -188,7 +210,7 @@ overflow:
   phb
   phy
   setDBR $7e
-  jsr modemSnapshotBegin
+  jsr modemSnapshotBeginI8
 
   ldy modemReceiveReadIndex
   cpy modemReceiveWriteIndex
@@ -198,7 +220,7 @@ overflow:
   pha
   iny
   sty modemReceiveReadIndex
-  jsr modemSnapshotEnd
+  jsr modemSnapshotEndI8
   pla
   ply
   plb
@@ -206,7 +228,7 @@ overflow:
   rts
 
 empty:
-  jsr modemSnapshotEnd
+  jsr modemSnapshotEndI8
   ply
   plb
   sec
@@ -222,7 +244,7 @@ empty:
   phy
   setDBR $7e
   pha
-  jsr modemSnapshotBegin
+  jsr modemSnapshotBeginI8
 
   ldy modemTransmitWriteIndex
   iny
@@ -235,7 +257,7 @@ empty:
   sta modemTransmitBuffer, y
   iny
   sty modemTransmitWriteIndex
-  jsr modemSnapshotEnd
+  jsr modemSnapshotEndI8
   ply
   plb
   clc
@@ -247,7 +269,7 @@ overflow:
   ora #MODEM_FLAG_TX_OVERFLOW
   sta modemFlags
   modemIncrement32 modemTransmitOverflowCount
-  jsr modemSnapshotEnd
+  jsr modemSnapshotEndI8
   ply
   plb
   sec
@@ -290,6 +312,7 @@ done:
 
 .proc modemRecordPollBudgetYield
   .a8
+  .i16
   lda modemFlags
   ora #MODEM_FLAG_POLL_BUDGET_YIELD
   sta modemFlags

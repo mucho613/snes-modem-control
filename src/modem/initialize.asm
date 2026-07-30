@@ -9,7 +9,8 @@
 .import modemResetStartFrame, modemReinitializeCount
 .import modemSessionProbeSent, modemSessionRetryCount, modemSessionLineLength
 .import modemResetQueues, modemSnapshotBegin, modemSnapshotEnd
-.import modemSetState
+.import modemSnapshotBeginI8, modemSnapshotEndI8
+.import modemSetState, modemSetStateI8
 
 .export modemInitialize
 
@@ -90,7 +91,7 @@
   setDP $4000
 
   mi8
-  jsr modemSnapshotBegin
+  jsr modemSnapshotBeginI8
   jsr modemResetQueues
   stz modemSessionProbeSent
   stz modemSessionRetryCount
@@ -111,15 +112,15 @@
   m8
   modemIncrement32 modemReinitializeCount
   lda #MODEM_STATE_RESETTING
-  jsr modemSetState
-  jsr modemSnapshotEnd
+  jsr modemSetStateI8
+  jsr modemSnapshotEndI8
 
   mi16
   ply
   plx
   pld
   plb
-  plp
+  plp_m16_i16
   pla
   rts
 .endproc

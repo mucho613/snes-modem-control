@@ -8,6 +8,7 @@
 .import pppSnapshotSequence, pppSnapshotDepth
 
 .export pppDiagnosticInitialize, pppSnapshotBegin, pppSnapshotEnd
+.export pppSnapshotBeginI8, pppSnapshotEndI8
 
 .proc pppDiagnosticInitialize
   .a8
@@ -39,6 +40,7 @@
 
 .proc pppSnapshotBegin
   .a8
+  .i16
 
   pha
   lda pppSnapshotDepth
@@ -52,6 +54,34 @@ nested:
 
 .proc pppSnapshotEnd
   .a8
+  .i16
+
+  pha
+  dec pppSnapshotDepth
+  bne nested
+  pppIncrement32 pppSnapshotSequence
+nested:
+  pla
+  rts
+.endproc
+
+.proc pppSnapshotBeginI8
+  .a8
+  .i8
+
+  pha
+  lda pppSnapshotDepth
+  bne nested
+  pppIncrement32 pppSnapshotSequence
+nested:
+  inc pppSnapshotDepth
+  pla
+  rts
+.endproc
+
+.proc pppSnapshotEndI8
+  .a8
+  .i8
 
   pha
   dec pppSnapshotDepth

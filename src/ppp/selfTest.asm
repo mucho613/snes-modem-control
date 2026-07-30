@@ -481,7 +481,7 @@
   setDBR $7e
   jsr pppSnapshotEnd
   pla
-  plp
+  plp_m8_i16
   i8
   ply
   plx

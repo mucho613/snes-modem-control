@@ -547,7 +547,7 @@ STATUS_VALUE_COLUMN = 7
   pld
   plb
   pla
-  plp
+  plp_m8_i16
   rtl
 .endproc
 

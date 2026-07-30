@@ -7,6 +7,7 @@
 .import modemDriverState
 .import modemQueueByte
 .import pppSnapshotBegin, pppSnapshotEnd
+.import pppSnapshotBeginI8, pppSnapshotEndI8
 .import pppTransmitActive, pppTransmitStage, pppTransmitEscapeSecond
 .import pppTransmitLength, pppTransmitPosition, pppTransmitFcs
 .import pppTransmitLogicalByte, pppTransmitFillRemaining
@@ -145,13 +146,13 @@ abortDone:
   beq connected
   lda pppTransmitActive
   beq done
-  jsr pppSnapshotBegin
+  jsr pppSnapshotBeginI8
   stz pppTransmitActive
   stz pppTransmitEscapeSecond
   lda #PPP_TRANSMIT_STAGE_IDLE
   sta pppTransmitStage
   pppIncrement32 pppTransmitAbortCount
-  jsr pppSnapshotEnd
+  jsr pppSnapshotEndI8
   bra done
 
 connected:
@@ -167,9 +168,9 @@ fill:
   bcs done
   jsr modemQueueByte
   bcc accepted
-  jsr pppSnapshotBegin
+  jsr pppSnapshotBeginI8
   pppIncrement32 pppTransmitBackpressureCount
-  jsr pppSnapshotEnd
+  jsr pppSnapshotEndI8
   bra done
 
 accepted:

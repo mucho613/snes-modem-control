@@ -9,7 +9,7 @@
 .import modemTraceFrozen, modemTraceNextSequence, modemTraceOverwrittenCount
 .import modemTrace, modemTraceScratchKind
 
-.export modemRecordTrace, modemSetState
+.export modemRecordTrace, modemSetState, modemSetStateI8
 .export modemClearTrace, modemFreezeTrace, modemResumeTrace
 
 ; Input A = MODEM_TRACE_* event kind. Callers use 8-bit A and index registers.
@@ -92,13 +92,25 @@ done:
   plx
   plb
   pla
-  plp
+  plp_m8_i8
   rts
 .endproc
 
 ; Input A = MODEM_STATE_*.
 .proc modemSetState
   .a8
+  .i16
+  sta modemDriverState
+  pha
+  lda #MODEM_TRACE_STATE
+  jsr modemRecordTrace
+  pla
+  rts
+.endproc
+
+.proc modemSetStateI8
+  .a8
+  .i8
   sta modemDriverState
   pha
   lda #MODEM_TRACE_STATE
@@ -109,6 +121,7 @@ done:
 
 .proc modemClearTrace
   .a8
+  .i8
   stz modemTraceNextSequence
   stz modemTraceNextSequence + 1
   stz modemTraceNextSequence + 2
@@ -125,6 +138,7 @@ done:
 
 .proc modemFreezeTrace
   .a8
+  .i8
   lda #$01
   sta modemTraceFrozen
   rts
@@ -132,6 +146,7 @@ done:
 
 .proc modemResumeTrace
   .a8
+  .i8
   stz modemTraceFrozen
   rts
 .endproc

@@ -64,13 +64,13 @@
 .endproc
 
 ; Queue one display-only byte. Input A is 8-bit. The routine preserves A and
-; X, works with either index width, and cannot be split by VBlank.
+; X and cannot be split by VBlank.
 .proc terminalQueueByte
   .a8
+  .i16
 
   php
   sei
-  i16
   phx
   phb
   setDBR $7e
@@ -99,14 +99,21 @@ spaceAvailable:
   lda terminalQueueScratchByte
   plb
   plx
-  plp
+  plp_m8_i16
   rts
 .endproc
 
 ; Explicit name used by the modem RX producer.
 .proc terminalMirrorReceivedByte
   .a8
-  jmp terminalQueueByte
+  .i8
+
+  php
+  sei
+  i16
+  jsr terminalQueueByte
+  plp_m8_i8
+  rts
 .endproc
 
 ; Compatibility string output for existing local messages. The argument is a
@@ -197,7 +204,7 @@ spaceAvailable:
   pld
   plb
   pla
-  plp
+  plp_m8_i16
   rts
 
 @renderByte:

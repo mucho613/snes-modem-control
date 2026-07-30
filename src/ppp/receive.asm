@@ -5,11 +5,12 @@
 .code
 
 .import modemDriverState, modemSessionLastResult, modemSessionLineLength
-.import modemSetState
+.import modemSetState, modemSetStateI8
 .import modemReadByte
 .import pppDecoderReset, pppDecoderPush, pppDecoderDiscardPartial
 .import pppLastInvalidReason
 .import pppSnapshotBegin, pppSnapshotEnd
+.import pppSnapshotBeginI8, pppSnapshotEndI8
 .import pppReceiveEnabled, pppReceiveActive, pppFrameReady, pppReceiveLastEvent
 .import pppReceiveLastInvalidReason, pppReceiveDrainRemaining
 .import pppReceiveByteCount, pppReceiveFrameCount, pppReceiveFcsErrorCount
@@ -97,9 +98,9 @@
   bne :+
   jmp done
 :
-  jsr pppSnapshotBegin
+  jsr pppSnapshotBeginI8
   stz pppReceiveActive
-  jsr pppSnapshotEnd
+  jsr pppSnapshotEndI8
   jmp done
 
 @checkConnected:
@@ -110,22 +111,22 @@
   bne :+
   jmp done
 :
-  jsr pppSnapshotBegin
+  jsr pppSnapshotBeginI8
   stz pppReceiveActive
-  jsr pppSnapshotEnd
+  jsr pppSnapshotEndI8
   jmp done
 
 connected:
   lda pppReceiveActive
   bne checkFrameOwnership
-  jsr pppSnapshotBegin
+  jsr pppSnapshotBeginI8
   lda #$01
   sta pppReceiveActive
   stz pppFrameReady
   i16
   jsr pppDecoderReset
   i8
-  jsr pppSnapshotEnd
+  jsr pppSnapshotEndI8
 
 checkFrameOwnership:
   lda pppFrameReady
@@ -148,9 +149,9 @@ drain:
   bne done
   dec pppReceiveDrainRemaining
   bne drain
-  jsr pppSnapshotBegin
+  jsr pppSnapshotBeginI8
   pppIncrement32 pppReceiveDrainBudgetYieldCount
-  jsr pppSnapshotEnd
+  jsr pppSnapshotEndI8
   bra done
 
 carrierTail:
@@ -158,14 +159,14 @@ carrierTail:
   ; disconnect. The current modem poll may already have queued that second
   ; line. It belongs to the completed link, so consume the rest of this RX
   ; burst before exposing READY to the next AT transaction.
-  jsr pppSnapshotBegin
+  jsr pppSnapshotBeginI8
 carrierTailByte:
   jsr modemReadByte
   bcs carrierTailDone
   pppIncrement32 pppCarrierTailByteCount
   bra carrierTailByte
 carrierTailDone:
-  jsr pppSnapshotEnd
+  jsr pppSnapshotEndI8
 
 done:
   mi16
@@ -302,7 +303,7 @@ done:
   stz modemSessionLineLength
   lda #MODEM_STATE_READY
   i8
-  jsr modemSetState
+  jsr modemSetStateI8
   i16
   lda #PPP_EVENT_CARRIER_LOST
   ply
@@ -318,12 +319,12 @@ done:
 
   phb
   setDBR $7e
-  jsr pppSnapshotBegin
+  jsr pppSnapshotBeginI8
   lda #$01
   sta pppReceiveEnabled
   stz pppReceiveActive
   stz pppFrameReady
-  jsr pppSnapshotEnd
+  jsr pppSnapshotEndI8
   plb
   rts
 .endproc
@@ -334,11 +335,11 @@ done:
 
   phb
   setDBR $7e
-  jsr pppSnapshotBegin
+  jsr pppSnapshotBeginI8
   stz pppReceiveEnabled
   stz pppReceiveActive
   stz pppFrameReady
-  jsr pppSnapshotEnd
+  jsr pppSnapshotEndI8
   plb
   rts
 .endproc
@@ -514,9 +515,9 @@ pppCarrierLossSelfTestLineEnd:
 
   phb
   setDBR $7e
-  jsr pppSnapshotBegin
+  jsr pppSnapshotBeginI8
   stz pppFrameReady
-  jsr pppSnapshotEnd
+  jsr pppSnapshotEndI8
   plb
   rts
 .endproc

@@ -6,6 +6,9 @@
 .code
 
 .proc initializeRegisters
+  .a16
+  .i16
+
   m8
   stz NMITIMEN ; disable interrupts
   stz HDMAEN ; disable HDMA
