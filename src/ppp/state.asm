@@ -27,6 +27,11 @@
 .export pppLcpTimerActive, pppLcpDeferredRequest
 .export pppLcpRestartDeadline, pppLcpPeerMagic
 .export pppCarrierLossCount, pppCarrierTailByteCount
+.export pppPapState, pppPapLastCode, pppPapLastIdentifier, pppPapLastError
+.export pppPapRequestIdentifier, pppPapNextIdentifier
+.export pppPapRestartRemaining, pppPapPendingAction
+.export pppPapTimerActive, pppPapFailure, pppPapPacketLength
+.export pppPapRestartDeadline, pppPapReceiveCount, pppPapTransmitCount
 
 pppDiagnosticState:
 pppDiagnosticMagic: .res $4
@@ -78,6 +83,20 @@ pppLcpRestartDeadline: .res $2
 pppLcpPeerMagic: .res $4
 pppCarrierLossCount: .res $4
 pppCarrierTailByteCount: .res $4
+pppPapState: .res $1
+pppPapLastCode: .res $1
+pppPapLastIdentifier: .res $1
+pppPapLastError: .res $1
+pppPapRequestIdentifier: .res $1
+pppPapNextIdentifier: .res $1
+pppPapRestartRemaining: .res $1
+pppPapPendingAction: .res $1
+pppPapTimerActive: .res $1
+pppPapFailure: .res $1
+pppPapPacketLength: .res $2
+pppPapRestartDeadline: .res $2
+pppPapReceiveCount: .res $4
+pppPapTransmitCount: .res $4
 .res PPP_DIAGNOSTIC_SIZE - (* - pppDiagnosticState)
 pppDiagnosticStateEnd:
 
@@ -130,6 +149,20 @@ pppDiagnosticStateEnd:
 .assert pppLcpPeerMagic - pppDiagnosticState = PPP_DIAG_LCP_PEER_MAGIC, error, "PPP LCP peer magic offset"
 .assert pppCarrierLossCount - pppDiagnosticState = PPP_DIAG_CARRIER_LOSS_COUNT, error, "PPP carrier loss count offset"
 .assert pppCarrierTailByteCount - pppDiagnosticState = PPP_DIAG_CARRIER_TAIL_BYTE_COUNT, error, "PPP carrier tail byte count offset"
+.assert pppPapState - pppDiagnosticState = PPP_DIAG_PAP_STATE, error, "PPP PAP state offset"
+.assert pppPapLastCode - pppDiagnosticState = PPP_DIAG_PAP_LAST_CODE, error, "PPP PAP code offset"
+.assert pppPapLastIdentifier - pppDiagnosticState = PPP_DIAG_PAP_LAST_IDENTIFIER, error, "PPP PAP identifier offset"
+.assert pppPapLastError - pppDiagnosticState = PPP_DIAG_PAP_LAST_ERROR, error, "PPP PAP error offset"
+.assert pppPapRequestIdentifier - pppDiagnosticState = PPP_DIAG_PAP_REQUEST_IDENTIFIER, error, "PPP PAP request identifier offset"
+.assert pppPapNextIdentifier - pppDiagnosticState = PPP_DIAG_PAP_NEXT_IDENTIFIER, error, "PPP PAP next identifier offset"
+.assert pppPapRestartRemaining - pppDiagnosticState = PPP_DIAG_PAP_RESTART_REMAINING, error, "PPP PAP restart offset"
+.assert pppPapPendingAction - pppDiagnosticState = PPP_DIAG_PAP_PENDING_ACTION, error, "PPP PAP pending action offset"
+.assert pppPapTimerActive - pppDiagnosticState = PPP_DIAG_PAP_TIMER_ACTIVE, error, "PPP PAP timer active offset"
+.assert pppPapFailure - pppDiagnosticState = PPP_DIAG_PAP_FAILURE, error, "PPP PAP failure offset"
+.assert pppPapPacketLength - pppDiagnosticState = PPP_DIAG_PAP_PACKET_LENGTH, error, "PPP PAP packet length offset"
+.assert pppPapRestartDeadline - pppDiagnosticState = PPP_DIAG_PAP_RESTART_DEADLINE, error, "PPP PAP deadline offset"
+.assert pppPapReceiveCount - pppDiagnosticState = PPP_DIAG_PAP_RECEIVE_COUNT, error, "PPP PAP receive count offset"
+.assert pppPapTransmitCount - pppDiagnosticState = PPP_DIAG_PAP_TRANSMIT_COUNT, error, "PPP PAP transmit count offset"
 .assert pppDiagnosticStateEnd - pppDiagnosticState = PPP_DIAGNOSTIC_SIZE, error, "PPP diagnostic ABI size"
 
 ; Decoder and pump scratch fields are private and intentionally excluded from

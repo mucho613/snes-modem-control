@@ -3,9 +3,10 @@
 ## 目的
 
 疑似PSTNの相手側モデムとしてI/O DATA DFM-56Uを使い、WSL2上の
-`pppd`をNTT DATA NDM24の対向にします。最初の試験範囲はLCPとPAP要求
-optionまでです。SFC側にPAPを実装するまでは認証成功やIPCP到達を合格条件に
-しません。
+`pppd`をNTT DATA NDM24の対向にします。LCP試験ではPAP要求optionまでを
+確認済みです。SFC側PAP clientの実装後は、閉じたfixture資格情報による
+Authenticate-Request/Ackと認証成功を次の合格条件にします。IPCPはその次の
+段階です。
 
 ```mermaid
 flowchart LR
@@ -137,8 +138,10 @@ Ubuntuの`pppd`はpeer profileより前に`/etc/ppp/options`も読みます。�
 2. SFCと`pppd`がConfigure-Requestを送信する。
 3. SFCがMRU、ACCM、PAP、Magic-Numberを含むpeer Requestへ正しく応答する。
 4. 双方のConfigure-Ack後にSFC診断状態が`Opened`になる。
-5. `pppd`がPAP待ちへ進み、未実装のSFC側PAPによって認証完了しない。
-6. 切断後にSFC側LCPが`Closed`へ戻り、timerとpending送信を残さない。
+5. `pppd`がSFCのPAP Authenticate-Requestを受理し、Authenticate-Ackを返す。
+6. SFC側のPAP stateが`Opened`へ到達し、再送timerが停止する。
+7. 未実装のIPCPで停止しても、PAP payloadやpasswordが通常ログへ出ない。
+8. 切断後にSFC側LCPが`Closed`、PAPが`Inactive`へ戻り、timerとpending送信を残さない。
 
 SFC側の発信と切断結果待ちは、期待するresult codeを明示します。
 

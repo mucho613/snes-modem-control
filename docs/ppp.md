@@ -69,6 +69,8 @@ Rust参照実装は全入力分割位置、破損FCSからの再同期、Flag直
 - `src/ppp/lcpOptions.asm`: peer option評価とNak/Reject生成
 - `src/ppp/lcpTimer.asm`: restart timer、Max-Configure、lower-down
 - `src/ppp/lcpPoll.asm`: main-loop、frame所有権、送信直列化
+- `src/ppp/pap.asm`: PAP client、packet parser、restart timer
+- `src/ppp/papPoll.asm`: LCP/PAP frame振り分け、共有送信器との直列化
 - `src/ppp/selfTest.asm`: 固定fixtureによる常設セルフテスト
 
 `pppDecoderPush` はraw byteを1byteずつ受け取り、次のeventを返します。
@@ -132,7 +134,7 @@ Address 1 + Control 1 + Protocol 2 + Information 1500 + FCS 2
 
 ## 常設PPP診断
 
-`pppDiagnosticState` はmagic `PPP1`、ABI version 4、112byteの公開診断blockです。レイアウトの正本は `spec/ndm24.toml` で、AssemblyとRustのoffset定数および[生成済みABI表](generated/diagnostic-abi.md)を同時に生成します。
+`pppDiagnosticState` はmagic `PPP1`、ABI version 5、134byteの公開診断blockです。レイアウトの正本は `spec/ndm24.toml` で、AssemblyとRustのoffset定数および[生成済みABI表](generated/diagnostic-abi.md)を同時に生成します。
 
 PC側では次のコマンドでJSON Linesとして読み取れます。
 
@@ -158,6 +160,8 @@ cargo run -p ndm24-tools -- ppp-monitor
 - LCP state、最後のCode・Identifier・error、local Request Identifier
 - restart残数、timer有効状態と期限、pending/deferred送信
 - 受理したpeer MRU、ACCM、Magic-Number、option flags
+- PAP state、Code、Identifier、Length、error、failure、restart状態
+- PAP packet送受信回数
 
 認証frameには利用者IDやpasswordが含まれ得るため、常設traceへpayload全体は保存しません。protocol、code、identifier、length、エラー理由までを診断対象とし、credential byte列は記録対象外とします。
 
@@ -212,7 +216,7 @@ Configure-Rejectが必要なoptionとConfigure-Nak候補が同じRequestに含�
 
 `src/ppp/lcp.asm` の `pppLcpParseFrame` は、FCS検証後に所有権が固定された `pppFrameBuffer` を直接読みます。非圧縮のAddress・Control・Protocolを確認した後、LCPのCode、Identifier、network byte orderのLengthを抽出します。LengthがPPP Informationより短い場合のpaddingは無視し、Configure-Request/Ack/Nak/Rejectでは各optionのLengthもpacket境界内で検証します。
 
-parserの最終Code、Identifier、Length、error、呼出回数はPPP診断ABI version 2へ公開します。既存96byte blockの予約領域を利用しているため、frame bufferや低レベルNDM24転送用WRAMの配置は変わりません。`ppp-self-test` の失敗step `$20`～`$27` はLCP parser fixtureを表します。
+parserの最終Code、Identifier、Length、error、呼出回数は現在のPPP診断ABIへ公開します。診断blockを拡張しても、frame bufferや低レベルNDM24転送用WRAMの配置は変わりません。`ppp-self-test` の失敗step `$20`～`$27` はLCP parser fixtureを表します。
 
 ## 65816 LCP Configure交渉コア
 
@@ -255,8 +259,39 @@ pending送信を次の接続へ持ち越しません。常設セルフテスト�
 `$66`～`$69`が、部分一致からの再同期、検出event、状態復帰、常設counterを
 検査します。
 
+## 65816 PAP client
+
+`src/ppp/pap.asm` は、対向serverから認証を要求されたpeerとして
+Authenticate-Requestを送信し、Authenticate-Ack/Nakを処理します。LCPが
+`Opened`へ到達し、受理済みpeer optionにPAPが含まれる場合だけ開始します。
+閉じた試験環境の資格情報はPeer-ID `ndm24`、Password `ndm24-test`です。
+これは実サービス用の秘密情報ではなく、WSL2側の`pap-secrets` fixtureと
+一致させています。
+
+Authenticate-Requestは共有PPP encoderがidleであることを確認してからbufferを
+構築します。encoderがbusyならbuffer、Identifier、Max-Authenticate残数、
+timerを変更しません。encoderへ受理された時点でだけIdentifierを確定して残数を
+消費し、180 frame後の期限を設定します。timeout再送ごとにIdentifierを更新し、
+初回を含む10回で応答がなければ`Failed`へ遷移します。
+
+受信側はProtocol `$C023`、Code、Identifier、network byte orderのLength、
+1 octetのMessage-Lengthを検査します。PAP Lengthより後ろのPPP paddingは無視
+しますが、Length内のMessageより後ろに余分なdataがあれば不正packetとして
+状態を変えません。最新RequestとIdentifierが一致するAckだけが`Opened`、
+Nakだけが`Failed`を成立させます。Message本文と資格情報は公開診断blockや
+通常traceへ保存しません。
+
+`src/ppp/lcpPoll.asm`はLCPが`Opened`の間だけ非LCP frameを保持し、続く
+`src/ppp/papPoll.asm`がPAPへ振り分けます。LCP再交渉やlower-down中にLCPが
+保持しているframeをPAP側が解放することはありません。現時点でPAP以外の
+非LCP protocolは、IPCP未実装のため明示的に解放します。常設セルフテストの
+step `$6A`～`$6F`は、Authenticate-Request構築、共有encoderへの受理、
+不一致Identifierの無視と状態維持、正常Ack、timer停止、lower-downを閉じた
+fixtureで検査します。
+
 ## 次の実装
 
 オフラインで確定できるLCP処理と、実対向での`Opened`到達まで完了しました。
-raw `NO CARRIER`による自動lower-downも実対向で合格しました。次はPAP
-Authenticate-Requestの送信と認証結果処理へ進みます。
+raw `NO CARRIER`による自動lower-downも実対向で合格しました。PAP clientは
+Rust参照実装と65816常設セルフテストまで実装済みです。次はrevision A実機と
+WSL2 `pppd`でPAP認証成功を確認し、その結果を固定した後にIPCPへ進みます。

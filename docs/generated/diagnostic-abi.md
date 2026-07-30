@@ -44,7 +44,7 @@ ABI version: `2`. Block size: `128` bytes.
 
 ## PPP Diagnostic ABI
 
-ABI version: `4`. Block size: `112` bytes.
+ABI version: `5`. Block size: `134` bytes.
 
 | Offset | Size | Type | Field | Meaning |
 |---:|---:|---|---|---|
@@ -97,6 +97,20 @@ ABI version: `4`. Block size: `112` bytes.
 | `0x64` | 4 | `u32` | `lcp_peer_magic` | Accepted peer Magic-Number |
 | `0x68` | 4 | `u32` | `carrier_loss_count` | Raw NDM24 NO CARRIER result lines detected while PPP owned RX |
 | `0x6C` | 4 | `u32` | `carrier_tail_byte_count` | Bytes discarded from the current RX burst after NO CARRIER |
+| `0x70` | 1 | `u8` | `pap_state` | Current PAP client state |
+| `0x71` | 1 | `u8` | `pap_last_code` | Code of the most recently parsed PAP packet |
+| `0x72` | 1 | `u8` | `pap_last_identifier` | Identifier of the most recently parsed PAP packet |
+| `0x73` | 1 | `u8` | `pap_last_error` | Most recent PAP parser or state error |
+| `0x74` | 1 | `u8` | `pap_request_identifier` | Identifier of the outstanding PAP Authenticate-Request |
+| `0x75` | 1 | `u8` | `pap_next_identifier` | Identifier reserved for the next PAP Authenticate-Request |
+| `0x76` | 1 | `u8` | `pap_restart_remaining` | Remaining PAP Authenticate-Request transmissions |
+| `0x77` | 1 | `u8` | `pap_pending_action` | PAP transmit action waiting for the shared PPP encoder |
+| `0x78` | 1 | `u8` | `pap_timer_active` | Non-zero while the PAP restart timer is armed |
+| `0x79` | 1 | `u8` | `pap_failure` | Reason for the most recent PAP failure |
+| `0x7A` | 2 | `u16` | `pap_packet_length` | Length field of the most recently parsed PAP packet |
+| `0x7C` | 2 | `u16` | `pap_restart_deadline` | Low 16-bit VBlank frame deadline for PAP restart |
+| `0x7E` | 4 | `u32` | `pap_receive_count` | PAP packets presented to the packet parser |
+| `0x82` | 4 | `u32` | `pap_transmit_count` | PAP Authenticate-Requests accepted by the shared encoder |
 
 ## Mailbox ABI
 

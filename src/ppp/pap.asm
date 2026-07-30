@@ -1,0 +1,576 @@
+.include "../macro/utility.asm"
+.include "constants.inc"
+
+.code
+
+.import frameCounter
+.import pppSnapshotBegin, pppSnapshotEnd
+.import pppLastProtocol, pppLastFrameLength, pppFrameBuffer
+.import pppTransmitActive, pppTransmitBuffer, pppTransmitBegin
+.import pppTransmitInitialize
+.import pppLcpInitialize, pppLcpPeerFlags
+.import pppPapState, pppPapLastCode, pppPapLastIdentifier, pppPapLastError
+.import pppPapRequestIdentifier, pppPapNextIdentifier
+.import pppPapRestartRemaining, pppPapPendingAction
+.import pppPapTimerActive, pppPapFailure, pppPapPacketLength
+.import pppPapRestartDeadline, pppPapReceiveCount, pppPapTransmitCount
+
+.export pppPapInitialize, pppPapLowerUp, pppPapLowerDown
+.export pppPapBuildPending, pppPapReceiveFrame, pppPapPollTimeout
+.export pppPapRunSelfTest
+
+.proc pppPapInitialize
+  .a8
+  .i16
+
+  phb
+  setDBR $7e
+  stz pppPapState
+  stz pppPapLastCode
+  stz pppPapLastIdentifier
+  stz pppPapLastError
+  stz pppPapRequestIdentifier
+  lda #$01
+  sta pppPapNextIdentifier
+  stz pppPapRestartRemaining
+  stz pppPapPendingAction
+  stz pppPapTimerActive
+  stz pppPapFailure
+  rep #$20
+  .a16
+  stz pppPapPacketLength
+  stz pppPapRestartDeadline
+  stz pppPapReceiveCount
+  stz pppPapReceiveCount + 2
+  stz pppPapTransmitCount
+  stz pppPapTransmitCount + 2
+  sep #$20
+  .a8
+  plb
+  rts
+.endproc
+
+; Enter the authentication phase once LCP reaches Opened.
+.proc pppPapLowerUp
+  .a8
+  .i16
+
+  phb
+  setDBR $7e
+  lda pppPapState
+  bne @done
+  jsr pppSnapshotBegin
+  stz pppPapFailure
+  stz pppPapTimerActive
+  lda #PPP_PAP_DEFAULT_MAX_AUTHENTICATE
+  sta pppPapRestartRemaining
+  lda pppLcpPeerFlags
+  and #PPP_LCP_PEER_FLAG_PAP
+  beq @notRequired
+  lda #PPP_PAP_STATE_REQUEST_PENDING
+  sta pppPapState
+  lda #PPP_PAP_ACTION_AUTHENTICATE_REQUEST
+  sta pppPapPendingAction
+  bra @publish
+@notRequired:
+  lda #PPP_PAP_STATE_OPENED
+  sta pppPapState
+  stz pppPapPendingAction
+@publish:
+  jsr pppSnapshotEnd
+@done:
+  plb
+  rts
+.endproc
+
+.proc pppPapLowerDown
+  .a8
+  .i16
+
+  phb
+  setDBR $7e
+  jsr pppSnapshotBegin
+  stz pppPapState
+  stz pppPapRequestIdentifier
+  stz pppPapRestartRemaining
+  stz pppPapPendingAction
+  stz pppPapTimerActive
+  stz pppPapFailure
+  rep #$20
+  .a16
+  stz pppPapPacketLength
+  stz pppPapRestartDeadline
+  sep #$20
+  .a8
+  jsr pppSnapshotEnd
+  plb
+  rts
+.endproc
+
+; Build the fixed closed-test credential fixture and transfer it to the shared
+; asynchronous encoder. Credentials are deliberately never copied into the
+; public diagnostic block.
+;
+; Carry clear means accepted. Carry set means the shared encoder is busy.
+.proc pppPapBuildPending
+  .a8
+  .i16
+
+  phb
+  setDBR $7e
+  lda pppPapPendingAction
+  cmp #PPP_PAP_ACTION_AUTHENTICATE_REQUEST
+  beq @build
+  plb
+  clc
+  rts
+
+@build:
+  ; Do not overwrite the unescaped source of an active LCP or PAP frame.
+  lda pppTransmitActive
+  beq :+
+  plb
+  sec
+  rts
+:
+  lda #$ff
+  sta pppTransmitBuffer + 0
+  lda #$03
+  sta pppTransmitBuffer + 1
+  lda #$c0
+  sta pppTransmitBuffer + 2
+  lda #$23
+  sta pppTransmitBuffer + 3
+  lda #PPP_PAP_CODE_AUTHENTICATE_REQUEST
+  sta pppTransmitBuffer + 4
+  lda pppPapNextIdentifier
+  sta pppTransmitBuffer + 5
+  stz pppTransmitBuffer + 6
+  lda #PPP_PAP_PACKET_LENGTH
+  sta pppTransmitBuffer + 7
+  lda #PPP_PAP_PEER_ID_LENGTH
+  sta pppTransmitBuffer + 8
+  lda #'n'
+  sta pppTransmitBuffer + 9
+  lda #'d'
+  sta pppTransmitBuffer + 10
+  lda #'m'
+  sta pppTransmitBuffer + 11
+  lda #'2'
+  sta pppTransmitBuffer + 12
+  lda #'4'
+  sta pppTransmitBuffer + 13
+  lda #PPP_PAP_PASSWORD_LENGTH
+  sta pppTransmitBuffer + 14
+  lda #'n'
+  sta pppTransmitBuffer + 15
+  lda #'d'
+  sta pppTransmitBuffer + 16
+  lda #'m'
+  sta pppTransmitBuffer + 17
+  lda #'2'
+  sta pppTransmitBuffer + 18
+  lda #'4'
+  sta pppTransmitBuffer + 19
+  lda #'-'
+  sta pppTransmitBuffer + 20
+  lda #'t'
+  sta pppTransmitBuffer + 21
+  lda #'e'
+  sta pppTransmitBuffer + 22
+  lda #'s'
+  sta pppTransmitBuffer + 23
+  lda #'t'
+  sta pppTransmitBuffer + 24
+
+  rep #$20
+  .a16
+  lda #PPP_PAP_TRANSMIT_FRAME_LENGTH
+  jsr pppTransmitBegin
+  sep #$20
+  .a8
+  bcs busyReturn
+
+  jsr pppSnapshotBegin
+  lda pppPapNextIdentifier
+  sta pppPapRequestIdentifier
+  inc pppPapNextIdentifier
+  dec pppPapRestartRemaining
+  stz pppPapPendingAction
+  lda #PPP_PAP_STATE_WAITING_FOR_REPLY
+  sta pppPapState
+  pppIncrement32 pppPapTransmitCount
+  rep #$20
+  .a16
+  lda frameCounter
+  clc
+  adc #PPP_PAP_RESTART_INTERVAL_FRAMES
+  sta pppPapRestartDeadline
+  sep #$20
+  .a8
+  lda #$01
+  sta pppPapTimerActive
+  jsr pppSnapshotEnd
+  plb
+  clc
+  rts
+
+busyReturn:
+  plb
+  sec
+  rts
+.endproc
+
+.macro pppPapReturnError error
+  lda #error
+  sta pppPapLastError
+  jsr pppSnapshotEnd
+  plb
+  sec
+  rts
+.endmacro
+
+; Parse and apply Authenticate-Ack/Nak from the retained PPP frame.
+.proc pppPapReceiveFrame
+  .a8
+  .i16
+
+  phb
+  setDBR $7e
+  jsr pppSnapshotBegin
+  pppIncrement32 pppPapReceiveCount
+  stz pppPapLastCode
+  stz pppPapLastIdentifier
+  rep #$20
+  .a16
+  stz pppPapPacketLength
+  lda pppLastProtocol
+  cmp #PPP_PROTOCOL_PAP
+  beq @checkHeader
+  sep #$20
+  .a8
+  pppPapReturnError PPP_PAP_ERROR_WRONG_PROTOCOL
+
+@checkHeader:
+  .a16
+  lda pppLastFrameLength
+  cmp #PPP_PAP_MINIMUM_FRAME_LENGTH
+  bcs @readHeader
+  sep #$20
+  .a8
+  pppPapReturnError PPP_PAP_ERROR_TRUNCATED_HEADER
+
+@readHeader:
+  sep #$20
+  .a8
+  lda pppFrameBuffer + PPP_PAP_FRAME_OFFSET
+  sta pppPapLastCode
+  lda pppFrameBuffer + PPP_PAP_FRAME_OFFSET + 1
+  sta pppPapLastIdentifier
+  lda pppFrameBuffer + PPP_PAP_FRAME_OFFSET + 3
+  sta pppPapPacketLength
+  lda pppFrameBuffer + PPP_PAP_FRAME_OFFSET + 2
+  sta pppPapPacketLength + 1
+  rep #$20
+  .a16
+  lda pppPapPacketLength
+  cmp #PPP_PAP_HEADER_LENGTH
+  bcs @checkAvailable
+  sep #$20
+  .a8
+  pppPapReturnError PPP_PAP_ERROR_INVALID_PACKET_LENGTH
+
+@checkAvailable:
+  .a16
+  clc
+  adc #PPP_PAP_FRAME_OFFSET
+  cmp pppLastFrameLength
+  bcc @checkState
+  beq @checkState
+  sep #$20
+  .a8
+  pppPapReturnError PPP_PAP_ERROR_TRUNCATED_PACKET
+
+@checkState:
+  sep #$20
+  .a8
+  lda pppPapState
+  cmp #PPP_PAP_STATE_WAITING_FOR_REPLY
+  beq @checkCode
+  pppPapReturnError PPP_PAP_ERROR_UNSUPPORTED_CODE
+
+@checkCode:
+  lda pppPapLastCode
+  cmp #PPP_PAP_CODE_AUTHENTICATE_ACK
+  beq @checkIdentifier
+  cmp #PPP_PAP_CODE_AUTHENTICATE_NAK
+  beq @checkIdentifier
+  pppPapReturnError PPP_PAP_ERROR_UNSUPPORTED_CODE
+
+@checkIdentifier:
+  lda pppPapLastIdentifier
+  cmp pppPapRequestIdentifier
+  beq @checkMessage
+  pppPapReturnError PPP_PAP_ERROR_IDENTIFIER_MISMATCH
+
+@checkMessage:
+  rep #$20
+  .a16
+  lda pppPapPacketLength
+  cmp #PPP_PAP_HEADER_LENGTH + 1
+  bcs @messagePresent
+  sep #$20
+  .a8
+  pppPapReturnError PPP_PAP_ERROR_MESSAGE_LENGTH_MISSING
+
+@messagePresent:
+  sep #$20
+  .a8
+  lda pppFrameBuffer + PPP_PAP_FRAME_OFFSET + PPP_PAP_HEADER_LENGTH
+  rep #$20
+  .a16
+  and #$00ff
+  clc
+  adc #PPP_PAP_HEADER_LENGTH + 1
+  cmp pppPapPacketLength
+  beq @accepted
+  bcc @trailing
+  sep #$20
+  .a8
+  pppPapReturnError PPP_PAP_ERROR_MESSAGE_TRUNCATED
+
+@trailing:
+  sep #$20
+  .a8
+  pppPapReturnError PPP_PAP_ERROR_TRAILING_DATA
+
+@accepted:
+  sep #$20
+  .a8
+  stz pppPapLastError
+  stz pppPapTimerActive
+  lda pppPapLastCode
+  cmp #PPP_PAP_CODE_AUTHENTICATE_ACK
+  beq @ack
+  lda #PPP_PAP_STATE_FAILED
+  sta pppPapState
+  lda #PPP_PAP_FAILURE_REJECTED
+  sta pppPapFailure
+  bra @success
+@ack:
+  lda #PPP_PAP_STATE_OPENED
+  sta pppPapState
+  stz pppPapFailure
+@success:
+  jsr pppSnapshotEnd
+  plb
+  clc
+  rts
+
+.endproc
+
+.proc pppPapPollTimeout
+  .a8
+  .i16
+
+  phb
+  setDBR $7e
+  lda pppPapTimerActive
+  bne @checkDeadline
+  plb
+  clc
+  rts
+
+@checkDeadline:
+  rep #$20
+  .a16
+  lda frameCounter
+  sec
+  sbc pppPapRestartDeadline
+  bmi @unchanged
+  sep #$20
+  .a8
+  jsr pppSnapshotBegin
+  stz pppPapTimerActive
+  lda pppPapState
+  cmp #PPP_PAP_STATE_WAITING_FOR_REPLY
+  bne @publish
+  lda pppPapRestartRemaining
+  beq @failed
+  lda #PPP_PAP_STATE_REQUEST_PENDING
+  sta pppPapState
+  lda #PPP_PAP_ACTION_AUTHENTICATE_REQUEST
+  sta pppPapPendingAction
+  bra @publish
+@failed:
+  lda #PPP_PAP_STATE_FAILED
+  sta pppPapState
+  lda #PPP_PAP_FAILURE_RETRY_LIMIT
+  sta pppPapFailure
+@publish:
+  jsr pppSnapshotEnd
+  plb
+  sec
+  rts
+
+@unchanged:
+  sep #$20
+  .a8
+  plb
+  clc
+  rts
+.endproc
+
+.macro pppPapRequireEqual failure
+  beq :+
+  jmp failure
+:
+.endmacro
+
+; Deterministic fixture for request construction, Identifier matching, Ack,
+; and lower-down. It does not access the NDM24 controller port.
+;
+; Output:
+;   Carry clear, A=$00: passed
+;   Carry set, A=$6A-$6D: failed step
+.proc pppPapRunSelfTest
+  .a8
+  .i16
+
+  jsr pppTransmitInitialize
+  jsr pppPapInitialize
+  lda #PPP_LCP_PEER_FLAG_PAP
+  sta pppLcpPeerFlags
+  jsr pppPapLowerUp
+  lda pppPapState
+  cmp #PPP_PAP_STATE_REQUEST_PENDING
+  pppPapRequireEqual @fail6a
+  jsr pppPapBuildPending
+  bcc :+
+  jmp @fail6a
+:
+  lda pppPapState
+  cmp #PPP_PAP_STATE_WAITING_FOR_REPLY
+  pppPapRequireEqual @fail6a
+  lda pppPapRequestIdentifier
+  cmp #$01
+  pppPapRequireEqual @fail6a
+  lda pppPapNextIdentifier
+  cmp #$02
+  pppPapRequireEqual @fail6a
+  lda pppPapRestartRemaining
+  cmp #(PPP_PAP_DEFAULT_MAX_AUTHENTICATE - 1)
+  pppPapRequireEqual @fail6a
+
+  lda pppTransmitBuffer + 0
+  cmp #$ff
+  pppPapRequireEqual @fail6b
+  lda pppTransmitBuffer + 2
+  cmp #$c0
+  pppPapRequireEqual @fail6b
+  lda pppTransmitBuffer + 3
+  cmp #$23
+  pppPapRequireEqual @fail6b
+  lda pppTransmitBuffer + 4
+  cmp #PPP_PAP_CODE_AUTHENTICATE_REQUEST
+  pppPapRequireEqual @fail6b
+  lda pppTransmitBuffer + 5
+  cmp #$01
+  pppPapRequireEqual @fail6b
+  lda pppTransmitBuffer + 8
+  cmp #PPP_PAP_PEER_ID_LENGTH
+  pppPapRequireEqual @fail6b
+  lda pppTransmitBuffer + 14
+  cmp #PPP_PAP_PASSWORD_LENGTH
+  pppPapRequireEqual @fail6b
+
+  ; A wrong Identifier is ignored without stopping the timer.
+  lda #PPP_PAP_CODE_AUTHENTICATE_ACK
+  ldx #$0002
+  jsr @writeReply
+  jsr pppPapReceiveFrame
+  bcs :+
+  jmp @fail6c
+:
+  lda pppPapLastError
+  cmp #PPP_PAP_ERROR_IDENTIFIER_MISMATCH
+  pppPapRequireEqual @fail6c
+  lda pppPapState
+  cmp #PPP_PAP_STATE_WAITING_FOR_REPLY
+  pppPapRequireEqual @fail6e
+  lda pppPapTimerActive
+  bne :+
+  jmp @fail6f
+:
+  ; The matching Ack opens PAP and stops its timer.
+  lda #PPP_PAP_CODE_AUTHENTICATE_ACK
+  ldx #$0001
+  jsr @writeReply
+  jsr pppPapReceiveFrame
+  bcc :+
+  jmp @fail6d
+:
+  lda pppPapState
+  cmp #PPP_PAP_STATE_OPENED
+  pppPapRequireEqual @fail6d
+  lda pppPapTimerActive
+  ora pppPapFailure
+  pppPapRequireEqual @fail6d
+
+  jsr pppPapLowerDown
+  lda pppPapState
+  pppPapRequireEqual @fail6d
+  lda #$00
+  bra @cleanup
+
+@fail6a:
+  lda #$6a
+  bra @cleanup
+@fail6b:
+  lda #$6b
+  bra @cleanup
+@fail6c:
+  lda #$6c
+  bra @cleanup
+@fail6d:
+  lda #$6d
+  bra @cleanup
+@fail6e:
+  lda #$6e
+  bra @cleanup
+@fail6f:
+  lda #$6f
+
+@cleanup:
+  pha
+  jsr pppTransmitInitialize
+  jsr pppLcpInitialize
+  jsr pppPapInitialize
+  pla
+  cmp #$00
+  beq @passed
+  sec
+  rts
+@passed:
+  clc
+  rts
+
+; Input A=Code, X low byte=Identifier. Empty message.
+@writeReply:
+  sta pppFrameBuffer + 4
+  txa
+  sta pppFrameBuffer + 5
+  stz pppFrameBuffer + 6
+  lda #PPP_PAP_HEADER_LENGTH + 1
+  sta pppFrameBuffer + 7
+  stz pppFrameBuffer + 8
+  rep #$20
+  .a16
+  lda #PPP_PROTOCOL_PAP
+  sta pppLastProtocol
+  lda #PPP_PAP_MINIMUM_FRAME_LENGTH + 1
+  sta pppLastFrameLength
+  sep #$20
+  .a8
+  rts
+.endproc

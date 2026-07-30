@@ -57,6 +57,9 @@
   beq @receiveLcp
   sep #$20
   .a8
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_OPENED
+  beq @timer
   jsr pppReleaseFrame
   bra @timer
 

@@ -200,6 +200,20 @@ pub struct PppDiagnosticSnapshot {
     pub lcp_peer_magic: u32,
     pub carrier_loss_count: u32,
     pub carrier_tail_byte_count: u32,
+    pub pap_state: u8,
+    pub pap_last_code: u8,
+    pub pap_last_identifier: u8,
+    pub pap_last_error: u8,
+    pub pap_request_identifier: u8,
+    pub pap_next_identifier: u8,
+    pub pap_restart_remaining: u8,
+    pub pap_pending_action: u8,
+    pub pap_timer_active: bool,
+    pub pap_failure: u8,
+    pub pap_packet_length: u16,
+    pub pap_restart_deadline: u16,
+    pub pap_receive_count: u32,
+    pub pap_transmit_count: u32,
 }
 
 impl PppDiagnosticSnapshot {
@@ -279,6 +293,20 @@ impl PppDiagnosticSnapshot {
             lcp_peer_magic: read_u32(data, PPP_DIAG_LCP_PEER_MAGIC)?,
             carrier_loss_count: read_u32(data, PPP_DIAG_CARRIER_LOSS_COUNT)?,
             carrier_tail_byte_count: read_u32(data, PPP_DIAG_CARRIER_TAIL_BYTE_COUNT)?,
+            pap_state: data[PPP_DIAG_PAP_STATE],
+            pap_last_code: data[PPP_DIAG_PAP_LAST_CODE],
+            pap_last_identifier: data[PPP_DIAG_PAP_LAST_IDENTIFIER],
+            pap_last_error: data[PPP_DIAG_PAP_LAST_ERROR],
+            pap_request_identifier: data[PPP_DIAG_PAP_REQUEST_IDENTIFIER],
+            pap_next_identifier: data[PPP_DIAG_PAP_NEXT_IDENTIFIER],
+            pap_restart_remaining: data[PPP_DIAG_PAP_RESTART_REMAINING],
+            pap_pending_action: data[PPP_DIAG_PAP_PENDING_ACTION],
+            pap_timer_active: data[PPP_DIAG_PAP_TIMER_ACTIVE] != 0,
+            pap_failure: data[PPP_DIAG_PAP_FAILURE],
+            pap_packet_length: read_u16(data, PPP_DIAG_PAP_PACKET_LENGTH)?,
+            pap_restart_deadline: read_u16(data, PPP_DIAG_PAP_RESTART_DEADLINE)?,
+            pap_receive_count: read_u32(data, PPP_DIAG_PAP_RECEIVE_COUNT)?,
+            pap_transmit_count: read_u32(data, PPP_DIAG_PAP_TRANSMIT_COUNT)?,
         })
     }
 }
@@ -482,6 +510,18 @@ mod tests {
             .copy_from_slice(&3_u32.to_le_bytes());
         data[PPP_DIAG_CARRIER_TAIL_BYTE_COUNT..PPP_DIAG_CARRIER_TAIL_BYTE_COUNT + 4]
             .copy_from_slice(&12_u32.to_le_bytes());
+        data[PPP_DIAG_PAP_STATE] = 2;
+        data[PPP_DIAG_PAP_LAST_CODE] = 2;
+        data[PPP_DIAG_PAP_LAST_IDENTIFIER] = 9;
+        data[PPP_DIAG_PAP_REQUEST_IDENTIFIER] = 9;
+        data[PPP_DIAG_PAP_RESTART_REMAINING] = 8;
+        data[PPP_DIAG_PAP_TIMER_ACTIVE] = 1;
+        data[PPP_DIAG_PAP_PACKET_LENGTH..PPP_DIAG_PAP_PACKET_LENGTH + 2]
+            .copy_from_slice(&5_u16.to_le_bytes());
+        data[PPP_DIAG_PAP_RECEIVE_COUNT..PPP_DIAG_PAP_RECEIVE_COUNT + 4]
+            .copy_from_slice(&2_u32.to_le_bytes());
+        data[PPP_DIAG_PAP_TRANSMIT_COUNT..PPP_DIAG_PAP_TRANSMIT_COUNT + 4]
+            .copy_from_slice(&1_u32.to_le_bytes());
 
         let snapshot = PppDiagnosticSnapshot::decode(&data).unwrap();
         assert_eq!(snapshot.snapshot_sequence, 8);
@@ -503,6 +543,15 @@ mod tests {
         assert_eq!(snapshot.lcp_peer_magic, 0x1234_5678);
         assert_eq!(snapshot.carrier_loss_count, 3);
         assert_eq!(snapshot.carrier_tail_byte_count, 12);
+        assert_eq!(snapshot.pap_state, 2);
+        assert_eq!(snapshot.pap_last_code, 2);
+        assert_eq!(snapshot.pap_last_identifier, 9);
+        assert_eq!(snapshot.pap_request_identifier, 9);
+        assert_eq!(snapshot.pap_restart_remaining, 8);
+        assert!(snapshot.pap_timer_active);
+        assert_eq!(snapshot.pap_packet_length, 5);
+        assert_eq!(snapshot.pap_receive_count, 2);
+        assert_eq!(snapshot.pap_transmit_count, 1);
     }
 
     #[test]

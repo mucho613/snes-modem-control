@@ -289,8 +289,8 @@ description = "Frame at which the current generic AT transaction started"
 
 [ppp_diagnostic]
 magic = [0x50, 0x50, 0x50, 0x31]
-version = 4
-size = 112
+version = 5
+size = 134
 
 [[ppp_diagnostic.fields]]
 name = "magic"
@@ -634,6 +634,104 @@ offset = 108
 size = 4
 type = "u32"
 description = "Bytes discarded from the current RX burst after NO CARRIER"
+
+[[ppp_diagnostic.fields]]
+name = "pap_state"
+offset = 112
+size = 1
+type = "u8"
+description = "Current PAP client state"
+
+[[ppp_diagnostic.fields]]
+name = "pap_last_code"
+offset = 113
+size = 1
+type = "u8"
+description = "Code of the most recently parsed PAP packet"
+
+[[ppp_diagnostic.fields]]
+name = "pap_last_identifier"
+offset = 114
+size = 1
+type = "u8"
+description = "Identifier of the most recently parsed PAP packet"
+
+[[ppp_diagnostic.fields]]
+name = "pap_last_error"
+offset = 115
+size = 1
+type = "u8"
+description = "Most recent PAP parser or state error"
+
+[[ppp_diagnostic.fields]]
+name = "pap_request_identifier"
+offset = 116
+size = 1
+type = "u8"
+description = "Identifier of the outstanding PAP Authenticate-Request"
+
+[[ppp_diagnostic.fields]]
+name = "pap_next_identifier"
+offset = 117
+size = 1
+type = "u8"
+description = "Identifier reserved for the next PAP Authenticate-Request"
+
+[[ppp_diagnostic.fields]]
+name = "pap_restart_remaining"
+offset = 118
+size = 1
+type = "u8"
+description = "Remaining PAP Authenticate-Request transmissions"
+
+[[ppp_diagnostic.fields]]
+name = "pap_pending_action"
+offset = 119
+size = 1
+type = "u8"
+description = "PAP transmit action waiting for the shared PPP encoder"
+
+[[ppp_diagnostic.fields]]
+name = "pap_timer_active"
+offset = 120
+size = 1
+type = "u8"
+description = "Non-zero while the PAP restart timer is armed"
+
+[[ppp_diagnostic.fields]]
+name = "pap_failure"
+offset = 121
+size = 1
+type = "u8"
+description = "Reason for the most recent PAP failure"
+
+[[ppp_diagnostic.fields]]
+name = "pap_packet_length"
+offset = 122
+size = 2
+type = "u16"
+description = "Length field of the most recently parsed PAP packet"
+
+[[ppp_diagnostic.fields]]
+name = "pap_restart_deadline"
+offset = 124
+size = 2
+type = "u16"
+description = "Low 16-bit VBlank frame deadline for PAP restart"
+
+[[ppp_diagnostic.fields]]
+name = "pap_receive_count"
+offset = 126
+size = 4
+type = "u32"
+description = "PAP packets presented to the packet parser"
+
+[[ppp_diagnostic.fields]]
+name = "pap_transmit_count"
+offset = 130
+size = 4
+type = "u32"
+description = "PAP Authenticate-Requests accepted by the shared encoder"
 
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]
