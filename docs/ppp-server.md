@@ -470,6 +470,29 @@ server停止までにEcho Request/Reply countは`9/9`、最後のIdentifierは8�
 dropは0のままでした。その後のTerminate-Request/Ackも各1回成立し、DFM-56Uは
 WindowsのCOM5へ正常に戻りました。
 
+## 2026-07-31 revision A local LCP終了結果
+
+mailbox ABI version 8、PPP診断ABI version 19のsmoke ROMで再接続し、
+`ppp-dial`が発信前にlocal Openを再設定する経路を確認しました。LCP、PAP、
+IPCPはすべて`Opened`となり、切断前のEcho Request/Replyは`5/5`、drop 0でした。
+SFC側から`ppp-close`を実行したpppd journalは次の通りです。
+
+```text
+rcvd [LCP TermReq id=0x1]
+LCP terminated by peer
+sent [LCP TermAck id=0x1]
+Connection terminated.
+Modem hangup
+```
+
+SFC診断はlocal Terminate-Request送信受理2、matching Terminate-Ack受信1、
+Max-Terminate枯渇0で`Closed`へ進みました。2回目は2400 bit/s回線でAckが
+戻る前にrestart timerが満了して共有encoderへ受理された再送で、pppdには
+到達せずlower-down時に中止されたため、TX abortは1でした。続くraw
+`NO CARRIER`は1回検出され、LCP/IPCP `Closed`、PAP `Inactive`、IP/DNS初期化を
+確認しました。FCS error、invalid、overflowは0です。試験後に統合`Stop`を実行し、
+DFM-56UはWindowsのCOM5へ戻りました。
+
 試験終了時は必ず停止します。
 
 ```powershell
