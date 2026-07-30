@@ -11,12 +11,16 @@
 .import pppLcpPendingAction, pppLcpPacketLength
 .import pppLcpTimerActive, pppLcpDeferredRequest
 .import pppLcpTerminateRequestCount, pppLcpTerminateAckCount
+.import pppLcpProtocolRejectCount, pppLcpLastRejectedProtocol
+.import pppLcpRejectIdentifier, pppLcpPeerMru
+.import pppLcpPacketEnd, pppLcpOutputCursor
 .import pppFrameBuffer, pppTransmitBuffer, pppTransmitActive
 .import pppTransmitBegin, pppTransmitInitialize
 .import pppLcpArmRestartTimer
 .import pppLastProtocol, pppLastFrameLength
 
-.export pppLcpOpen, pppLcpReceiveFrame, pppLcpBuildPending
+.export pppLcpOpen, pppLcpReceiveFrame, pppLcpRejectProtocol
+.export pppLcpBuildPending
 .export pppLcpNegotiationRunSelfTest
 
 ; Start LCP establishment with the conservative empty local option list.
@@ -298,6 +302,29 @@
   rts
 .endproc
 
+; Queue a Protocol-Reject for the retained unknown PPP frame. The caller owns
+; pppFrameBuffer until pppLcpBuildPending enters the shared transmitter.
+.proc pppLcpRejectProtocol
+  .a8
+  .i16
+
+  phb
+  setDBR $7e
+  jsr pppSnapshotBegin
+  rep #$20
+  .a16
+  lda pppLastProtocol
+  sta pppLcpLastRejectedProtocol
+  sep #$20
+  .a8
+  inc pppLcpRejectIdentifier
+  lda #PPP_LCP_ACTION_PROTOCOL_REJECT
+  sta pppLcpPendingAction
+  jsr pppSnapshotEnd
+  plb
+  rts
+.endproc
+
 ; Build the current pending LCP packet directly into the shared PPP transmit
 ; buffer and start its restartable RFC 1662 encoder.
 ;
@@ -340,6 +367,8 @@
   beq @buildSelectiveResponse
   cmp #PPP_LCP_ACTION_TERMINATE_ACK
   beq @buildTerminateAck
+  cmp #PPP_LCP_ACTION_PROTOCOL_REJECT
+  beq @buildProtocolReject
   jmp @busy
 
 @buildRequest:
@@ -354,7 +383,7 @@
   rep #$20
   .a16
   lda #PPP_LCP_MINIMUM_FRAME_LENGTH
-  bra @begin
+  jmp @begin
 
 @copyResponse:
   .a8
@@ -386,12 +415,12 @@
   lda pppLcpPacketLength
   clc
   adc #PPP_UNCOMPRESSED_HEADER_LENGTH
-  bra @begin
+  jmp @begin
 
 @buildSelectiveResponse:
   .a8
   jsr pppLcpBuildPeerResponse
-  bra @begin
+  jmp @begin
 
 @buildTerminateAck:
   .a8
@@ -405,6 +434,71 @@
   rep #$20
   .a16
   lda #PPP_LCP_MINIMUM_FRAME_LENGTH
+  jmp @begin
+
+@buildProtocolReject:
+  .a8
+  lda #PPP_LCP_CODE_PROTOCOL_REJECT
+  sta pppTransmitBuffer + 4
+  lda pppLcpRejectIdentifier
+  sta pppTransmitBuffer + 5
+
+  ; LCP Length includes its four-byte header. Limit it to the received frame,
+  ; the peer MRU, and this build's fixed 1500-byte transmit Information area.
+  rep #$20
+  .a16
+  lda pppLastFrameLength
+  clc
+  adc #$0002
+  cmp pppLcpPeerMru
+  bcc :+
+  beq :+
+  lda pppLcpPeerMru
+:
+  cmp #PPP_DEFAULT_MRU + 1
+  bcc :+
+  lda #PPP_DEFAULT_MRU
+:
+  cmp #$0006
+  bcs :+
+  lda #$0006
+:
+  sta pppLcpOutputCursor
+  xba
+  sep #$20
+  .a8
+  sta pppTransmitBuffer + 6
+  lda pppLcpOutputCursor
+  sta pppTransmitBuffer + 7
+
+  rep #$20
+  .a16
+  lda pppLcpOutputCursor
+  sec
+  sbc #PPP_LCP_HEADER_LENGTH
+  sta pppLcpPacketEnd
+  ldx #PPP_UNCOMPRESSED_HEADER_LENGTH - 2
+  ldy #PPP_UNCOMPRESSED_HEADER_LENGTH + PPP_LCP_HEADER_LENGTH
+@copyRejectedFrame:
+  .a16
+  lda pppLcpPacketEnd
+  beq @protocolRejectLength
+  sep #$20
+  .a8
+  lda pppFrameBuffer, x
+  sta pppTransmitBuffer, y
+  rep #$20
+  .a16
+  inx
+  iny
+  dec pppLcpPacketEnd
+  bra @copyRejectedFrame
+
+@protocolRejectLength:
+  .a16
+  lda pppLcpOutputCursor
+  clc
+  adc #PPP_UNCOMPRESSED_HEADER_LENGTH
 
 @begin:
   .a16
@@ -420,12 +514,24 @@
   bra :+
 @maybeTerminateAck:
   cmp #PPP_LCP_ACTION_TERMINATE_ACK
-  bne @counterDone
+  bne @maybeProtocolReject
   rep #$20
   .a16
   inc pppLcpTerminateAckCount
   bne :+
   inc pppLcpTerminateAckCount + 2
+:
+  sep #$20
+  .a8
+  bra @counterDone
+@maybeProtocolReject:
+  cmp #PPP_LCP_ACTION_PROTOCOL_REJECT
+  bne @counterDone
+  rep #$20
+  .a16
+  inc pppLcpProtocolRejectCount
+  bne :+
+  inc pppLcpProtocolRejectCount + 2
 :
   sep #$20
   .a8

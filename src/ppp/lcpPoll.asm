@@ -12,7 +12,10 @@
 .import pppLcpState, pppLcpPendingAction, pppLcpTimerActive
 .import pppLcpDeferredRequest, pppLcpPollAction
 .import pppLcpPollSavedModemState
+.import pppLcpProtocolRejectCount, pppLcpLastRejectedProtocol
+.import pppLcpRejectIdentifier
 .import pppLcpInitialize, pppLcpOpen, pppLcpReceiveFrame
+.import pppLcpRejectProtocol
 .import pppLcpBuildPending, pppLcpPollTimeout, pppLcpLowerDown
 .import pppLcpPeerTerminateComplete
 .import pppLastProtocol, pppLastFrameLength, pppFrameBuffer
@@ -34,10 +37,14 @@
   .a8
 
   lda pppReceiveEnabled
-  beq @lowerUnavailable
+  bne :+
+  jmp @lowerUnavailable
+:
   lda modemDriverState
   cmp #MODEM_STATE_CONNECTED
-  bne @lowerUnavailable
+  beq :+
+  jmp @lowerUnavailable
+:
 
   lda pppLcpState
   cmp #PPP_LCP_STATE_CLOSED
@@ -48,7 +55,9 @@
 @serviceExistingPending:
   .a8
   jsr @servicePending
-  bcs @done
+  bcc :+
+  jmp @done
+:
   lda pppFrameReady
   beq @timer
   rep #$20
@@ -56,6 +65,27 @@
   lda pppLastProtocol
   cmp #PPP_PROTOCOL_LCP
   beq @receiveLcp
+  cmp #PPP_PROTOCOL_PAP
+  beq @knownUpperProtocol
+  cmp #PPP_PROTOCOL_IPCP
+  beq @knownUpperProtocol
+  cmp #PPP_PROTOCOL_IP
+  beq @knownUpperProtocol
+  sep #$20
+  .a8
+  lda pppLcpState
+  cmp #PPP_LCP_STATE_OPENED
+  bne :+
+  jsr pppLcpRejectProtocol
+  jsr @servicePending
+  bcs @done
+  bra @timer
+:
+  jsr pppReleaseFrame
+  bra @timer
+
+@knownUpperProtocol:
+  .a16
   sep #$20
   .a8
   lda pppLcpState
@@ -158,6 +188,8 @@
   beq @responseSent
   cmp #PPP_LCP_ACTION_TERMINATE_ACK
   beq @terminateAckSent
+  cmp #PPP_LCP_ACTION_PROTOCOL_REJECT
+  beq @responseSent
   bne @serviceReady
 
 @terminateAckSent:
@@ -296,6 +328,96 @@
   ora pppLcpPendingAction
   ora pppLcpTimerActive
   pppLcpPollRequireEqual @fail63
+
+  ; An unknown PPP protocol is rejected while Opened, including its
+  ; uncompressed Protocol field and retained Information.
+  lda #$ff
+  sta pppFrameBuffer + 0
+  lda #$03
+  sta pppFrameBuffer + 1
+  lda #$80
+  sta pppFrameBuffer + 2
+  lda #$57
+  sta pppFrameBuffer + 3
+  lda #$aa
+  sta pppFrameBuffer + 4
+  lda #$bb
+  sta pppFrameBuffer + 5
+  lda #$cc
+  sta pppFrameBuffer + 6
+  rep #$20
+  .a16
+  lda #$8057
+  sta pppLastProtocol
+  lda #$0007
+  sta pppLastFrameLength
+  sep #$20
+  .a8
+  lda #$01
+  sta pppFrameReady
+  sta pppTransmitActive
+  rep #$20
+  .a16
+  jsr pppLcpPoll
+  sep #$20
+  .a8
+  lda pppFrameReady
+  pppLcpPollRequireNonzero @fail65
+  lda pppLcpPendingAction
+  cmp #PPP_LCP_ACTION_PROTOCOL_REJECT
+  pppLcpPollRequireEqual @fail65
+  jsr pppTransmitInitialize
+  rep #$20
+  .a16
+  jsr pppLcpPoll
+  sep #$20
+  .a8
+  lda pppFrameReady
+  ora pppLcpPendingAction
+  pppLcpPollRequireEqual @fail65
+  lda pppTransmitBuffer + 4
+  cmp #PPP_LCP_CODE_PROTOCOL_REJECT
+  pppLcpPollRequireEqual @fail65
+  lda pppTransmitBuffer + 5
+  cmp #$01
+  pppLcpPollRequireEqual @fail65
+  lda pppTransmitBuffer + 7
+  cmp #$09
+  pppLcpPollRequireEqual @fail65
+  lda pppTransmitBuffer + 8
+  cmp #$80
+  pppLcpPollRequireEqual @fail65
+  lda pppTransmitBuffer + 9
+  cmp #$57
+  pppLcpPollRequireEqual @fail65
+  lda pppTransmitBuffer + 10
+  cmp #$aa
+  pppLcpPollRequireEqual @fail65
+  lda pppTransmitBuffer + 12
+  cmp #$cc
+  pppLcpPollRequireEqual @fail65
+  lda pppLcpRejectIdentifier
+  cmp #$01
+  pppLcpPollRequireEqual @fail65
+  rep #$20
+  .a16
+  lda pppLcpLastRejectedProtocol
+  cmp #$8057
+  beq :+
+  sep #$20
+  .a8
+  jmp @fail65
+:
+  .a16
+  lda pppLcpProtocolRejectCount
+  cmp #$0001
+  beq :+
+  sep #$20
+  .a8
+  jmp @fail65
+:
+  sep #$20
+  .a8
 
   ; A peer request in Opened serializes its Ack before a fresh local request.
   jsr pppTransmitInitialize

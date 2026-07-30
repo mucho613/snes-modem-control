@@ -13,6 +13,8 @@
 .import pppLcpPeerMagic, pppLcpRestartDeadline, pppLcpTimerActive
 .import pppLcpDeferredRequest, pppLcpPollAction
 .import pppLcpTerminateRequestCount, pppLcpTerminateAckCount
+.import pppLcpProtocolRejectCount, pppLcpLastRejectedProtocol
+.import pppLcpRejectIdentifier
 
 .export pppLcpInitialize, pppLcpParseFrame, pppLcpRunSelfTest
 
@@ -55,8 +57,12 @@
   stz pppLcpTerminateRequestCount + 2
   stz pppLcpTerminateAckCount
   stz pppLcpTerminateAckCount + 2
+  stz pppLcpProtocolRejectCount
+  stz pppLcpProtocolRejectCount + 2
+  stz pppLcpLastRejectedProtocol
   sep #$20
   .a8
+  stz pppLcpRejectIdentifier
   plb
   rts
 .endproc

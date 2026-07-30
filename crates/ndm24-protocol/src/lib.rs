@@ -335,6 +335,9 @@ pub struct PppDiagnosticSnapshot {
     pub ipcp_secondary_dns_address: [u8; 4],
     pub lcp_terminate_request_count: u32,
     pub lcp_terminate_ack_count: u32,
+    pub lcp_protocol_reject_count: u32,
+    pub lcp_last_rejected_protocol: u16,
+    pub lcp_reject_identifier: u8,
 }
 
 impl PppDiagnosticSnapshot {
@@ -549,6 +552,12 @@ impl PppDiagnosticSnapshot {
             ipcp_secondary_dns_address: read_array(data, PPP_DIAG_IPCP_SECONDARY_DNS_ADDRESS)?,
             lcp_terminate_request_count: read_u32(data, PPP_DIAG_LCP_TERMINATE_REQUEST_COUNT)?,
             lcp_terminate_ack_count: read_u32(data, PPP_DIAG_LCP_TERMINATE_ACK_COUNT)?,
+            lcp_protocol_reject_count: read_u32(data, PPP_DIAG_LCP_PROTOCOL_REJECT_COUNT)?,
+            lcp_last_rejected_protocol: read_u16(
+                data,
+                PPP_DIAG_LCP_LAST_REJECTED_PROTOCOL,
+            )?,
+            lcp_reject_identifier: data[PPP_DIAG_LCP_REJECT_IDENTIFIER],
         })
     }
 }
@@ -967,6 +976,11 @@ mod tests {
             .copy_from_slice(&3_u32.to_le_bytes());
         data[PPP_DIAG_LCP_TERMINATE_ACK_COUNT..PPP_DIAG_LCP_TERMINATE_ACK_COUNT + 4]
             .copy_from_slice(&2_u32.to_le_bytes());
+        data[PPP_DIAG_LCP_PROTOCOL_REJECT_COUNT..PPP_DIAG_LCP_PROTOCOL_REJECT_COUNT + 4]
+            .copy_from_slice(&4_u32.to_le_bytes());
+        data[PPP_DIAG_LCP_LAST_REJECTED_PROTOCOL..PPP_DIAG_LCP_LAST_REJECTED_PROTOCOL + 2]
+            .copy_from_slice(&0x8057_u16.to_le_bytes());
+        data[PPP_DIAG_LCP_REJECT_IDENTIFIER] = 9;
 
         let snapshot = PppDiagnosticSnapshot::decode(&data).unwrap();
         assert_eq!(snapshot.snapshot_sequence, 8);
@@ -1114,6 +1128,9 @@ mod tests {
         assert_eq!(snapshot.ipcp_secondary_dns_address, [1, 0, 0, 1]);
         assert_eq!(snapshot.lcp_terminate_request_count, 3);
         assert_eq!(snapshot.lcp_terminate_ack_count, 2);
+        assert_eq!(snapshot.lcp_protocol_reject_count, 4);
+        assert_eq!(snapshot.lcp_last_rejected_protocol, 0x8057);
+        assert_eq!(snapshot.lcp_reject_identifier, 9);
     }
 
     #[test]

@@ -292,8 +292,8 @@ description = "Frame at which the current generic AT transaction started"
 
 [ppp_diagnostic]
 magic = [0x50, 0x50, 0x50, 0x31]
-version = 15
-size = 439
+version = 16
+size = 446
 
 [[ppp_diagnostic.fields]]
 name = "magic"
@@ -1582,6 +1582,27 @@ offset = 435
 size = 4
 type = "u32"
 description = "Terminate-Acks accepted by the shared PPP transmitter"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_protocol_reject_count"
+offset = 439
+size = 4
+type = "u32"
+description = "Protocol-Reject packets accepted by the shared PPP transmitter"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_last_rejected_protocol"
+offset = 443
+size = 2
+type = "u16"
+description = "Most recent unsupported PPP protocol rejected by LCP"
+
+[[ppp_diagnostic.fields]]
+name = "lcp_reject_identifier"
+offset = 445
+size = 1
+type = "u8"
+description = "Identifier used by the most recent LCP Protocol-Reject"
 
 [mailbox]
 magic = [0x4e, 0x44, 0x4d, 0x43]
