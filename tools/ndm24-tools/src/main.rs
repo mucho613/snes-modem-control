@@ -69,6 +69,8 @@ enum Command {
         speed: u32,
         #[arg(long, default_value_t = 4_096)]
         length: u32,
+        #[arg(long, default_value_t = 0)]
+        soak_seconds: u64,
         #[arg(long, default_value = "COM5")]
         port: String,
         #[arg(long, default_value = "ws://localhost:23074")]
@@ -376,13 +378,21 @@ async fn async_main() -> Result<()> {
             revision,
             speed,
             length,
+            soak_seconds,
             port,
             websocket,
             labels,
             output,
         } => {
             let report = Box::pin(speed_test::run(
-                &websocket, &labels, &port, &revision, speed, length, &output,
+                &websocket,
+                &labels,
+                &port,
+                &revision,
+                speed,
+                length,
+                soak_seconds,
+                &output,
             ))
             .await?;
             println!("speed test report saved at {}", report.display());

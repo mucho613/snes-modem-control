@@ -39,6 +39,8 @@ struct SpeedTestReport {
     hardware_revision: String,
     speed_bps: u32,
     transfer_length: u32,
+    requested_soak_seconds: u64,
+    completed_soak_seconds: u64,
     peer_port: String,
     peer_connect_line: Option<String>,
     peer_transcript: Vec<String>,
@@ -57,6 +59,7 @@ pub async fn run(
     hardware_revision: &str,
     speed: u32,
     length: u32,
+    soak_seconds: u64,
     output_root: &Path,
 ) -> Result<PathBuf> {
     ensure!(length != 0, "transfer length must be non-zero");
@@ -79,6 +82,8 @@ pub async fn run(
         hardware_revision: revision_label,
         speed_bps: speed,
         transfer_length: length,
+        requested_soak_seconds: soak_seconds,
+        completed_soak_seconds: 0,
         peer_port: port_name.to_owned(),
         peer_connect_line: None,
         peer_transcript: Vec::new(),
@@ -98,6 +103,7 @@ pub async fn run(
         peer_carrier,
         speed,
         length,
+        soak_seconds,
         &mut report,
     ))
     .await;
@@ -131,6 +137,7 @@ async fn run_connected(
     peer_carrier: &str,
     speed: u32,
     length: u32,
+    soak_seconds: u64,
     report: &mut SpeedTestReport,
 ) -> Result<()> {
     wait_for_driver_state(
@@ -215,6 +222,20 @@ async fn run_connected(
     report
         .transfers
         .push(Box::pin(receive_test(websocket, labels, peer, speed, length)).await?);
+    if soak_seconds != 0 {
+        let started = Instant::now();
+        while started.elapsed() < Duration::from_secs(soak_seconds) {
+            let snapshot = qusb2snes::read_snapshot(websocket, labels).await?;
+            ensure!(
+                snapshot.driver_state == DriverState::Connected,
+                "carrier soak lost connection after {} seconds",
+                started.elapsed().as_secs()
+            );
+            report.completed_soak_seconds = started.elapsed().as_secs();
+            tokio::time::sleep(Duration::from_secs(5)).await;
+        }
+        report.completed_soak_seconds = soak_seconds;
+    }
     Ok(())
 }
 
