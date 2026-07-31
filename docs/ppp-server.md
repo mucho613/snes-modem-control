@@ -10,8 +10,8 @@
 
 ```mermaid
 flowchart LR
-    S["SFC + NDM24"] <-->|"V.22bis 2400 bit/s"| X["疑似電話交換機"]
-    X <-->|"V.22bis 2400 bit/s"| D["DFM-56U"]
+    S["SFC + NDM24"] <-->|"2400 / 14400 bit/s"| X["疑似電話交換機"]
+    X <-->|"2400 / 14400 bit/s"| D["DFM-56U"]
     D <-->|"USB CDC ACM"| W["Ubuntu 22.04 / WSL2<br/>pppd + NTP + NAT"]
     P["Windows PowerShell"] -->|"usbipd / systemctl"| W
     W -->|"outbound IPv4"| I["Internet"]
@@ -48,6 +48,7 @@ usbipd-winを修復または更新します。
 ## ファイル
 
 - `tools/ppp-server/ndm24-answer.chat`: DFM-56U初期化、着信待ち、応答
+- `tools/ppp-server/ndm24-answer-14400.chat`: 14400 bit/s用のDFM-56U初期化
 - `tools/ppp-server/ndm24-lcp`: LCP試験用`pppd` peer profile
 - `tools/ppp-server/ndm24-ppp-server.service`: 手動起動するsystemd service
 - `tools/ppp-server/ndm24-ntp-server.py`: 閉じた試験網専用の最小NTPv4応答器
@@ -122,6 +123,21 @@ DFM-56Uは次の条件へ固定します。
 - `AT&K0`: DTE flow control無効
 - `ATM0`: speaker無効
 - `ATS0=0`: chat scriptから`ATA`を送る手動応答
+
+revision Bを14400 bit/sで接続するときは、対向とSFCの両方で速度を指定します。
+引数を省略した場合は、従来どおり2400 bit/sです。
+
+```powershell
+.\tools\ppp-server\ndm24-ppp-server.ps1 Start -Speed 14400
+cargo run -p ndm24-tools -- ppp-dial --speed 14400
+```
+
+14400 bit/s時のDFM-56Uは
+`AT+MS=V32B,0,14400,14400,14400,14400`へ固定します。2026-07-31に
+revision BでLCP、PAP、IPCPの`Opened`、SFC `10.24.0.2`、対向
+`10.24.0.1`、DNS Server Address `1.1.1.1` / `1.0.0.1`を確認しました。
+同じ接続上で`1.1.1.1`へのICMP Echoと、`example.com`のDNS問い合わせにも
+成功し、carrier loss、FCS error、invalid frame、RX overflowはいずれも0でした。
 
 `pppd`はPAPを要求し、CHAP、MS-CHAP、EAP、PFC、ACFC、VJ、CCP、
 BSD-Compress、Deflate、IPv6を無効にします。LCP `Opened`後は5秒間隔で

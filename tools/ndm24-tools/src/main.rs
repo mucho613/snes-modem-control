@@ -120,6 +120,8 @@ enum Command {
         timeout_seconds: u64,
     },
     PppDial {
+        #[arg(long, default_value_t = 2_400)]
+        speed: u32,
         #[arg(long, default_value = "ws://localhost:23074")]
         websocket: String,
         #[arg(long, default_value = "build/smoke/modem-control.lbl")]
@@ -456,6 +458,7 @@ async fn async_main() -> Result<()> {
             Ok(())
         }
         Command::PppDial {
+            speed,
             websocket,
             labels,
             setup_timeout_seconds,
@@ -464,6 +467,7 @@ async fn async_main() -> Result<()> {
             ppp_dial::run(
                 &websocket,
                 &labels,
+                speed,
                 Duration::from_secs(setup_timeout_seconds),
                 Duration::from_secs(dial_timeout_seconds),
             )

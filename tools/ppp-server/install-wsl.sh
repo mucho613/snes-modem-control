@@ -9,6 +9,7 @@ fi
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 peer_file="${script_dir}/ndm24-lcp"
 chat_file="${script_dir}/ndm24-answer.chat"
+chat_14400_file="${script_dir}/ndm24-answer-14400.chat"
 service_file="${script_dir}/ndm24-ppp-server.service"
 ntp_script="${script_dir}/ndm24-ntp-server.py"
 ntp_test_file="${script_dir}/test_ndm24_ntp_server.py"
@@ -41,6 +42,8 @@ systemctl reset-failed mgetty.service 2>/dev/null || true
 install -d -o root -g root -m 0755 /etc/ppp/peers
 install -o root -g root -m 0600 "${peer_file}" /etc/ppp/peers/ndm24-lcp
 install -o root -g root -m 0600 "${chat_file}" /etc/ppp/ndm24-answer.chat
+install -o root -g root -m 0600 \
+  "${chat_14400_file}" /etc/ppp/ndm24-answer-14400.chat
 install -o root -g root -m 0644 \
   "${service_file}" /etc/systemd/system/ndm24-ppp-server.service
 install -d -o root -g root -m 0755 /usr/local/lib/ndm24

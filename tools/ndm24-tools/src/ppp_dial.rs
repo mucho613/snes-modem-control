@@ -8,7 +8,7 @@ use ndm24_protocol::{
     MODEM_SESSION_RESULT_CONNECT, MODEM_SESSION_RESULT_OK,
 };
 
-use crate::connect_test::{NDM24_SETUP_COMMANDS, at_arguments};
+use crate::connect_test::at_arguments;
 use crate::qusb2snes;
 
 pub(crate) const SETUP_TIMEOUT_FRAMES: u16 = 300;
@@ -17,6 +17,7 @@ pub(crate) const DIAL_TIMEOUT_FRAMES: u16 = 3_900;
 pub async fn run(
     websocket: &str,
     labels: &Path,
+    speed: u32,
     setup_timeout: Duration,
     dial_timeout: Duration,
 ) -> Result<()> {
@@ -27,11 +28,11 @@ pub async fn run(
         initial.driver_state
     );
 
-    for command in NDM24_SETUP_COMMANDS {
+    for command in setup_commands(speed)? {
         transact(
             websocket,
             labels,
-            command,
+            &command,
             MODEM_SESSION_RESULT_OK,
             SETUP_TIMEOUT_FRAMES,
             setup_timeout,
@@ -89,6 +90,20 @@ pub async fn run(
     Ok(())
 }
 
+fn setup_commands(speed: u32) -> Result<[String; 5]> {
+    ensure!(
+        speed == 2_400 || speed == 14_400,
+        "PPP dial speed {speed} is not supported"
+    );
+    Ok([
+        "AT&F".to_owned(),
+        "ATM0".to_owned(),
+        format!("AT%B{speed}"),
+        "ATS7=60".to_owned(),
+        "ATX3".to_owned(),
+    ])
+}
+
 pub(crate) async fn transact(
     websocket: &str,
     labels: &Path,
@@ -128,8 +143,9 @@ mod tests {
     #[test]
     fn setup_sequence_restores_speaker_setting_after_factory_defaults() {
         assert_eq!(
-            NDM24_SETUP_COMMANDS,
-            ["AT&F", "ATM0", "AT%B2400", "ATS7=60", "ATX3"]
+            setup_commands(14_400).unwrap(),
+            ["AT&F", "ATM0", "AT%B14400", "ATS7=60", "ATX3"]
         );
+        assert!(setup_commands(9_600).is_err());
     }
 }

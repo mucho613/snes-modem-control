@@ -104,6 +104,9 @@ cargo run -p ndm24-tools -- at ATM0
 cargo run -p ndm24-tools -- mailbox ppp-receive-start
 cargo run -p ndm24-tools -- ppp-dial
 
+# revision Bを14400 bit/sで発信（対向も Start -Speed 14400 で起動する）
+cargo run -p ndm24-tools -- ppp-dial --speed 14400
+
 # LCPをローカルから終了し、Terminate-AckまたはMax-Terminate完了まで待つ
 cargo run -p ndm24-tools -- ppp-close
 

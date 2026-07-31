@@ -4,7 +4,10 @@ param(
     [ValidateSet("Install", "Probe", "Start", "Status", "Logs", "Stop")]
     [string] $Action = "Status",
 
-    [string] $Distribution = "Ubuntu-22.04"
+    [string] $Distribution = "Ubuntu-22.04",
+
+    [ValidateSet(2400, 14400)]
+    [int] $Speed = 2400
 )
 
 $ErrorActionPreference = "Stop"
@@ -95,6 +98,26 @@ function Install-PppServer {
     )
 }
 
+function Set-AnswerSpeed {
+    $sourceName = if ($Speed -eq 14400) {
+        "ndm24-answer-14400.chat"
+    } else {
+        "ndm24-answer.chat"
+    }
+    $source = Join-Path $PSScriptRoot $sourceName
+    $linuxPath = (
+        & wsl.exe -d $Distribution --exec wslpath -a $source
+    ).Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrEmpty($linuxPath)) {
+        throw "could not translate the $Speed bit/s answer profile path"
+    }
+    Invoke-NativeChecked "wsl.exe" @(
+        "-d", $Distribution, "-u", "root",
+        "--exec", "install", "-o", "root", "-g", "root", "-m", "0600",
+        $linuxPath, "/etc/ppp/ndm24-answer.chat"
+    )
+}
+
 function Show-ServiceStatus {
     $device = Get-Dfm56uDevice
     [pscustomobject]@{
@@ -137,6 +160,7 @@ switch ($Action) {
     }
     "Start" {
         Connect-Dfm56u
+        Set-AnswerSpeed
         Invoke-NativeChecked "wsl.exe" @(
             "-d", $Distribution, "-u", "root",
             "--exec", "systemctl", "restart", $serviceName
